@@ -6,11 +6,17 @@ import {
   accountNotFound,
   confirmationRequired,
   errorResponse,
+  scopeInsufficient,
   successResponse,
   toMcpError,
 } from '../errors/index.js';
 import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
-import { SCOPE_TIERS, type ScopeTier } from '../types/index.js';
+import {
+  getScopeTier,
+  hasSufficientScope,
+  SCOPE_TIERS,
+  type ScopeTier,
+} from '../types/index.js';
 
 export interface ServerOptions {
   tokenStorage: TokenStorage;
@@ -23,6 +29,26 @@ export function createServer(options: ServerOptions): McpServer {
   });
 
   const accountStore = new AccountStore(options.tokenStorage);
+
+  // Helper to validate account exists and has sufficient scope
+  function validateAccountScope(
+    accountId: string,
+    requiredTier: ScopeTier,
+  ): { error: ReturnType<typeof errorResponse> } | { account: NonNullable<ReturnType<typeof accountStore.getAccount>> } {
+    const account = accountStore.getAccount(accountId);
+    if (!account) {
+      return { error: errorResponse(accountNotFound(accountId).toResponse()) };
+    }
+
+    if (!hasSufficientScope(account.scopes, requiredTier)) {
+      const currentTier = getScopeTier(account.scopes);
+      return {
+        error: errorResponse(scopeInsufficient(requiredTier, currentTier, accountId).toResponse()),
+      };
+    }
+
+    return { account };
+  }
 
   // google_list_accounts - List all connected Google accounts
   server.registerTool(
@@ -134,6 +160,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'readonly');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const options: { maxResults?: number; pageToken?: string } = {};
@@ -167,6 +196,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'readonly');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const message = await client.getMessage(args.messageId, args.format ?? 'full');
@@ -206,6 +238,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'readonly');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const thread = await client.getThread(args.threadId, args.format ?? 'full');
@@ -256,6 +291,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'compose');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const draftInput: Parameters<typeof client.createDraft>[0] = {
@@ -312,6 +350,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'compose');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const draftInput: Parameters<typeof client.createDraft>[0] = {
@@ -353,6 +394,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'compose');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const draft = await client.getDraft(args.draftId);
@@ -408,6 +452,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'compose');
+      if ('error' in validation) return validation.error;
+
       // Safety gate: require explicit confirmation
       if (args.confirm !== true) {
         return errorResponse(
@@ -448,6 +495,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'compose');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         await client.deleteDraft(args.draftId);
@@ -489,6 +539,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'compose');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
 
@@ -570,6 +623,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const labels = await client.listLabels();
@@ -604,6 +660,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const message = await client.modifyLabels(
@@ -640,6 +699,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
 
@@ -675,6 +737,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const message = await client.modifyLabels(args.messageId, [], ['INBOX']);
@@ -706,6 +771,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const message = await client.trashMessage(args.messageId);
@@ -736,6 +804,9 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const message = await client.untrashMessage(args.messageId);
