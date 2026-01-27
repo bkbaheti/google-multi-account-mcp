@@ -48,8 +48,16 @@ Gmail Write (with confirm gate):
 ## Cold Start Protocol
 1. Read this file (CLAUDE.md)
 2. Read `docs/TASKS.md` for current state
-3. Identify current phase and next pending task
-4. Work on ONE task at a time
+3. **Announce context** - Start your first message with a brief status:
+   ```
+   **Session Context:**
+   - Phase: [current phase]
+   - Active tasks: [any in-progress tasks, or "none"]
+   - Next pending: [first pending task]
+   - Completed this phase: [count or "none yet"]
+   ```
+4. Ask user what they'd like to work on, or suggest the next pending task
+5. Work on ONE task at a time
 
 ## Task Workflow
 
