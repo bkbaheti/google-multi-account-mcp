@@ -76,6 +76,12 @@ export interface DraftInput {
   references?: string;
 }
 
+export interface SentMessage {
+  id: string;
+  threadId: string;
+  labelIds?: string[];
+}
+
 export interface SearchResult {
   messages: MessageSummary[];
   nextPageToken?: string;
@@ -198,6 +204,37 @@ export class GmailClient {
     });
 
     return this.convertDraftResponseFull(response.data);
+  }
+
+  async sendDraft(draftId: string): Promise<SentMessage> {
+    const gmail = await this.getGmail();
+
+    const response = await gmail.users.drafts.send({
+      userId: 'me',
+      requestBody: {
+        id: draftId,
+      } as gmail_v1.Schema$Draft,
+    });
+
+    const result: SentMessage = {
+      id: response.data.id ?? '',
+      threadId: response.data.threadId ?? '',
+    };
+
+    if (response.data.labelIds) {
+      result.labelIds = response.data.labelIds;
+    }
+
+    return result;
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    const gmail = await this.getGmail();
+
+    await gmail.users.drafts.delete({
+      userId: 'me',
+      id: draftId,
+    });
   }
 
   private buildDraftRequestBody(input: DraftInput): { message: { raw: string; threadId?: string } } {

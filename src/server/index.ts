@@ -549,6 +549,129 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // gmail_send_draft - Send a draft (with confirmation gate)
+  server.registerTool(
+    'gmail_send_draft',
+    {
+      description:
+        'Send a draft email. IMPORTANT: This will actually send the email. You MUST pass confirm: true to proceed. Requires compose or full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        draftId: z.string().describe('The draft ID to send'),
+        confirm: z
+          .boolean()
+          .describe(
+            'REQUIRED: Must be true to actually send. This is a safety gate to prevent accidental sends.',
+          ),
+      },
+    },
+    async (args) => {
+      // Safety gate: require explicit confirmation
+      if (args.confirm !== true) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: false,
+                  error:
+                    'Confirmation required. Set confirm: true to send this email. This safety gate prevents accidental sends.',
+                  hint: 'Review the draft using gmail_get_draft first, then call gmail_send_draft with confirm: true',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const sent = await client.sendDraft(args.draftId);
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: 'Email sent successfully',
+                  sentMessage: {
+                    id: sent.id,
+                    threadId: sent.threadId,
+                    labelIds: sent.labelIds,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // gmail_delete_draft - Delete a draft
+  server.registerTool(
+    'gmail_delete_draft',
+    {
+      description: 'Delete a draft email',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        draftId: z.string().describe('The draft ID to delete'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        await client.deleteDraft(args.draftId);
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: 'Draft deleted successfully',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
   return server;
 }
 

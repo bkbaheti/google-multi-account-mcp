@@ -12,5 +12,6 @@ export {
   type MessagePart,
   type MessageSummary,
   type SearchResult,
+  type SentMessage,
   type Thread,
 } from './client.js';

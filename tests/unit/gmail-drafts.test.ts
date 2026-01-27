@@ -266,4 +266,45 @@ describe('GmailClient drafts', () => {
     });
   });
 
+  describe('sendDraft', () => {
+    it('sends a draft and returns the sent message', async () => {
+      const mockSendResponse = {
+        data: {
+          id: 'sent-msg-123',
+          threadId: 'thread-456',
+          labelIds: ['SENT'],
+        },
+      };
+
+      mockDraftsSend.mockResolvedValue(mockSendResponse);
+
+      const result = await client.sendDraft('draft-123');
+
+      expect(result).toEqual({
+        id: 'sent-msg-123',
+        threadId: 'thread-456',
+        labelIds: ['SENT'],
+      });
+
+      expect(mockDraftsSend).toHaveBeenCalledWith({
+        userId: 'me',
+        requestBody: {
+          id: 'draft-123',
+        },
+      });
+    });
+  });
+
+  describe('deleteDraft', () => {
+    it('deletes a draft', async () => {
+      mockDraftsDelete.mockResolvedValue({});
+
+      await client.deleteDraft('draft-123');
+
+      expect(mockDraftsDelete).toHaveBeenCalledWith({
+        userId: 'me',
+        id: 'draft-123',
+      });
+    });
+  });
 });
