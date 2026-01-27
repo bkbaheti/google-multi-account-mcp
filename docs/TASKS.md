@@ -4,10 +4,10 @@
 
 ### Active
 <!-- Tasks currently being worked on -->
+- [IN PROGRESS] Implement gmail_create_draft tool
 
 ### Pending
 <!-- Ready to pick up -->
-- [ ] Implement gmail_create_draft tool
 - [ ] Implement gmail_update_draft tool
 - [ ] Implement draft preview rendering
 - [ ] Implement gmail_send_draft with confirm gate

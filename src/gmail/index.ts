@@ -4,6 +4,8 @@ export {
   getHeader,
   getHtmlBody,
   getTextBody,
+  type Draft,
+  type DraftInput,
   type Message,
   type MessageHeader,
   type MessagePart,

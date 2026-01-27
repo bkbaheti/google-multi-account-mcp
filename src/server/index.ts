@@ -333,6 +333,81 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // gmail_create_draft - Create a draft email
+  server.registerTool(
+    'gmail_create_draft',
+    {
+      description:
+        'Create a draft email. The draft can be reviewed, updated, and sent later. Requires compose or full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
+        subject: z.string().describe('Email subject'),
+        body: z.string().describe('Email body (plain text)'),
+        cc: z.string().optional().describe('CC email address(es), comma-separated for multiple'),
+        bcc: z.string().optional().describe('BCC email address(es), comma-separated for multiple'),
+        threadId: z
+          .string()
+          .optional()
+          .describe('Thread ID to reply in (for continuing a conversation)'),
+        inReplyTo: z
+          .string()
+          .optional()
+          .describe('Message-ID of the message being replied to'),
+        references: z.string().optional().describe('References header for threading'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const draftInput: Parameters<typeof client.createDraft>[0] = {
+          to: args.to,
+          subject: args.subject,
+          body: args.body,
+        };
+        if (args.cc) draftInput.cc = args.cc;
+        if (args.bcc) draftInput.bcc = args.bcc;
+        if (args.threadId) draftInput.threadId = args.threadId;
+        if (args.inReplyTo) draftInput.inReplyTo = args.inReplyTo;
+        if (args.references) draftInput.references = args.references;
+
+        const draft = await client.createDraft(draftInput);
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: 'Draft created successfully',
+                  draft: {
+                    id: draft.id,
+                    messageId: draft.message?.id,
+                    threadId: draft.message?.threadId,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
   return server;
 }
 

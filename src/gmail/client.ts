@@ -52,6 +52,25 @@ export interface Thread {
   messages?: Message[];
 }
 
+export interface Draft {
+  id: string;
+  message?: {
+    id?: string;
+    threadId?: string;
+  };
+}
+
+export interface DraftInput {
+  to: string;
+  subject: string;
+  body: string;
+  cc?: string;
+  bcc?: string;
+  threadId?: string;
+  inReplyTo?: string;
+  references?: string;
+}
+
 export interface SearchResult {
   messages: MessageSummary[];
   nextPageToken?: string;
@@ -134,6 +153,64 @@ export class GmailClient {
     });
 
     return this.convertMessage(response.data);
+  }
+
+  async createDraft(input: DraftInput): Promise<Draft> {
+    const gmail = await this.getGmail();
+
+    // Build RFC 2822 message
+    const lines: string[] = [];
+    lines.push(`To: ${input.to}`);
+    if (input.cc) {
+      lines.push(`Cc: ${input.cc}`);
+    }
+    if (input.bcc) {
+      lines.push(`Bcc: ${input.bcc}`);
+    }
+    lines.push(`Subject: ${input.subject}`);
+    if (input.inReplyTo) {
+      lines.push(`In-Reply-To: ${input.inReplyTo}`);
+    }
+    if (input.references) {
+      lines.push(`References: ${input.references}`);
+    }
+    lines.push('Content-Type: text/plain; charset=utf-8');
+    lines.push('');
+    lines.push(input.body);
+
+    const rawMessage = lines.join('\r\n');
+    const encodedMessage = Buffer.from(rawMessage, 'utf-8').toString('base64url');
+
+    const requestBody: { message: { raw: string; threadId?: string } } = {
+      message: {
+        raw: encodedMessage,
+      },
+    };
+
+    if (input.threadId) {
+      requestBody.message.threadId = input.threadId;
+    }
+
+    const response = await gmail.users.drafts.create({
+      userId: 'me',
+      requestBody,
+    });
+
+    const result: Draft = {
+      id: response.data.id ?? '',
+    };
+
+    if (response.data.message) {
+      result.message = {};
+      if (response.data.message.id) {
+        result.message.id = response.data.message.id;
+      }
+      if (response.data.message.threadId) {
+        result.message.threadId = response.data.message.threadId;
+      }
+    }
+
+    return result;
   }
 
   async getThread(
