@@ -7,27 +7,38 @@
  * - Have at least one account added via test-oauth.ts
  *
  * Usage:
- *   npx tsx scripts/test-gmail.ts search <accountId> <query>
- *   npx tsx scripts/test-gmail.ts get <accountId> <messageId>
- *   npx tsx scripts/test-gmail.ts thread <accountId> <threadId>
+ *   npx tsx scripts/test-gmail.ts search [accountId] <query>
+ *   npx tsx scripts/test-gmail.ts get [accountId] <messageId>
+ *   npx tsx scripts/test-gmail.ts thread [accountId] <threadId>
+ *
+ * If only one account exists, accountId is optional and will be auto-selected.
+ * For multiple accounts, specify account ID or 1-based index.
  */
 
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { AccountStore, createTokenStorage, GmailClient, getHeader, getTextBody } from '../src/index.js';
+import {
+  AccountStore,
+  createTokenStorage,
+  GmailClient,
+  getHeader,
+  getTextBody,
+} from '../src/index.js';
+import type { Account } from '../src/types/index.js';
+import { selectAccount } from './utils.js';
 
 const TOKENS_DIR = path.join(os.homedir(), '.config', 'mcp-google', 'tokens');
 
 async function main() {
   const command = process.argv[2];
-  const accountId = process.argv[3];
 
-  if (!command || !accountId) {
+  if (!command) {
     console.log('Usage:');
-    console.log('  npx tsx scripts/test-gmail.ts search <accountId> <query>');
-    console.log('  npx tsx scripts/test-gmail.ts get <accountId> <messageId>');
-    console.log('  npx tsx scripts/test-gmail.ts thread <accountId> <threadId>');
-    console.log('\nRun "npx tsx scripts/test-oauth.ts list" to see account IDs');
+    console.log('  npx tsx scripts/test-gmail.ts search [accountId] <query>');
+    console.log('  npx tsx scripts/test-gmail.ts get [accountId] <messageId>');
+    console.log('  npx tsx scripts/test-gmail.ts thread [accountId] <threadId>');
+    console.log('\nIf only one account exists, accountId is optional.');
+    console.log('Run "npx tsx scripts/test-oauth.ts list" to see account IDs');
     return;
   }
 
@@ -35,24 +46,54 @@ async function main() {
   const tokenStorage = await createTokenStorage(TOKENS_DIR, passphrase);
   const accountStore = new AccountStore(tokenStorage);
 
-  const account = accountStore.getAccount(accountId);
-  if (!account) {
-    console.error(`Account not found: ${accountId}`);
-    console.error('Run "npx tsx scripts/test-oauth.ts list" to see available accounts');
-    process.exit(1);
+  // Parse arguments: command [accountId] <arg>
+  // If we have only one account, arg2 is the command arg
+  // If we have multiple accounts or arg2 looks like an account ID, treat it as such
+  const arg2 = process.argv[3];
+  const arg3 = process.argv[4];
+
+  let account: Account;
+  let commandArg: string | undefined;
+
+  // Try to determine if arg2 is an account identifier or command argument
+  const accounts = accountStore.listAccounts();
+
+  if (accounts.length === 0) {
+    throw new Error('No accounts configured. Run: pnpm tsx scripts/test-oauth.ts add');
+  }
+
+  // Check if arg2 matches an account ID or is a valid index
+  const arg2IsAccountId =
+    arg2 &&
+    (accountStore.getAccount(arg2) !== null ||
+      (parseInt(arg2, 10) >= 1 && parseInt(arg2, 10) <= accounts.length));
+
+  if (arg2IsAccountId) {
+    // arg2 is account identifier, arg3 is command argument
+    account = selectAccount(accountStore, arg2);
+    commandArg = arg3;
+  } else if (accounts.length === 1) {
+    // Single account, auto-select; arg2 is command argument
+    account = selectAccount(accountStore);
+    commandArg = arg2;
+  } else {
+    // Multiple accounts and arg2 doesn't match - show account list
+    account = selectAccount(accountStore, arg2); // Will throw with helpful message
   }
 
   console.log(`Using account: ${account.email}\n`);
 
-  const client = new GmailClient(accountStore, accountId);
+  const client = new GmailClient(accountStore, account.id);
 
   switch (command) {
     case 'search': {
-      const query = process.argv[4] ?? 'is:inbox';
+      const query = commandArg ?? 'is:inbox';
       console.log(`Searching for: "${query}"\n`);
 
       const result = await client.searchMessages(query, { maxResults: 10 });
-      console.log(`Found ${result.messages.length} messages (${result.resultSizeEstimate ?? '?'} total)`);
+      console.log(
+        `Found ${result.messages.length} messages (${result.resultSizeEstimate ?? '?'} total)`,
+      );
 
       if (result.messages.length > 0) {
         console.log('\nFetching details for first few messages...\n');
@@ -77,9 +118,9 @@ async function main() {
     }
 
     case 'get': {
-      const messageId = process.argv[4];
+      const messageId = commandArg;
       if (!messageId) {
-        console.error('Usage: npx tsx scripts/test-gmail.ts get <accountId> <messageId>');
+        console.error('Usage: npx tsx scripts/test-gmail.ts get [accountId] <messageId>');
         process.exit(1);
       }
 
@@ -97,9 +138,9 @@ async function main() {
     }
 
     case 'thread': {
-      const threadId = process.argv[4];
+      const threadId = commandArg;
       if (!threadId) {
-        console.error('Usage: npx tsx scripts/test-gmail.ts thread <accountId> <threadId>');
+        console.error('Usage: npx tsx scripts/test-gmail.ts thread [accountId] <threadId>');
         process.exit(1);
       }
 
@@ -113,7 +154,7 @@ async function main() {
         console.log('From:', getHeader(msg, 'From'));
         console.log('Date:', getHeader(msg, 'Date'));
         console.log('Subject:', getHeader(msg, 'Subject'));
-        console.log('\n' + (getTextBody(msg)?.slice(0, 200) ?? '(no text body)') + '...\n');
+        console.log(`\n${getTextBody(msg)?.slice(0, 200) ?? '(no text body)'}...\n`);
       }
       break;
     }
