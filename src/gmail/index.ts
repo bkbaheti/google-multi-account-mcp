@@ -7,6 +7,7 @@ export {
   type Draft,
   type DraftInput,
   type DraftMessage,
+  type Label,
   type Message,
   type MessageHeader,
   type MessagePart,

@@ -22,6 +22,7 @@ export const SCOPE_TIERS = {
   ],
   full: [
     'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.labels',
     'https://www.googleapis.com/auth/userinfo.email',
   ],
 } as const;

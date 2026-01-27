@@ -1,6 +1,6 @@
 # Tasks
 
-## Current Phase: 4 - Modify Tools (Optional)
+## Current Phase: 5 - Attachment Support (Pending)
 
 ---
 
@@ -68,11 +68,17 @@
 
 ---
 
-## Phase 4 - Modify Tools (Optional)
-### Pending
-- [ ] Implement gmail_modify_labels tool
-- [ ] Implement gmail_mark_read_unread tool
-- [ ] Implement gmail_archive tool
+## Phase 4 - Inbox Management (COMPLETED)
+
+### Completed
+- [DONE] Add gmail.labels scope to full tier
+- [DONE] Implement gmail_list_labels tool
+- [DONE] Implement gmail_modify_labels tool
+- [DONE] Implement gmail_mark_read_unread tool
+- [DONE] Implement gmail_archive tool
+- [DONE] Implement gmail_trash tool
+- [DONE] Implement gmail_untrash tool
+- [DONE] Add unit tests for label operations
 
 ### Identified
-### Completed
+- Batch modify (multiple messages at once) deferred to future phase

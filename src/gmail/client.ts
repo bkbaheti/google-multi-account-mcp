@@ -99,6 +99,18 @@ export interface SearchResult {
   resultSizeEstimate?: number;
 }
 
+export interface Label {
+  id: string;
+  name: string;
+  type: 'system' | 'user';
+  messageListVisibility?: 'show' | 'hide';
+  labelListVisibility?: 'labelShow' | 'labelShowIfUnread' | 'labelHide';
+  color?: {
+    textColor?: string;
+    backgroundColor?: string;
+  };
+}
+
 export class GmailClient {
   private readonly accountStore: AccountStore;
   private readonly accountId: string;
@@ -369,6 +381,86 @@ export class GmailClient {
     }
 
     return result;
+  }
+
+  async listLabels(): Promise<Label[]> {
+    const gmail = await this.getGmail();
+
+    const response = await gmail.users.labels.list({
+      userId: 'me',
+    });
+
+    const labels: Label[] = (response.data.labels ?? []).map((label) => {
+      const result: Label = {
+        id: label.id ?? '',
+        name: label.name ?? '',
+        type: label.type === 'system' ? 'system' : 'user',
+      };
+
+      if (label.messageListVisibility) {
+        result.messageListVisibility = label.messageListVisibility as 'show' | 'hide';
+      }
+      if (label.labelListVisibility) {
+        result.labelListVisibility = label.labelListVisibility as
+          | 'labelShow'
+          | 'labelShowIfUnread'
+          | 'labelHide';
+      }
+      if (label.color) {
+        result.color = {};
+        if (label.color.textColor) {
+          result.color.textColor = label.color.textColor;
+        }
+        if (label.color.backgroundColor) {
+          result.color.backgroundColor = label.color.backgroundColor;
+        }
+      }
+
+      return result;
+    });
+
+    return labels;
+  }
+
+  async modifyLabels(
+    messageId: string,
+    addLabelIds: string[],
+    removeLabelIds: string[],
+  ): Promise<Message> {
+    const gmail = await this.getGmail();
+
+    const response = await gmail.users.messages.modify({
+      userId: 'me',
+      id: messageId,
+      requestBody: {
+        addLabelIds,
+        removeLabelIds,
+      },
+    });
+
+    return this.convertMessage(response.data);
+  }
+
+  async trashMessage(messageId: string): Promise<Message> {
+    const gmail = await this.getGmail();
+
+    const response = await gmail.users.messages.trash({
+      userId: 'me',
+      id: messageId,
+    });
+
+    return this.convertMessage(response.data);
+  }
+
+  async untrashMessage(messageId: string): Promise<Message> {
+    const gmail = await this.getGmail();
+
+    const response = await gmail.users.messages.untrash({
+      userId: 'me',
+      id: messageId,
+    });
+
+    return this.convertMessage(response.data);
   }
 
   private convertMessage(m: gmail_v1.Schema$Message): Message {

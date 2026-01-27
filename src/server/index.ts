@@ -805,6 +805,324 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // === Phase 4: Inbox Management Tools ===
+
+  // gmail_list_labels - List all labels (system and custom)
+  server.registerTool(
+    'gmail_list_labels',
+    {
+      description:
+        'List all Gmail labels (system labels like INBOX, SENT, etc. and custom user labels). Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const labels = await client.listLabels();
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  labels,
+                  count: labels.length,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // gmail_modify_labels - Add or remove labels from a message
+  server.registerTool(
+    'gmail_modify_labels',
+    {
+      description:
+        'Add or remove labels from a Gmail message. Use label IDs (e.g., "INBOX", "STARRED", "IMPORTANT", or custom label IDs). Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID to modify'),
+        addLabelIds: z
+          .array(z.string())
+          .optional()
+          .describe('Label IDs to add (e.g., ["STARRED", "IMPORTANT"])'),
+        removeLabelIds: z
+          .array(z.string())
+          .optional()
+          .describe('Label IDs to remove (e.g., ["UNREAD"])'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const message = await client.modifyLabels(
+          args.messageId,
+          args.addLabelIds ?? [],
+          args.removeLabelIds ?? [],
+        );
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: 'Labels modified successfully',
+                  updatedMessage: {
+                    id: message.id,
+                    threadId: message.threadId,
+                    labelIds: message.labelIds,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // gmail_mark_read_unread - Toggle read/unread status
+  server.registerTool(
+    'gmail_mark_read_unread',
+    {
+      description:
+        'Mark a Gmail message as read or unread. This is a shortcut for modifying the UNREAD label. Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID to modify'),
+        markAsRead: z.boolean().describe('true to mark as read, false to mark as unread'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+
+        const addLabelIds = args.markAsRead ? [] : ['UNREAD'];
+        const removeLabelIds = args.markAsRead ? ['UNREAD'] : [];
+
+        const message = await client.modifyLabels(args.messageId, addLabelIds, removeLabelIds);
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: args.markAsRead ? 'Message marked as read' : 'Message marked as unread',
+                  updatedMessage: {
+                    id: message.id,
+                    threadId: message.threadId,
+                    labelIds: message.labelIds,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // gmail_archive - Remove message from INBOX (archive it)
+  server.registerTool(
+    'gmail_archive',
+    {
+      description:
+        'Archive a Gmail message by removing it from INBOX. The message remains in All Mail and can still be found via search. Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID to archive'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const message = await client.modifyLabels(args.messageId, [], ['INBOX']);
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: 'Message archived (removed from INBOX)',
+                  updatedMessage: {
+                    id: message.id,
+                    threadId: message.threadId,
+                    labelIds: message.labelIds,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // gmail_trash - Move message to trash
+  server.registerTool(
+    'gmail_trash',
+    {
+      description:
+        'Move a Gmail message to Trash. The message will be permanently deleted after 30 days. Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID to trash'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const message = await client.trashMessage(args.messageId);
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: 'Message moved to Trash',
+                  updatedMessage: {
+                    id: message.id,
+                    threadId: message.threadId,
+                    labelIds: message.labelIds,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // gmail_untrash - Restore message from trash
+  server.registerTool(
+    'gmail_untrash',
+    {
+      description: 'Restore a Gmail message from Trash back to the mailbox. Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID to restore from trash'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const message = await client.untrashMessage(args.messageId);
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: 'Message restored from Trash',
+                  updatedMessage: {
+                    id: message.id,
+                    threadId: message.threadId,
+                    labelIds: message.labelIds,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
   // === MCP Prompts for Safe Email Workflows ===
 
   // Prompt: compose-email - Guided workflow for composing and sending email
