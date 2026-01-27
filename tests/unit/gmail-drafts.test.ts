@@ -152,4 +152,75 @@ describe('GmailClient drafts', () => {
       expect(rawMessage).toContain('References: <original-message-id@example.com>');
     });
   });
+
+  describe('updateDraft', () => {
+    it('updates an existing draft with new content', async () => {
+      const mockDraftResponse = {
+        data: {
+          id: 'draft-123',
+          message: {
+            id: 'msg-456',
+            threadId: 'thread-789',
+          },
+        },
+      };
+
+      mockDraftsUpdate.mockResolvedValue(mockDraftResponse);
+
+      const result = await client.updateDraft('draft-123', {
+        to: 'new-recipient@example.com',
+        subject: 'Updated Subject',
+        body: 'Updated body content',
+      });
+
+      expect(result).toEqual({
+        id: 'draft-123',
+        message: {
+          id: 'msg-456',
+          threadId: 'thread-789',
+        },
+      });
+
+      // Verify the API was called with correct parameters
+      expect(mockDraftsUpdate).toHaveBeenCalledWith({
+        userId: 'me',
+        id: 'draft-123',
+        requestBody: {
+          message: {
+            raw: expect.any(String),
+          },
+        },
+      });
+
+      // Verify the raw message contains updated headers
+      const callArgs = mockDraftsUpdate.mock.calls[0][0];
+      const rawMessage = Buffer.from(callArgs.requestBody.message.raw, 'base64url').toString(
+        'utf-8',
+      );
+      expect(rawMessage).toContain('To: new-recipient@example.com');
+      expect(rawMessage).toContain('Subject: Updated Subject');
+      expect(rawMessage).toContain('Updated body content');
+    });
+
+    it('preserves threadId when updating a draft in a thread', async () => {
+      const mockDraftResponse = {
+        data: {
+          id: 'draft-123',
+          message: { id: 'msg-456', threadId: 'thread-existing' },
+        },
+      };
+
+      mockDraftsUpdate.mockResolvedValue(mockDraftResponse);
+
+      await client.updateDraft('draft-123', {
+        to: 'recipient@example.com',
+        subject: 'Re: Original Subject',
+        body: 'Updated reply content',
+        threadId: 'thread-existing',
+      });
+
+      const callArgs = mockDraftsUpdate.mock.calls[0][0];
+      expect(callArgs.requestBody.message.threadId).toBe('thread-existing');
+    });
+  });
 });

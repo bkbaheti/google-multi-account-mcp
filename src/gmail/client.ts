@@ -157,8 +157,30 @@ export class GmailClient {
 
   async createDraft(input: DraftInput): Promise<Draft> {
     const gmail = await this.getGmail();
+    const requestBody = this.buildDraftRequestBody(input);
 
-    // Build RFC 2822 message
+    const response = await gmail.users.drafts.create({
+      userId: 'me',
+      requestBody,
+    });
+
+    return this.convertDraftResponse(response.data);
+  }
+
+  async updateDraft(draftId: string, input: DraftInput): Promise<Draft> {
+    const gmail = await this.getGmail();
+    const requestBody = this.buildDraftRequestBody(input);
+
+    const response = await gmail.users.drafts.update({
+      userId: 'me',
+      id: draftId,
+      requestBody,
+    });
+
+    return this.convertDraftResponse(response.data);
+  }
+
+  private buildDraftRequestBody(input: DraftInput): { message: { raw: string; threadId?: string } } {
     const lines: string[] = [];
     lines.push(`To: ${input.to}`);
     if (input.cc) {
@@ -191,22 +213,21 @@ export class GmailClient {
       requestBody.message.threadId = input.threadId;
     }
 
-    const response = await gmail.users.drafts.create({
-      userId: 'me',
-      requestBody,
-    });
+    return requestBody;
+  }
 
+  private convertDraftResponse(data: { id?: string | null; message?: { id?: string | null; threadId?: string | null } | null }): Draft {
     const result: Draft = {
-      id: response.data.id ?? '',
+      id: data.id ?? '',
     };
 
-    if (response.data.message) {
+    if (data.message) {
       result.message = {};
-      if (response.data.message.id) {
-        result.message.id = response.data.message.id;
+      if (data.message.id) {
+        result.message.id = data.message.id;
       }
-      if (response.data.message.threadId) {
-        result.message.threadId = response.data.message.threadId;
+      if (data.message.threadId) {
+        result.message.threadId = data.message.threadId;
       }
     }
 
