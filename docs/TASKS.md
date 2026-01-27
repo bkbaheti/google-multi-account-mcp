@@ -76,9 +76,9 @@ Address gaps identified in spec review to ensure full SPEC.md compliance.
 Lower priority features for power users.
 
 ### Completed
-- [DONE] Implement `gmail_batch_modify_labels` tool - Bulk label modification up to 1000 messages (commit: TBD)
-- [DONE] Implement label management tools - gmail_create_label, gmail_update_label, gmail_delete_label (commit: TBD)
-- [DONE] Add MCP Resources - accounts://list and cache://stats for inspection (commit: TBD)
+- [DONE] Implement `gmail_batch_modify_labels` tool - Bulk label modification up to 1000 messages (commit: 2c40d9f)
+- [DONE] Implement label management tools - gmail_create_label, gmail_update_label, gmail_delete_label (commit: 2c40d9f)
+- [DONE] Add MCP Resources - accounts://list and cache://stats for inspection (commit: 2c40d9f)
 
 ### Deferred (Requires New OAuth Scopes)
 - [ ] **Implement filter/automation tools** (`gmail_list_filters`, `gmail_create_filter`) - Requires `gmail.settings.basic` scope
