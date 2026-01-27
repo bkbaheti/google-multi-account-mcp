@@ -805,6 +805,118 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // === MCP Prompts for Safe Email Workflows ===
+
+  // Prompt: compose-email - Guided workflow for composing and sending email
+  server.registerPrompt(
+    'compose-email',
+    {
+      title: 'Compose Email',
+      description:
+        'Guided workflow for composing an email safely. Creates a draft, shows preview, and requires confirmation before sending.',
+      argsSchema: {
+        accountId: z.string().describe('The Google account ID to send from'),
+        to: z.string().describe('Recipient email address'),
+        subject: z.string().describe('Email subject'),
+        body: z.string().describe('Email body content'),
+      },
+    },
+    async (args) => {
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: `Please help me send an email with these details:
+- From account: ${args.accountId}
+- To: ${args.to}
+- Subject: ${args.subject}
+- Body: ${args.body}
+
+Follow this safe workflow:
+1. First, create a draft using gmail_create_draft
+2. Show me the draft preview using gmail_get_draft
+3. Ask for my confirmation before sending
+4. Only send with gmail_send_draft (confirm: true) after I approve`,
+            },
+          },
+        ],
+      };
+    },
+  );
+
+  // Prompt: reply-to-email - Guided workflow for replying to an email
+  server.registerPrompt(
+    'reply-to-email',
+    {
+      title: 'Reply to Email',
+      description:
+        'Guided workflow for replying to an existing email thread safely with proper threading.',
+      argsSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID to reply to'),
+        body: z.string().describe('Reply body content'),
+      },
+    },
+    async (args) => {
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: `Please help me reply to message ${args.messageId} with account ${args.accountId}.
+
+My reply: ${args.body}
+
+Follow this safe workflow:
+1. First, fetch the original message using gmail_get_message to get:
+   - threadId
+   - Message-ID header (for In-Reply-To)
+   - Subject (prefix with Re: if not already)
+   - From address (to use as To in reply)
+2. Create a reply draft using gmail_reply_in_thread with proper headers
+3. Show me the draft preview using gmail_get_draft
+4. Ask for my confirmation before sending
+5. Only send after I approve`,
+            },
+          },
+        ],
+      };
+    },
+  );
+
+  // Prompt: review-drafts - List and review pending drafts
+  server.registerPrompt(
+    'review-drafts',
+    {
+      title: 'Review Drafts',
+      description: 'List all draft emails for an account and optionally send or delete them.',
+      argsSchema: {
+        accountId: z.string().describe('The Google account ID'),
+      },
+    },
+    async (args) => {
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: `Please help me review my email drafts for account ${args.accountId}.
+
+For each draft:
+1. Show the preview (to, subject, snippet)
+2. Ask what I want to do: send, edit, or delete
+3. For sending, always require my explicit confirmation`,
+            },
+          },
+        ],
+      };
+    },
+  );
+
   return server;
 }
 

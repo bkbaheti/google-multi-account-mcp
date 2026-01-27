@@ -4,11 +4,10 @@
 
 ### Active
 <!-- Tasks currently being worked on -->
-- [IN PROGRESS] Implement gmail_reply_in_thread tool
+- [IN PROGRESS] Add MCP prompts for safe workflows
 
 ### Pending
 <!-- Ready to pick up -->
-- [ ] Add MCP prompts for safe workflows
 - [ ] Write tests for confirmation flow
 
 ### Identified
@@ -20,6 +19,7 @@
 - [DONE] Implement gmail_update_draft tool (commit: cd4099b)
 - [DONE] Implement draft preview rendering (commit: c5d2308)
 - [DONE] Implement gmail_send_draft with confirm gate (commit: ba95d15)
+- [DONE] Implement gmail_reply_in_thread tool (commit: 1ae85bb)
 
 ---
 
