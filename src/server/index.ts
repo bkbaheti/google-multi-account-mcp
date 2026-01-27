@@ -2,6 +2,13 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { TokenStorage } from '../auth/index.js';
 import { AccountStore } from '../auth/index.js';
+import {
+  accountNotFound,
+  confirmationRequired,
+  errorResponse,
+  successResponse,
+  toMcpError,
+} from '../errors/index.js';
 import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
 import { SCOPE_TIERS, type ScopeTier } from '../types/index.js';
 
@@ -34,14 +41,7 @@ export function createServer(options: ServerOptions): McpServer {
         lastUsedAt: account.lastUsedAt,
       }));
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
+      return successResponse(result);
     },
   );
 
@@ -64,37 +64,17 @@ export function createServer(options: ServerOptions): McpServer {
       try {
         const account = await accountStore.addAccount(scopeTier);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: `Successfully added account ${account.email}`,
-                  account: {
-                    id: account.id,
-                    email: account.email,
-                    scopes: account.scopes,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: `Successfully added account ${account.email}`,
+          account: {
+            id: account.id,
+            email: account.email,
+            scopes: account.scopes,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -112,25 +92,10 @@ export function createServer(options: ServerOptions): McpServer {
       const removed = await accountStore.removeAccount(args.accountId);
 
       if (removed) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: true, message: 'Account removed' }, null, 2),
-            },
-          ],
-        };
+        return successResponse({ success: true, message: 'Account removed' });
       }
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify({ success: false, error: 'Account not found' }, null, 2),
-          },
-        ],
-        isError: true,
-      };
+      return errorResponse(accountNotFound(args.accountId).toResponse());
     },
   );
 
@@ -148,29 +113,10 @@ export function createServer(options: ServerOptions): McpServer {
       const updated = accountStore.setAccountLabels(args.accountId, args.labels);
 
       if (updated) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                { success: true, message: 'Labels updated', labels: args.labels },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({ success: true, message: 'Labels updated', labels: args.labels });
       }
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify({ success: false, error: 'Account not found' }, null, 2),
-          },
-        ],
-        isError: true,
-      };
+      return errorResponse(accountNotFound(args.accountId).toResponse());
     },
   );
 
@@ -199,25 +145,9 @@ export function createServer(options: ServerOptions): McpServer {
         }
         const result = await client.searchMessages(args.query, options);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
+        return successResponse(result);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -254,25 +184,9 @@ export function createServer(options: ServerOptions): McpServer {
           body: getTextBody(message),
         };
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
+        return successResponse(response);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -310,25 +224,9 @@ export function createServer(options: ServerOptions): McpServer {
           })),
         };
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
+        return successResponse(response);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -373,37 +271,17 @@ export function createServer(options: ServerOptions): McpServer {
 
         const draft = await client.createDraft(draftInput);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Draft created successfully',
-                  draft: {
-                    id: draft.id,
-                    messageId: draft.message?.id,
-                    threadId: draft.message?.threadId,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Draft created successfully',
+          draft: {
+            id: draft.id,
+            messageId: draft.message?.id,
+            threadId: draft.message?.threadId,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -449,37 +327,17 @@ export function createServer(options: ServerOptions): McpServer {
 
         const draft = await client.updateDraft(args.draftId, draftInput);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Draft updated successfully',
-                  draft: {
-                    id: draft.id,
-                    messageId: draft.message?.id,
-                    threadId: draft.message?.threadId,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Draft updated successfully',
+          draft: {
+            id: draft.id,
+            messageId: draft.message?.id,
+            threadId: draft.message?.threadId,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -526,25 +384,9 @@ export function createServer(options: ServerOptions): McpServer {
           },
         };
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
+        return successResponse(response);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -568,61 +410,29 @@ export function createServer(options: ServerOptions): McpServer {
     async (args) => {
       // Safety gate: require explicit confirmation
       if (args.confirm !== true) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: false,
-                  error:
-                    'Confirmation required. Set confirm: true to send this email. This safety gate prevents accidental sends.',
-                  hint: 'Review the draft using gmail_get_draft first, then call gmail_send_draft with confirm: true',
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(
+          confirmationRequired(
+            'send this email',
+            'Review the draft using gmail_get_draft first, then call gmail_send_draft with confirm: true',
+          ).toResponse(),
+        );
       }
 
       try {
         const client = new GmailClient(accountStore, args.accountId);
         const sent = await client.sendDraft(args.draftId);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Email sent successfully',
-                  sentMessage: {
-                    id: sent.id,
-                    threadId: sent.threadId,
-                    labelIds: sent.labelIds,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Email sent successfully',
+          sentMessage: {
+            id: sent.id,
+            threadId: sent.threadId,
+            labelIds: sent.labelIds,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -642,32 +452,12 @@ export function createServer(options: ServerOptions): McpServer {
         const client = new GmailClient(accountStore, args.accountId);
         await client.deleteDraft(args.draftId);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Draft deleted successfully',
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Draft deleted successfully',
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -720,87 +510,49 @@ export function createServer(options: ServerOptions): McpServer {
         // If sendImmediately requested, check confirm gate and send
         if (args.sendImmediately) {
           if (args.confirm !== true) {
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(
-                    {
-                      success: false,
-                      error:
-                        'Confirmation required to send immediately. Set confirm: true to send.',
-                      hint: 'Draft was created but not sent. Use gmail_send_draft with confirm: true to send it.',
-                      draft: {
-                        id: draft.id,
-                        messageId: draft.message?.id,
-                        threadId: draft.message?.threadId,
-                      },
-                    },
-                    null,
-                    2,
-                  ),
+            const error = confirmationRequired(
+              'send immediately',
+              'Draft was created but not sent. Use gmail_send_draft with confirm: true to send it.',
+            ).toResponse();
+            // Include draft info in the error details
+            return errorResponse({
+              ...error,
+              details: {
+                ...error.details,
+                draft: {
+                  id: draft.id,
+                  messageId: draft.message?.id,
+                  threadId: draft.message?.threadId,
                 },
-              ],
-              isError: true,
-            };
+              },
+            });
           }
 
           // Send the draft
           const sent = await client.sendDraft(draft.id);
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(
-                  {
-                    success: true,
-                    message: 'Reply sent successfully',
-                    sentMessage: {
-                      id: sent.id,
-                      threadId: sent.threadId,
-                      labelIds: sent.labelIds,
-                    },
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-          };
+          return successResponse({
+            success: true,
+            message: 'Reply sent successfully',
+            sentMessage: {
+              id: sent.id,
+              threadId: sent.threadId,
+              labelIds: sent.labelIds,
+            },
+          });
         }
 
         // Return draft info
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Reply draft created',
-                  draft: {
-                    id: draft.id,
-                    messageId: draft.message?.id,
-                    threadId: draft.message?.threadId,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Reply draft created',
+          draft: {
+            id: draft.id,
+            messageId: draft.message?.id,
+            threadId: draft.message?.threadId,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -822,32 +574,12 @@ export function createServer(options: ServerOptions): McpServer {
         const client = new GmailClient(accountStore, args.accountId);
         const labels = await client.listLabels();
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  labels,
-                  count: labels.length,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          labels,
+          count: labels.length,
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -880,37 +612,17 @@ export function createServer(options: ServerOptions): McpServer {
           args.removeLabelIds ?? [],
         );
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Labels modified successfully',
-                  updatedMessage: {
-                    id: message.id,
-                    threadId: message.threadId,
-                    labelIds: message.labelIds,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Labels modified successfully',
+          updatedMessage: {
+            id: message.id,
+            threadId: message.threadId,
+            labelIds: message.labelIds,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -936,37 +648,17 @@ export function createServer(options: ServerOptions): McpServer {
 
         const message = await client.modifyLabels(args.messageId, addLabelIds, removeLabelIds);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: args.markAsRead ? 'Message marked as read' : 'Message marked as unread',
-                  updatedMessage: {
-                    id: message.id,
-                    threadId: message.threadId,
-                    labelIds: message.labelIds,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: args.markAsRead ? 'Message marked as read' : 'Message marked as unread',
+          updatedMessage: {
+            id: message.id,
+            threadId: message.threadId,
+            labelIds: message.labelIds,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -987,37 +679,17 @@ export function createServer(options: ServerOptions): McpServer {
         const client = new GmailClient(accountStore, args.accountId);
         const message = await client.modifyLabels(args.messageId, [], ['INBOX']);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Message archived (removed from INBOX)',
-                  updatedMessage: {
-                    id: message.id,
-                    threadId: message.threadId,
-                    labelIds: message.labelIds,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Message archived (removed from INBOX)',
+          updatedMessage: {
+            id: message.id,
+            threadId: message.threadId,
+            labelIds: message.labelIds,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -1038,37 +710,17 @@ export function createServer(options: ServerOptions): McpServer {
         const client = new GmailClient(accountStore, args.accountId);
         const message = await client.trashMessage(args.messageId);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Message moved to Trash',
-                  updatedMessage: {
-                    id: message.id,
-                    threadId: message.threadId,
-                    labelIds: message.labelIds,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Message moved to Trash',
+          updatedMessage: {
+            id: message.id,
+            threadId: message.threadId,
+            labelIds: message.labelIds,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
@@ -1088,37 +740,17 @@ export function createServer(options: ServerOptions): McpServer {
         const client = new GmailClient(accountStore, args.accountId);
         const message = await client.untrashMessage(args.messageId);
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  success: true,
-                  message: 'Message restored from Trash',
-                  updatedMessage: {
-                    id: message.id,
-                    threadId: message.threadId,
-                    labelIds: message.labelIds,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return successResponse({
+          success: true,
+          message: 'Message restored from Trash',
+          updatedMessage: {
+            id: message.id,
+            threadId: message.threadId,
+            labelIds: message.labelIds,
+          },
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({ success: false, error: message }, null, 2),
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(toMcpError(error));
       }
     },
   );
