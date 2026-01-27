@@ -447,36 +447,7 @@ export class GmailClient {
       userId: 'me',
     });
 
-    const labels: Label[] = (response.data.labels ?? []).map((label) => {
-      const result: Label = {
-        id: label.id ?? '',
-        name: label.name ?? '',
-        type: label.type === 'system' ? 'system' : 'user',
-      };
-
-      if (label.messageListVisibility) {
-        result.messageListVisibility = label.messageListVisibility as 'show' | 'hide';
-      }
-      if (label.labelListVisibility) {
-        result.labelListVisibility = label.labelListVisibility as
-          | 'labelShow'
-          | 'labelShowIfUnread'
-          | 'labelHide';
-      }
-      if (label.color) {
-        result.color = {};
-        if (label.color.textColor) {
-          result.color.textColor = label.color.textColor;
-        }
-        if (label.color.backgroundColor) {
-          result.color.backgroundColor = label.color.backgroundColor;
-        }
-      }
-
-      return result;
-    });
-
-    return labels;
+    return (response.data.labels ?? []).map((label) => this.convertLabel(label));
   }
 
   async modifyLabels(
@@ -496,6 +467,148 @@ export class GmailClient {
     });
 
     return this.convertMessage(response.data);
+  }
+
+  // Batch modify labels on multiple messages
+  async batchModifyLabels(
+    messageIds: string[],
+    addLabelIds: string[],
+    removeLabelIds: string[],
+  ): Promise<void> {
+    const gmail = await this.getGmail();
+
+    // Gmail API limits batch modify to 1000 messages
+    const maxBatchSize = 1000;
+    const idsToModify = messageIds.slice(0, maxBatchSize);
+
+    await gmail.users.messages.batchModify({
+      userId: 'me',
+      requestBody: {
+        ids: idsToModify,
+        addLabelIds,
+        removeLabelIds,
+      },
+    });
+  }
+
+  // Create a new label
+  async createLabel(
+    name: string,
+    options?: {
+      messageListVisibility?: 'show' | 'hide' | undefined;
+      labelListVisibility?: 'labelShow' | 'labelShowIfUnread' | 'labelHide' | undefined;
+      backgroundColor?: string | undefined;
+      textColor?: string | undefined;
+    },
+  ): Promise<Label> {
+    const gmail = await this.getGmail();
+
+    const requestBody: gmail_v1.Schema$Label = { name };
+
+    if (options?.messageListVisibility) {
+      requestBody.messageListVisibility = options.messageListVisibility;
+    }
+    if (options?.labelListVisibility) {
+      requestBody.labelListVisibility = options.labelListVisibility;
+    }
+    if (options?.backgroundColor || options?.textColor) {
+      requestBody.color = {};
+      if (options.backgroundColor) {
+        requestBody.color.backgroundColor = options.backgroundColor;
+      }
+      if (options.textColor) {
+        requestBody.color.textColor = options.textColor;
+      }
+    }
+
+    const response = await gmail.users.labels.create({
+      userId: 'me',
+      requestBody,
+    });
+
+    return this.convertLabel(response.data);
+  }
+
+  // Update an existing label
+  async updateLabel(
+    labelId: string,
+    updates: {
+      name?: string | undefined;
+      messageListVisibility?: 'show' | 'hide' | undefined;
+      labelListVisibility?: 'labelShow' | 'labelShowIfUnread' | 'labelHide' | undefined;
+      backgroundColor?: string | undefined;
+      textColor?: string | undefined;
+    },
+  ): Promise<Label> {
+    const gmail = await this.getGmail();
+
+    const requestBody: gmail_v1.Schema$Label = {};
+
+    if (updates.name !== undefined) {
+      requestBody.name = updates.name;
+    }
+    if (updates.messageListVisibility !== undefined) {
+      requestBody.messageListVisibility = updates.messageListVisibility;
+    }
+    if (updates.labelListVisibility !== undefined) {
+      requestBody.labelListVisibility = updates.labelListVisibility;
+    }
+    if (updates.backgroundColor !== undefined || updates.textColor !== undefined) {
+      requestBody.color = {};
+      if (updates.backgroundColor !== undefined) {
+        requestBody.color.backgroundColor = updates.backgroundColor;
+      }
+      if (updates.textColor !== undefined) {
+        requestBody.color.textColor = updates.textColor;
+      }
+    }
+
+    const response = await gmail.users.labels.patch({
+      userId: 'me',
+      id: labelId,
+      requestBody,
+    });
+
+    return this.convertLabel(response.data);
+  }
+
+  // Delete a label
+  async deleteLabel(labelId: string): Promise<void> {
+    const gmail = await this.getGmail();
+
+    await gmail.users.labels.delete({
+      userId: 'me',
+      id: labelId,
+    });
+  }
+
+  private convertLabel(label: gmail_v1.Schema$Label): Label {
+    const result: Label = {
+      id: label.id ?? '',
+      name: label.name ?? '',
+      type: label.type === 'system' ? 'system' : 'user',
+    };
+
+    if (label.messageListVisibility) {
+      result.messageListVisibility = label.messageListVisibility as 'show' | 'hide';
+    }
+    if (label.labelListVisibility) {
+      result.labelListVisibility = label.labelListVisibility as
+        | 'labelShow'
+        | 'labelShowIfUnread'
+        | 'labelHide';
+    }
+    if (label.color) {
+      result.color = {};
+      if (label.color.textColor) {
+        result.color.textColor = label.color.textColor;
+      }
+      if (label.color.backgroundColor) {
+        result.color.backgroundColor = label.color.backgroundColor;
+      }
+    }
+
+    return result;
   }
 
   async trashMessage(messageId: string): Promise<Message> {

@@ -17,6 +17,7 @@ import {
   SCOPE_TIERS,
   type ScopeTier,
 } from '../types/index.js';
+import { cache } from '../utils/index.js';
 
 export interface ServerOptions {
   tokenStorage: TokenStorage;
@@ -750,6 +751,211 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // gmail_batch_modify_labels - Bulk modify labels on multiple messages
+  server.registerTool(
+    'gmail_batch_modify_labels',
+    {
+      description:
+        'Apply label changes to multiple messages in one operation. More efficient than individual modifications. Limited to 1000 messages. Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageIds: z
+          .array(z.string())
+          .describe('Array of message IDs to modify (max 1000)'),
+        addLabelIds: z
+          .array(z.string())
+          .optional()
+          .describe('Label IDs to add to all messages'),
+        removeLabelIds: z
+          .array(z.string())
+          .optional()
+          .describe('Label IDs to remove from all messages'),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe('Set to true to confirm bulk operation (required for >100 messages)'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
+      // Require confirmation for large operations
+      const messageCount = args.messageIds.length;
+      if (messageCount > 100 && !args.confirm) {
+        return successResponse({
+          success: false,
+          requiresConfirmation: true,
+          message: `This operation will modify ${messageCount} messages. Set confirm: true to proceed.`,
+          affectedCount: messageCount,
+        });
+      }
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        await client.batchModifyLabels(
+          args.messageIds,
+          args.addLabelIds ?? [],
+          args.removeLabelIds ?? [],
+        );
+
+        return successResponse({
+          success: true,
+          message: `Labels modified on ${Math.min(messageCount, 1000)} messages`,
+          affectedCount: Math.min(messageCount, 1000),
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_create_label - Create a new label
+  server.registerTool(
+    'gmail_create_label',
+    {
+      description:
+        'Create a new Gmail label with optional color and visibility settings. Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        name: z.string().describe('Label name (use "/" for nesting, e.g., "Work/Projects")'),
+        messageListVisibility: z
+          .enum(['show', 'hide'])
+          .optional()
+          .describe('Whether to show label in message list'),
+        labelListVisibility: z
+          .enum(['labelShow', 'labelShowIfUnread', 'labelHide'])
+          .optional()
+          .describe('Whether to show label in label list'),
+        backgroundColor: z
+          .string()
+          .optional()
+          .describe('Background color hex (e.g., "#16a765")'),
+        textColor: z.string().optional().describe('Text color hex (e.g., "#ffffff")'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const label = await client.createLabel(args.name, {
+          messageListVisibility: args.messageListVisibility,
+          labelListVisibility: args.labelListVisibility,
+          backgroundColor: args.backgroundColor,
+          textColor: args.textColor,
+        });
+
+        return successResponse({
+          success: true,
+          message: 'Label created successfully',
+          label: {
+            id: label.id,
+            name: label.name,
+            type: label.type,
+          },
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_update_label - Update an existing label
+  server.registerTool(
+    'gmail_update_label',
+    {
+      description:
+        'Update a Gmail label (rename, change color, visibility). System labels cannot be modified. Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        labelId: z.string().describe('The label ID to update'),
+        name: z.string().optional().describe('New label name'),
+        messageListVisibility: z
+          .enum(['show', 'hide'])
+          .optional()
+          .describe('Whether to show label in message list'),
+        labelListVisibility: z
+          .enum(['labelShow', 'labelShowIfUnread', 'labelHide'])
+          .optional()
+          .describe('Whether to show label in label list'),
+        backgroundColor: z.string().optional().describe('New background color hex'),
+        textColor: z.string().optional().describe('New text color hex'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const label = await client.updateLabel(args.labelId, {
+          name: args.name,
+          messageListVisibility: args.messageListVisibility,
+          labelListVisibility: args.labelListVisibility,
+          backgroundColor: args.backgroundColor,
+          textColor: args.textColor,
+        });
+
+        return successResponse({
+          success: true,
+          message: 'Label updated successfully',
+          label: {
+            id: label.id,
+            name: label.name,
+            type: label.type,
+          },
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_delete_label - Delete a label
+  server.registerTool(
+    'gmail_delete_label',
+    {
+      description:
+        'Delete a Gmail label. Messages with this label will not be deleted, they will just lose the label. System labels cannot be deleted. Requires full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        labelId: z.string().describe('The label ID to delete'),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe('Set to true to confirm deletion'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'full');
+      if ('error' in validation) return validation.error;
+
+      if (!args.confirm) {
+        return successResponse({
+          success: false,
+          requiresConfirmation: true,
+          message: 'Label deletion is permanent. Set confirm: true to proceed.',
+          labelId: args.labelId,
+        });
+      }
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        await client.deleteLabel(args.labelId);
+
+        return successResponse({
+          success: true,
+          message: 'Label deleted successfully',
+          deletedLabelId: args.labelId,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
   // gmail_mark_read_unread - Toggle read/unread status
   server.registerTool(
     'gmail_mark_read_unread',
@@ -1343,6 +1549,71 @@ Tips:
 - Consider creating parent/child label structures if patterns emerge
 - Flag messages that don't fit any category for manual review`,
             },
+          },
+        ],
+      };
+    },
+  );
+
+  // === MCP Resources for Inspection ===
+
+  // Resource: accounts://list - List all connected accounts
+  server.registerResource(
+    'accounts',
+    'accounts://list',
+    {
+      description: 'List all connected Google accounts with their scope tiers',
+      mimeType: 'application/json',
+    },
+    async () => {
+      const accounts = accountStore.listAccounts();
+      const accountsData = accounts.map((account) => ({
+        id: account.id,
+        email: account.email,
+        scopeTier: getScopeTier(account.scopes),
+        labels: account.labels,
+        addedAt: account.addedAt,
+      }));
+
+      return {
+        contents: [
+          {
+            uri: 'accounts://list',
+            mimeType: 'application/json',
+            text: JSON.stringify({ accounts: accountsData, count: accountsData.length }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  // Resource: cache://stats - Cache statistics
+  server.registerResource(
+    'cache-stats',
+    'cache://stats',
+    {
+      description: 'Cache statistics including hit rate, size, and eviction counts',
+      mimeType: 'application/json',
+    },
+    async () => {
+      const stats = cache.getStats();
+
+      return {
+        contents: [
+          {
+            uri: 'cache://stats',
+            mimeType: 'application/json',
+            text: JSON.stringify(
+              {
+                hits: stats.hits,
+                misses: stats.misses,
+                evictions: stats.evictions,
+                size: stats.size,
+                hitRate: `${(stats.hitRate * 100).toFixed(2)}%`,
+              },
+              null,
+              2,
+            ),
           },
         ],
       };

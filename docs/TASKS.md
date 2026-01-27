@@ -1,6 +1,6 @@
 # Tasks
 
-## Current Phase: 9 - Advanced Features (Pending)
+## Current Phase: 9 - Advanced Features (COMPLETED)
 
 ---
 
@@ -9,12 +9,12 @@
 Infrastructure improvements for reliability and efficiency.
 
 ### Completed
-- [DONE] Implement configurable logging with sensitive data redaction (commit: TBD)
-- [DONE] Implement rate limiting with exponential backoff on 429/5xx errors (commit: TBD)
-- [DONE] Implement per-account request throttling with token bucket algorithm (commit: TBD)
-- [DONE] Implement LRU cache with configurable TTLs (commit: TBD)
-- [DONE] Add cache infrastructure with getWithMeta() for cache hints (commit: TBD)
-- [DONE] Implement `gmail_get_messages_batch` tool - Fetch multiple messages in one call (commit: TBD)
+- [DONE] Implement configurable logging with sensitive data redaction (commit: 225c14b)
+- [DONE] Implement rate limiting with exponential backoff on 429/5xx errors (commit: 225c14b)
+- [DONE] Implement per-account request throttling with token bucket algorithm (commit: 225c14b)
+- [DONE] Implement LRU cache with configurable TTLs (commit: 225c14b)
+- [DONE] Add cache infrastructure with getWithMeta() for cache hints (commit: 225c14b)
+- [DONE] Implement `gmail_get_messages_batch` tool - Fetch multiple messages in one call (commit: 225c14b)
 
 ### Notes
 - Logger supports log levels via MCP_GOOGLE_LOG_LEVEL env var
@@ -71,41 +71,26 @@ Address gaps identified in spec review to ensure full SPEC.md compliance.
 
 ---
 
-## Phase 9 - Advanced Features (Future)
+## Phase 9 - Advanced Features
 
 Lower priority features for power users.
 
-### Pending
+### Completed
+- [DONE] Implement `gmail_batch_modify_labels` tool - Bulk label modification up to 1000 messages (commit: TBD)
+- [DONE] Implement label management tools - gmail_create_label, gmail_update_label, gmail_delete_label (commit: TBD)
+- [DONE] Add MCP Resources - accounts://list and cache://stats for inspection (commit: TBD)
 
-- [ ] **Implement `gmail_batch_modify` tool - Apply labels to multiple messages**
+### Deferred (Requires New OAuth Scopes)
+- [ ] **Implement filter/automation tools** (`gmail_list_filters`, `gmail_create_filter`) - Requires `gmail.settings.basic` scope
+- [ ] **Implement vacation responder tools** (`gmail_get_vacation`, `gmail_set_vacation`) - Requires `gmail.settings.basic` scope
 
-  Processing emails in bulk is common: "archive all notifications older than a week" or "label all emails from this sender as 'Vendor'". Doing this one message at a time is slow and quota-inefficient. Gmail's `messages.batchModify` accepts up to 1000 message IDs and applies the same label changes to all. We'll accept `{ messageIds: string[], addLabelIds: string[], removeLabelIds: string[] }` and return success/failure counts. This enables powerful automation while staying within a single tool call. Safety consideration: require confirmation for operations affecting >100 messages.
+### Deferred (Significant Architectural Work)
+- [ ] **HTTP/SSE transport support** - Requires HTTP server, authentication, message format adaptation
 
-- [ ] **Implement label management tools (`gmail_create_label`, `gmail_update_label`, `gmail_delete_label`)**
-
-  Users need to create custom labels to organize email their way. Gmail allows up to 10,000 labels per account. `gmail_create_label` accepts name and optional color/visibility settings. `gmail_update_label` can rename or change appearance. `gmail_delete_label` removes the label (but not the messages—they just lose that label). These use the `labels.create/patch/delete` endpoints. Note: system labels (INBOX, SENT, SPAM, etc.) cannot be modified or deleted. We'll validate label names (no slashes for nesting conflicts) and handle the 10k limit gracefully.
-
-- [ ] **Implement filter/automation tools (`gmail_list_filters`, `gmail_create_filter`)**
-
-  Gmail filters automatically process incoming mail: skip inbox, apply label, forward, delete, etc. Filters have criteria (from, to, subject, hasAttachment) and actions (addLabel, markRead, archive). `gmail_list_filters` returns existing rules so users understand their automation. `gmail_create_filter` adds new rules—powerful but needs careful validation since a bad filter could auto-delete important mail. These require the `gmail.settings.basic` scope, which is a new tier we'd need to add. Filters are the gateway to "set it and forget it" email management.
-
-- [ ] **Implement vacation responder tools (`gmail_get_vacation`, `gmail_set_vacation`)**
-
-  The vacation responder (auto-reply) tells senders you're away. It has: enabled flag, subject, HTML body, date range, and audience (contacts only, or everyone). `gmail_get_vacation` returns current settings. `gmail_set_vacation` configures it. Common workflow: "I'm going on vacation Friday, set up an auto-reply." The tool would accept natural parameters like `startDate`, `endDate`, `message` and translate to the API format. Requires `gmail.settings.basic` scope. This is a "nice to have" that rounds out the full Gmail management experience.
-
-- [ ] **Add MCP Resources for account inspection and cache stats**
-
-  MCP Resources are read-only URIs that clients can inspect. Unlike tools (which perform actions), resources expose state. Examples: `accounts://list` returns connected accounts without side effects, `cache://stats` shows hit rate and memory usage, `quota://usage` shows API quota consumption. Resources are useful for debugging ("why is this slow?" → check cache stats) and monitoring. They're also discoverable—clients can list available resources. This makes the server more transparent and debuggable without cluttering the tool namespace.
-
-- [ ] **Consider HTTP/SSE transport support**
-
-  Currently we only support stdio transport (stdin/stdout), which requires the MCP server to run as a child process of the client. HTTP transport would let the server run as a standalone service, accessible over the network. SSE (Server-Sent Events) enables the server to push notifications to clients (new email arrived, rate limit warning). This enables architectures like: server running on a home server, accessed from multiple devices. Implementation requires an HTTP server (Express/Fastify), authentication (API keys or OAuth), and adapting MCP's message format to HTTP request/response. This is significant work but enables new use cases.
-
-### Identified
-- Filter/vacation tools require `gmail.settings.basic` scope (new tier)
-- MCP Resources are read-only inspection endpoints per MCP spec
-- HTTP transport requires careful security consideration (authentication, TLS)
-- Consider webhook support for real-time notifications (Gmail push notifications via Pub/Sub)
+### Notes
+- Batch modify requires confirm: true for operations affecting >100 messages
+- Label delete requires confirm: true for safety
+- MCP Resources are read-only inspection endpoints
 
 ---
 

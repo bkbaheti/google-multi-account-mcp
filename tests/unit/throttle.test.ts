@@ -18,7 +18,8 @@ describe('Throttle utilities', () => {
 
     it('tryConsume succeeds when tokens available', () => {
       expect(bucket.tryConsume('account-1')).toBe(true);
-      expect(bucket.getTokenCount('account-1')).toBe(9);
+      // Use toBeCloseTo due to time-based token refill between calls
+      expect(bucket.getTokenCount('account-1')).toBeCloseTo(9, 0);
     });
 
     it('tryConsume fails when bucket empty', () => {
