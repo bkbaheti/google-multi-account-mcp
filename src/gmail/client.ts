@@ -82,6 +82,17 @@ export interface SentMessage {
   labelIds?: string[];
 }
 
+export interface ReplyInput {
+  threadId: string;
+  to: string;
+  subject: string;
+  body: string;
+  cc?: string;
+  bcc?: string;
+  inReplyTo: string;
+  references: string;
+}
+
 export interface SearchResult {
   messages: MessageSummary[];
   nextPageToken?: string;
@@ -235,6 +246,21 @@ export class GmailClient {
       userId: 'me',
       id: draftId,
     });
+  }
+
+  async replyToThread(input: ReplyInput): Promise<Draft> {
+    const draftInput: DraftInput = {
+      to: input.to,
+      subject: input.subject,
+      body: input.body,
+      threadId: input.threadId,
+      inReplyTo: input.inReplyTo,
+      references: input.references,
+    };
+    if (input.cc) draftInput.cc = input.cc;
+    if (input.bcc) draftInput.bcc = input.bcc;
+
+    return this.createDraft(draftInput);
   }
 
   private buildDraftRequestBody(input: DraftInput): { message: { raw: string; threadId?: string } } {

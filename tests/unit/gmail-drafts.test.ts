@@ -307,4 +307,41 @@ describe('GmailClient drafts', () => {
       });
     });
   });
+
+  describe('replyToThread', () => {
+    it('creates a reply draft in an existing thread', async () => {
+      const mockDraftResponse = {
+        data: {
+          id: 'draft-reply-123',
+          message: {
+            id: 'msg-reply-456',
+            threadId: 'thread-existing',
+          },
+        },
+      };
+
+      mockDraftsCreate.mockResolvedValue(mockDraftResponse);
+
+      const result = await client.replyToThread({
+        threadId: 'thread-existing',
+        to: 'original-sender@example.com',
+        subject: 'Re: Original Subject',
+        body: 'This is my reply',
+        inReplyTo: '<original-msg-id@mail.example.com>',
+        references: '<original-msg-id@mail.example.com>',
+      });
+
+      expect(result.id).toBe('draft-reply-123');
+      expect(result.message?.threadId).toBe('thread-existing');
+
+      const callArgs = mockDraftsCreate.mock.calls[0][0];
+      expect(callArgs.requestBody.message.threadId).toBe('thread-existing');
+
+      const rawMessage = Buffer.from(callArgs.requestBody.message.raw, 'base64url').toString(
+        'utf-8',
+      );
+      expect(rawMessage).toContain('In-Reply-To: <original-msg-id@mail.example.com>');
+      expect(rawMessage).toContain('References: <original-msg-id@mail.example.com>');
+    });
+  });
 });

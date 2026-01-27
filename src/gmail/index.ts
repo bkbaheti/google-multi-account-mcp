@@ -11,6 +11,7 @@ export {
   type MessageHeader,
   type MessagePart,
   type MessageSummary,
+  type ReplyInput,
   type SearchResult,
   type SentMessage,
   type Thread,

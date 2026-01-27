@@ -672,6 +672,139 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // gmail_reply_in_thread - Create a reply in an existing thread
+  server.registerTool(
+    'gmail_reply_in_thread',
+    {
+      description:
+        'Reply to an existing email thread. Creates a draft reply and optionally sends it. Requires compose or full scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        threadId: z.string().describe('The thread ID to reply in'),
+        to: z.string().describe('Recipient email address(es)'),
+        subject: z.string().describe('Email subject (typically Re: original subject)'),
+        body: z.string().describe('Reply body (plain text)'),
+        inReplyTo: z.string().describe('Message-ID of the message being replied to'),
+        references: z.string().describe('References header (Message-ID chain for threading)'),
+        cc: z.string().optional().describe('CC email address(es)'),
+        bcc: z.string().optional().describe('BCC email address(es)'),
+        sendImmediately: z
+          .boolean()
+          .optional()
+          .describe('If true AND confirm is true, send immediately instead of creating a draft'),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe('Required if sendImmediately is true. Safety gate for sending.'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+
+        // Build reply input
+        const replyInput: Parameters<typeof client.replyToThread>[0] = {
+          threadId: args.threadId,
+          to: args.to,
+          subject: args.subject,
+          body: args.body,
+          inReplyTo: args.inReplyTo,
+          references: args.references,
+        };
+        if (args.cc) replyInput.cc = args.cc;
+        if (args.bcc) replyInput.bcc = args.bcc;
+
+        // Create the draft
+        const draft = await client.replyToThread(replyInput);
+
+        // If sendImmediately requested, check confirm gate and send
+        if (args.sendImmediately) {
+          if (args.confirm !== true) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: JSON.stringify(
+                    {
+                      success: false,
+                      error:
+                        'Confirmation required to send immediately. Set confirm: true to send.',
+                      hint: 'Draft was created but not sent. Use gmail_send_draft with confirm: true to send it.',
+                      draft: {
+                        id: draft.id,
+                        messageId: draft.message?.id,
+                        threadId: draft.message?.threadId,
+                      },
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          // Send the draft
+          const sent = await client.sendDraft(draft.id);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    message: 'Reply sent successfully',
+                    sentMessage: {
+                      id: sent.id,
+                      threadId: sent.threadId,
+                      labelIds: sent.labelIds,
+                    },
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        // Return draft info
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: 'Reply draft created',
+                  draft: {
+                    id: draft.id,
+                    messageId: draft.message?.id,
+                    threadId: draft.message?.threadId,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ success: false, error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
   return server;
 }
 
