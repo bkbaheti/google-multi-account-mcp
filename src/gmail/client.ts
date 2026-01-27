@@ -1,5 +1,6 @@
 import { type gmail_v1, google } from 'googleapis';
 import type { AccountStore } from '../auth/index.js';
+import { buildDraftWithAttachments, type MimeAttachment } from './mime.js';
 
 export interface MessageHeader {
   name: string;
@@ -109,6 +110,21 @@ export interface Label {
     textColor?: string;
     backgroundColor?: string;
   };
+}
+
+export interface AttachmentInfo {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface AttachmentData {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  data: string; // base64-encoded
 }
 
 export class GmailClient {
@@ -461,6 +477,122 @@ export class GmailClient {
     });
 
     return this.convertMessage(response.data);
+  }
+
+  // List attachments in a message
+  async listAttachments(messageId: string): Promise<AttachmentInfo[]> {
+    const message = await this.getMessage(messageId, 'full');
+    return this.extractAttachments(message.payload);
+  }
+
+  private extractAttachments(payload: MessagePayload | undefined): AttachmentInfo[] {
+    const attachments: AttachmentInfo[] = [];
+    if (!payload) return attachments;
+
+    this.findAttachmentParts(payload.parts ?? [], attachments);
+
+    // Check if the body itself is an attachment (single-part message)
+    if (payload.body?.attachmentId) {
+      attachments.push({
+        attachmentId: payload.body.attachmentId,
+        filename: 'attachment',
+        mimeType: payload.mimeType ?? 'application/octet-stream',
+        size: payload.body.size ?? 0,
+      });
+    }
+
+    return attachments;
+  }
+
+  private findAttachmentParts(parts: MessagePart[], attachments: AttachmentInfo[]): void {
+    for (const part of parts) {
+      // Check if this part has an attachment
+      if (part.body?.attachmentId) {
+        attachments.push({
+          attachmentId: part.body.attachmentId,
+          filename: part.filename || 'attachment',
+          mimeType: part.mimeType || 'application/octet-stream',
+          size: part.body.size ?? 0,
+        });
+      }
+
+      // Recurse into nested parts
+      if (part.parts) {
+        this.findAttachmentParts(part.parts, attachments);
+      }
+    }
+  }
+
+  // Get attachment data by ID
+  async getAttachment(messageId: string, attachmentId: string): Promise<AttachmentData> {
+    const gmail = await this.getGmail();
+
+    // First get attachment info from the message
+    const attachments = await this.listAttachments(messageId);
+    const attachmentInfo = attachments.find((a) => a.attachmentId === attachmentId);
+
+    if (!attachmentInfo) {
+      throw new Error(`Attachment not found: ${attachmentId}`);
+    }
+
+    // Fetch the attachment data
+    const response = await gmail.users.messages.attachments.get({
+      userId: 'me',
+      messageId,
+      id: attachmentId,
+    });
+
+    const data = response.data.data;
+    if (!data) {
+      throw new Error('Attachment data is empty');
+    }
+
+    // Gmail returns base64url encoding, convert to standard base64
+    const base64Data = data.replace(/-/g, '+').replace(/_/g, '/');
+
+    return {
+      attachmentId,
+      filename: attachmentInfo.filename,
+      mimeType: attachmentInfo.mimeType,
+      size: attachmentInfo.size,
+      data: base64Data,
+    };
+  }
+
+  // Create a draft with attachments
+  async createDraftWithAttachment(input: {
+    to: string;
+    subject: string;
+    body: string;
+    cc?: string | undefined;
+    bcc?: string | undefined;
+    threadId?: string | undefined;
+    inReplyTo?: string | undefined;
+    references?: string | undefined;
+    attachments: MimeAttachment[];
+  }): Promise<Draft> {
+    const gmail = await this.getGmail();
+
+    const requestBody = buildDraftWithAttachments(
+      {
+        to: input.to,
+        subject: input.subject,
+        body: input.body,
+        cc: input.cc,
+        bcc: input.bcc,
+        inReplyTo: input.inReplyTo,
+        references: input.references,
+        attachments: input.attachments,
+      },
+      input.threadId,
+    );
+
+    const response = await gmail.users.drafts.create({
+      userId: 'me',
+      requestBody,
+    });
+
+    return this.convertDraftResponse(response.data);
   }
 
   private convertMessage(m: gmail_v1.Schema$Message): Message {

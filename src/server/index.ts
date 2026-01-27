@@ -826,6 +826,130 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // === Phase 6: Attachment Tools ===
+
+  // gmail_list_attachments - List attachments in a message
+  server.registerTool(
+    'gmail_list_attachments',
+    {
+      description:
+        'List all attachments in a Gmail message. Returns attachment IDs, filenames, MIME types, and sizes. Requires readonly scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID to list attachments from'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'readonly');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const attachments = await client.listAttachments(args.messageId);
+
+        return successResponse({
+          attachments,
+          count: attachments.length,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_get_attachment - Download attachment by ID
+  server.registerTool(
+    'gmail_get_attachment',
+    {
+      description:
+        'Download an attachment from a Gmail message. Returns base64-encoded data. Use gmail_list_attachments first to get attachment IDs. Requires readonly scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID containing the attachment'),
+        attachmentId: z.string().describe('The attachment ID to download'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'readonly');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const attachment = await client.getAttachment(args.messageId, args.attachmentId);
+
+        return successResponse({
+          attachmentId: attachment.attachmentId,
+          filename: attachment.filename,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+          data: attachment.data,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_create_draft_with_attachment - Create a draft with file attachments
+  server.registerTool(
+    'gmail_create_draft_with_attachment',
+    {
+      description:
+        'Create a draft email with file attachments. The draft can be reviewed and sent later. Requires compose or full scope. Max 25MB total attachment size.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
+        subject: z.string().describe('Email subject'),
+        body: z.string().describe('Email body (plain text)'),
+        attachments: z
+          .array(
+            z.object({
+              filename: z.string().describe('Filename with extension'),
+              mimeType: z.string().describe('MIME type (e.g., "application/pdf", "image/png")'),
+              data: z.string().describe('Base64-encoded file data'),
+            }),
+          )
+          .describe('Array of attachments to include'),
+        cc: z.string().optional().describe('CC email address(es)'),
+        bcc: z.string().optional().describe('BCC email address(es)'),
+        threadId: z.string().optional().describe('Thread ID to reply in'),
+        inReplyTo: z.string().optional().describe('Message-ID being replied to'),
+        references: z.string().optional().describe('References header for threading'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'compose');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const draft = await client.createDraftWithAttachment({
+          to: args.to,
+          subject: args.subject,
+          body: args.body,
+          cc: args.cc,
+          bcc: args.bcc,
+          threadId: args.threadId,
+          inReplyTo: args.inReplyTo,
+          references: args.references,
+          attachments: args.attachments,
+        });
+
+        return successResponse({
+          success: true,
+          message: `Draft created with ${args.attachments.length} attachment(s)`,
+          draft: {
+            id: draft.id,
+            messageId: draft.message?.id,
+            threadId: draft.message?.threadId,
+          },
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
   // === MCP Prompts for Safe Email Workflows ===
 
   // Prompt: compose-email - Guided workflow for composing and sending email

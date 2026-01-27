@@ -4,6 +4,8 @@ export {
   getHeader,
   getHtmlBody,
   getTextBody,
+  type AttachmentData,
+  type AttachmentInfo,
   type Draft,
   type DraftInput,
   type DraftMessage,
@@ -17,3 +19,11 @@ export {
   type SentMessage,
   type Thread,
 } from './client.js';
+
+export {
+  buildDraftWithAttachments,
+  buildRawMessage,
+  encodeMimeHeader,
+  type MimeAttachment,
+  type MimeMessageOptions,
+} from './mime.js';
