@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { TokenStorage } from '../auth/index.js';
 import { AccountStore } from '../auth/index.js';
+import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
 import { SCOPE_TIERS, type ScopeTier } from '../types/index.js';
 
 export interface ServerOptions {
@@ -170,6 +171,165 @@ export function createServer(options: ServerOptions): McpServer {
         ],
         isError: true,
       };
+    },
+  );
+
+  // gmail_search_messages - Search messages in Gmail
+  server.registerTool(
+    'gmail_search_messages',
+    {
+      description:
+        'Search for messages in Gmail using Gmail search syntax (e.g., "from:user@example.com", "subject:hello", "is:unread")',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID to search'),
+        query: z.string().describe('Gmail search query'),
+        maxResults: z.number().optional().describe('Maximum number of results (default: 20)'),
+        pageToken: z.string().optional().describe('Token for pagination'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const options: { maxResults?: number; pageToken?: string } = {};
+        if (args.maxResults !== undefined) {
+          options.maxResults = args.maxResults;
+        }
+        if (args.pageToken !== undefined) {
+          options.pageToken = args.pageToken;
+        }
+        const result = await client.searchMessages(args.query, options);
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // gmail_get_message - Get a single message by ID
+  server.registerTool(
+    'gmail_get_message',
+    {
+      description: 'Get a single Gmail message by ID with headers and body content',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID'),
+        format: z
+          .enum(['minimal', 'metadata', 'full'])
+          .optional()
+          .describe('Response format (default: full)'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const message = await client.getMessage(args.messageId, args.format ?? 'full');
+
+        // Extract useful info for the response
+        const response = {
+          id: message.id,
+          threadId: message.threadId,
+          labelIds: message.labelIds,
+          snippet: message.snippet,
+          from: getHeader(message, 'From'),
+          to: getHeader(message, 'To'),
+          subject: getHeader(message, 'Subject'),
+          date: getHeader(message, 'Date'),
+          body: getTextBody(message),
+        };
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // gmail_get_thread - Get a thread with all messages
+  server.registerTool(
+    'gmail_get_thread',
+    {
+      description: 'Get a Gmail thread with all its messages',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        threadId: z.string().describe('The thread ID'),
+        format: z
+          .enum(['minimal', 'metadata', 'full'])
+          .optional()
+          .describe('Response format (default: full)'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const thread = await client.getThread(args.threadId, args.format ?? 'full');
+
+        // Extract useful info for the response
+        const response = {
+          id: thread.id,
+          messages: thread.messages?.map((msg) => ({
+            id: msg.id,
+            from: getHeader(msg, 'From'),
+            to: getHeader(msg, 'To'),
+            subject: getHeader(msg, 'Subject'),
+            date: getHeader(msg, 'Date'),
+            snippet: msg.snippet,
+            body: getTextBody(msg),
+          })),
+        };
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
     },
   );
 

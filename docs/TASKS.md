@@ -1,25 +1,40 @@
 # Tasks
 
-## Current Phase: 2 - Gmail Read/Search
+## Current Phase: 3 - Draft/Send with Safety Gate
 
 ### Active
 <!-- Tasks currently being worked on -->
 
 ### Pending
 <!-- Ready to pick up -->
-- [ ] Create Gmail API client wrapper
-- [ ] Implement request caching (LRU with TTL)
-- [ ] Implement gmail_search_messages tool
-- [ ] Implement gmail_get_message tool
-- [ ] Implement gmail_get_thread tool
-- [ ] Add rate limiting per account
-- [ ] Write tests with mocked Gmail API
+- [ ] Implement gmail_create_draft tool
+- [ ] Implement gmail_update_draft tool
+- [ ] Implement draft preview rendering
+- [ ] Implement gmail_send_draft with confirm gate
+- [ ] Implement gmail_reply_in_thread tool
+- [ ] Add MCP prompts for safe workflows
+- [ ] Write tests for confirmation flow
 
 ### Identified
 <!-- New tasks discovered during work -->
 
 ### Completed
 <!-- Format: [DONE] Task description (commit: abc1234) -->
+
+---
+
+## Phase 2 - Gmail Read/Search (COMPLETED)
+
+### Completed
+- [DONE] Create Gmail API client wrapper
+- [DONE] Implement gmail_search_messages tool
+- [DONE] Implement gmail_get_message tool
+- [DONE] Implement gmail_get_thread tool
+- [DONE] Add helper functions (getHeader, getTextBody, getHtmlBody, decodeBody)
+
+### Identified
+- Caching and rate limiting deferred to optimization phase
+- Full tests require mocked Gmail API (integration tested manually)
 
 ---
 
@@ -56,21 +71,6 @@
 - [DONE] Implement google_list_accounts tool (returns empty array)
 - [DONE] Add CLI entrypoint (bin: mcp-google)
 - [DONE] Verify MCP server connects via stdio
-
----
-
-## Phase 3 - Draft/Send with Safety Gate
-### Pending
-- [ ] Implement gmail_create_draft tool
-- [ ] Implement gmail_update_draft tool
-- [ ] Implement draft preview rendering
-- [ ] Implement gmail_send_draft with confirm gate
-- [ ] Implement gmail_reply_in_thread tool
-- [ ] Add MCP prompts for safe workflows
-- [ ] Write tests for confirmation flow
-
-### Identified
-### Completed
 
 ---
 
