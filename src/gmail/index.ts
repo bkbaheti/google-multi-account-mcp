@@ -6,6 +6,7 @@ export {
   getTextBody,
   type AttachmentData,
   type AttachmentInfo,
+  type BatchMessageResult,
   type Draft,
   type DraftInput,
   type DraftMessage,

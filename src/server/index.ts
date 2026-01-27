@@ -223,6 +223,70 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // gmail_get_messages_batch - Get multiple messages in one call
+  server.registerTool(
+    'gmail_get_messages_batch',
+    {
+      description:
+        'Fetch multiple Gmail messages in a single call. More efficient than fetching individually. Limited to 50 messages per call.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageIds: z.array(z.string()).describe('Array of message IDs to fetch (max 50)'),
+        format: z
+          .enum(['minimal', 'metadata', 'full'])
+          .optional()
+          .describe('Response format (default: full)'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'readonly');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const results = await client.getMessagesBatch(args.messageIds, args.format ?? 'full');
+
+        // Transform results for response
+        const messages = results.map((result) => {
+          if (result.success && result.message) {
+            return {
+              id: result.id,
+              success: true,
+              message: {
+                id: result.message.id,
+                threadId: result.message.threadId,
+                labelIds: result.message.labelIds,
+                snippet: result.message.snippet,
+                from: getHeader(result.message, 'From'),
+                to: getHeader(result.message, 'To'),
+                subject: getHeader(result.message, 'Subject'),
+                date: getHeader(result.message, 'Date'),
+                body: getTextBody(result.message),
+              },
+            };
+          }
+          return {
+            id: result.id,
+            success: false,
+            error: result.error,
+          };
+        });
+
+        const successCount = messages.filter((m) => m.success).length;
+        const failCount = messages.filter((m) => !m.success).length;
+
+        return successResponse({
+          total: messages.length,
+          successCount,
+          failCount,
+          messages,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
   // gmail_get_thread - Get a thread with all messages
   server.registerTool(
     'gmail_get_thread',

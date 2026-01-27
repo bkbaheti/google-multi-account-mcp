@@ -100,6 +100,13 @@ export interface SearchResult {
   resultSizeEstimate?: number;
 }
 
+export interface BatchMessageResult {
+  id: string;
+  success: boolean;
+  message?: Message;
+  error?: string;
+}
+
 export interface Label {
   id: string;
   name: string;
@@ -203,6 +210,40 @@ export class GmailClient {
     });
 
     return this.convertMessage(response.data);
+  }
+
+  // Batch get multiple messages in parallel
+  async getMessagesBatch(
+    messageIds: string[],
+    format: 'minimal' | 'metadata' | 'full' = 'full',
+  ): Promise<BatchMessageResult[]> {
+    // Limit batch size to prevent overwhelming the API
+    const maxBatchSize = 50;
+    const idsToFetch = messageIds.slice(0, maxBatchSize);
+
+    const results = await Promise.allSettled(
+      idsToFetch.map(async (id) => {
+        const message = await this.getMessage(id, format);
+        return { id, message };
+      }),
+    );
+
+    return results.map((result, index): BatchMessageResult => {
+      const id = idsToFetch[index] ?? '';
+      if (result.status === 'fulfilled') {
+        return {
+          id,
+          success: true,
+          message: result.value.message,
+        };
+      } else {
+        return {
+          id,
+          success: false,
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        };
+      }
+    });
   }
 
   async createDraft(input: DraftInput): Promise<Draft> {

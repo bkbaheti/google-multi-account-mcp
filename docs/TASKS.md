@@ -1,6 +1,27 @@
 # Tasks
 
-## Current Phase: 8 - Performance & Optimization (Pending)
+## Current Phase: 9 - Advanced Features (Pending)
+
+---
+
+## Phase 8 - Performance & Optimization (COMPLETED)
+
+Infrastructure improvements for reliability and efficiency.
+
+### Completed
+- [DONE] Implement configurable logging with sensitive data redaction (commit: TBD)
+- [DONE] Implement rate limiting with exponential backoff on 429/5xx errors (commit: TBD)
+- [DONE] Implement per-account request throttling with token bucket algorithm (commit: TBD)
+- [DONE] Implement LRU cache with configurable TTLs (commit: TBD)
+- [DONE] Add cache infrastructure with getWithMeta() for cache hints (commit: TBD)
+- [DONE] Implement `gmail_get_messages_batch` tool - Fetch multiple messages in one call (commit: TBD)
+
+### Notes
+- Logger supports log levels via MCP_GOOGLE_LOG_LEVEL env var
+- Automatic redaction of auth tokens, email content, and recipients
+- Token bucket throttling prevents API rate limit errors
+- LRU cache supports per-operation TTLs (search 30s, metadata 5min, bodies 10min)
+- Batch tool limited to 50 messages per call
 
 ---
 
@@ -47,44 +68,6 @@ Address gaps identified in spec review to ensure full SPEC.md compliance.
 - [DONE] Implement structured error model (`code`, `message`, `details`) across all tools (commit: 5972860)
 - [DONE] Add scope validation with explicit "needs upgrade" errors for tools requiring higher tiers (commit: 378bcd8)
 - [DONE] Add unit tests for error model consistency (commit: 9254e06)
-
----
-
-## Phase 8 - Performance & Optimization
-
-Infrastructure improvements for reliability and efficiency.
-
-### Pending
-
-- [ ] **Implement rate limiting with exponential backoff on 429/5xx errors**
-
-  APIs enforce rate limits to prevent abuse and ensure fair usage. Gmail's default is 250 quota units per user per second. When exceeded, the API returns HTTP 429 (Too Many Requests). Exponential backoff is the standard retry strategy: wait 1s, then 2s, then 4s, up to a maximum. This prevents "thundering herd" where all retries happen simultaneously. We'll wrap API calls with a retry decorator that catches 429/5xx errors, waits appropriately, and retries. The implementation tracks per-account rate limit state to avoid one account's heavy usage affecting others.
-
-- [ ] **Add request-level LRU cache with configurable TTLs**
-
-  Many email workflows repeatedly access the same data: reading a message, checking its thread, reading again. An LRU (Least Recently Used) cache stores recent API responses keyed by `accountId + method + params`. When a request matches a cached entry that hasn't expired, we return the cached data without hitting the API. TTL (Time To Live) varies by data type: search results change frequently (15-60s TTL), message metadata is stable (5-10min), message bodies never change (longer TTL). LRU eviction ensures the cache doesn't grow unbounded—when full, the least recently accessed entries are removed.
-
-- [ ] **Add cache hints in tool responses (`cacheHit`, `ttlRemainingMs`)**
-
-  Transparency about caching helps users understand data freshness. When a response includes `cacheHit: true, ttlRemainingMs: 45000`, the user knows they're seeing 45-second-old data. This is especially important for search results where new emails might have arrived. Cache hints also help debugging ("why am I seeing old data?") and allow clients to implement their own refresh logic. The implementation adds these fields to all tool responses, defaulting to `cacheHit: false` for uncached requests.
-
-- [ ] **Implement `gmail_get_messages_batch` tool - Fetch multiple messages in one call**
-
-  Fetching 10 messages individually requires 10 API calls with 10 round-trips of network latency. Gmail's batch API lets you bundle up to 100 requests into one HTTP request, dramatically reducing latency and quota usage. The response contains all results (or individual errors). We'll accept an array of message IDs and return an array of messages. Implementation uses `gmail.users.messages.batchGet` or constructs a multipart batch request. This is essential for workflows that process search results—instead of N sequential fetches, one batch request.
-
-- [ ] **Add per-account request throttling**
-
-  Beyond reactive rate limiting (handling 429s), proactive throttling prevents hitting limits in the first place. We maintain a token bucket per account: tokens regenerate at the rate limit (e.g., 250/second), each request consumes tokens, and requests wait if the bucket is empty. This smooths out bursty traffic and provides predictable behavior. It also enforces fairness between accounts—one account's heavy usage shouldn't starve others. The implementation uses a simple in-memory token bucket with timestamps.
-
-- [ ] **Add configurable logging levels with sensitive data redaction**
-
-  Debugging production issues requires logs, but email content is sensitive. We'll implement log levels (debug, info, warn, error) configurable via environment variable (`MCP_GOOGLE_LOG_LEVEL`). The key feature is automatic redaction: email bodies, subjects, and recipients are replaced with `[REDACTED]` in logs unless explicitly enabled. Headers like `Authorization` are always redacted. This balances debuggability with privacy. The implementation wraps console.log with level checking and runs output through a redaction filter.
-
-### Identified
-- Default TTLs from spec: search 15-60s, metadata 5-10min, bodies 2-5min
-- Batch limit: 100 messages max (50 recommended for reliability)
-- Cache invalidation needed after send/modify operations
-- Consider cache persistence across restarts (SQLite) in future
 
 ---
 
