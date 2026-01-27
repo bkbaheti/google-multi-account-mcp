@@ -1,6 +1,40 @@
 # Tasks
 
-## Current Phase: 6 - Attachment Support (Pending)
+## Current Phase: 8 - Performance & Optimization (Pending)
+
+---
+
+## Phase 7 - AI Productivity Prompts (COMPLETED)
+
+MCP prompts that leverage existing tools with AI guidance for common workflows.
+
+### Completed
+- [DONE] Implement `summarize-thread` prompt - AI-assisted thread summarization (commit: cf8e3af)
+- [DONE] Implement `smart-reply` prompt - Context-aware reply suggestions (commit: cf8e3af)
+- [DONE] Implement `extract-action-items` prompt - Find TODOs/deadlines in emails (commit: cf8e3af)
+- [DONE] Implement `categorize-emails` prompt - Suggest labels for uncategorized messages (commit: cf8e3af)
+
+### Notes
+- No new API integration needed - uses existing tools
+- Prompts guide AI behavior, don't add business logic
+
+---
+
+## Phase 6 - Attachment Support (COMPLETED)
+
+Enable downloading and sending email attachments.
+
+### Completed
+- [DONE] Implement `gmail_list_attachments` tool - List attachments in a message (commit: 9e7dcf3)
+- [DONE] Implement `gmail_get_attachment` tool - Download attachment by ID (commit: 9e7dcf3)
+- [DONE] Implement `gmail_create_draft_with_attachment` tool - Create draft with file attachment (commit: 9e7dcf3)
+- [DONE] Add MIME handling utilities for multipart messages (commit: 9e7dcf3)
+- [DONE] Add unit tests for attachment operations - 15 tests (commit: 9e7dcf3)
+
+### Notes
+- No new OAuth scope needed - uses existing `gmail.compose`
+- Gmail attachment size limit is 25MB
+- MIME utilities support non-ASCII filenames via RFC 2047 encoding
 
 ---
 
@@ -13,68 +47,6 @@ Address gaps identified in spec review to ensure full SPEC.md compliance.
 - [DONE] Implement structured error model (`code`, `message`, `details`) across all tools (commit: 5972860)
 - [DONE] Add scope validation with explicit "needs upgrade" errors for tools requiring higher tiers (commit: 378bcd8)
 - [DONE] Add unit tests for error model consistency (commit: 9254e06)
-
----
-
-## Phase 6 - Attachment Support
-
-Enable downloading and sending email attachments.
-
-### Pending
-
-- [ ] **Implement `gmail_list_attachments` tool - List attachments in a message**
-
-  Email attachments are stored separately from the message body in Gmail's API. When you fetch a message, attachments appear as "parts" in the MIME structure with metadata (filename, mimeType, size) but not the actual data. This tool parses the message payload recursively, identifies parts with `attachmentId` fields, and returns a list of `{ attachmentId, filename, mimeType, size }`. This lets users see what's attached before deciding to download, saving bandwidth and API quota. The recursive parsing handles nested multipart messages (like emails with both HTML body and attachments).
-
-- [ ] **Implement `gmail_get_attachment` tool - Download attachment by ID (returns base64)**
-
-  Gmail stores attachment data separately and requires a dedicated API call (`messages.attachments.get`) to retrieve it. This tool takes a `messageId` and `attachmentId`, fetches the raw bytes, and returns them as base64-encoded string. Base64 is the standard way to transmit binary data in JSON—it increases size by ~33% but ensures safe transport. The MCP client can then decode this to save as a file or process further. We might add a `savePath` option later to write directly to disk, but base64 output is the most flexible starting point.
-
-- [ ] **Implement `gmail_create_draft_with_attachment` tool - Create draft with file attachment**
-
-  Sending attachments requires constructing a MIME multipart message—the email standard for combining text, HTML, and binary files in one message. The structure looks like: `multipart/mixed` containing `multipart/alternative` (text + HTML body) and `application/octet-stream` (attachment). We'll accept base64-encoded file data, filename, and mimeType, then build the proper MIME structure with boundaries separating each part. Gmail's API accepts this as a base64url-encoded `raw` field. This is more complex than plain text emails but essential for real-world email workflows.
-
-- [ ] **Add MIME handling utilities for multipart messages**
-
-  MIME (Multipurpose Internet Mail Extensions) is the standard that allows emails to contain more than plain text. A MIME message has headers defining the content type and boundaries, followed by multiple "parts" separated by those boundaries. Each part has its own headers and body. Building MIME messages by hand is error-prone (boundary strings must be unique, line endings must be CRLF, base64 must be chunked at 76 chars). We'll create utility functions to handle this correctly: `buildMultipartMessage()`, `addAttachmentPart()`, `encodeMimeHeader()` for non-ASCII filenames, etc.
-
-- [ ] **Add unit tests for attachment operations**
-
-  Attachment handling has many edge cases: empty attachments, non-ASCII filenames (需要UTF-8编码), large files, nested multipart structures, inline images vs attached files. Tests will mock the Gmail API responses with realistic MIME structures and verify our parsing extracts the right metadata. For sending, we'll verify the generated MIME is valid by checking boundary formatting, Content-Type headers, and base64 encoding. These tests prevent regressions when we inevitably encounter weird real-world email formats.
-
-### Identified
-- No new OAuth scope needed - uses existing `gmail.compose`
-- Large attachments may need streaming or chunking consideration
-- Gmail attachment size limit is 25MB
-
----
-
-## Phase 7 - AI Productivity Prompts
-
-MCP prompts that leverage existing tools with AI guidance for common workflows.
-
-### Pending
-
-- [ ] **Implement `summarize-thread` prompt - AI-assisted thread summarization**
-
-  Long email threads are time-consuming to read. This prompt fetches a thread using `gmail_get_thread`, then provides the AI with structured context: participants, timeline, key messages, and instruction to summarize. The prompt guides the AI to identify: (1) the main topic/request, (2) key decisions made, (3) open questions, (4) action items. Unlike a tool, a prompt doesn't execute logic—it's a template that shapes how the AI approaches the task. The AI uses its language understanding to extract meaning, while our prompt ensures consistent, useful output format.
-
-- [ ] **Implement `smart-reply` prompt - Context-aware reply suggestions**
-
-  Drafting replies is cognitive overhead. This prompt fetches the thread context, identifies the sender's intent (question, request, FYI), and guides the AI to suggest 2-3 appropriate responses ranging from brief acknowledgment to detailed reply. The prompt includes instructions about tone matching (formal if the sender is formal), response completeness (answer all questions asked), and professional conventions (greeting, sign-off). It then helps create a draft using `gmail_create_draft`. This is AI-assisted, not AI-automated—the human reviews before sending.
-
-- [ ] **Implement `extract-action-items` prompt - Find TODOs/deadlines in emails**
-
-  Important tasks often get buried in email. This prompt analyzes message content looking for: explicit requests ("Can you..."), deadlines ("by Friday"), commitments made by others, and follow-up items. The AI identifies these patterns using natural language understanding—something regex can't do well. Output is structured: `{ task, deadline, assignee, source_message_id }`. This transforms passive email reading into active task capture. The prompt instructs the AI on what counts as an action item and how to handle ambiguous cases.
-
-- [ ] **Implement `categorize-emails` prompt - Suggest labels for uncategorized messages**
-
-  Manual email organization is tedious. This prompt fetches recent unlabeled messages (using `gmail_search_messages` with `-has:userlabel`), analyzes content/sender patterns, and suggests appropriate labels from the user's existing label set (fetched via `gmail_list_labels`). The AI considers: sender domain (work vs personal), content keywords, thread participants, and time sensitivity. It suggests labels but doesn't apply them automatically—the user confirms with `gmail_modify_labels`. This teaches the AI the user's organizational preferences over time through the labels they accept or reject.
-
-### Identified
-- No new API integration needed - uses existing tools
-- Prompts guide AI behavior, don't add business logic
-- Prompts should include few-shot examples for consistent output
 
 ---
 

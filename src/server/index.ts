@@ -1062,6 +1062,229 @@ For each draft:
     },
   );
 
+  // === Phase 7: AI Productivity Prompts ===
+
+  // Prompt: summarize-thread - AI-assisted thread summarization
+  server.registerPrompt(
+    'summarize-thread',
+    {
+      title: 'Summarize Email Thread',
+      description:
+        'AI-assisted summarization of an email thread. Identifies main topic, key decisions, open questions, and action items.',
+      argsSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        threadId: z.string().describe('The thread ID to summarize'),
+      },
+    },
+    async (args) => {
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: `Please summarize the email thread ${args.threadId} from account ${args.accountId}.
+
+Follow this workflow:
+1. Fetch the full thread using gmail_get_thread with format "full"
+2. Analyze all messages in chronological order
+3. Provide a structured summary with:
+   - **Main Topic/Request**: What is this thread about?
+   - **Participants**: Who is involved and their roles
+   - **Timeline**: Key dates and when messages were sent
+   - **Key Decisions**: Any agreements or conclusions reached
+   - **Open Questions**: Unresolved items that need answers
+   - **Action Items**: Tasks mentioned with assignees and deadlines if stated
+
+Be concise but comprehensive. Focus on extracting actionable information.`,
+            },
+          },
+        ],
+      };
+    },
+  );
+
+  // Prompt: smart-reply - Context-aware reply suggestions
+  server.registerPrompt(
+    'smart-reply',
+    {
+      title: 'Smart Reply',
+      description:
+        'Get AI-suggested replies based on email context. Offers multiple response options from brief to detailed.',
+      argsSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        messageId: z.string().describe('The message ID to reply to'),
+        tone: z
+          .enum(['professional', 'friendly', 'brief'])
+          .optional()
+          .describe('Preferred tone for the reply'),
+      },
+    },
+    async (args) => {
+      const toneInstruction = args.tone
+        ? `Use a ${args.tone} tone.`
+        : 'Match the tone of the original message.';
+
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: `Help me reply to message ${args.messageId} from account ${args.accountId}.
+
+Follow this workflow:
+1. Fetch the message using gmail_get_message with format "full"
+2. Also fetch the thread context using gmail_get_thread if it's part of a conversation
+3. Analyze:
+   - Sender's intent (question, request, FYI, complaint, etc.)
+   - Questions asked that need answers
+   - Action requested
+   - Urgency level
+4. ${toneInstruction}
+5. Suggest 2-3 reply options:
+   - **Brief**: Quick acknowledgment or short answer
+   - **Standard**: Complete response addressing all points
+   - **Detailed**: Comprehensive reply with additional context
+
+For each option:
+- Show the suggested reply text
+- Explain when this response would be appropriate
+
+After I choose, create a draft using gmail_create_draft with proper threading headers.
+Show me the preview and ask for confirmation before any sending.`,
+            },
+          },
+        ],
+      };
+    },
+  );
+
+  // Prompt: extract-action-items - Find TODOs and deadlines in emails
+  server.registerPrompt(
+    'extract-action-items',
+    {
+      title: 'Extract Action Items',
+      description:
+        'Scan emails to find tasks, deadlines, and commitments. Returns structured list of action items.',
+      argsSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        query: z
+          .string()
+          .optional()
+          .describe('Optional search query to filter messages (default: recent unread)'),
+        maxMessages: z
+          .number()
+          .optional()
+          .describe('Maximum messages to analyze (default: 20)'),
+      },
+    },
+    async (args) => {
+      const query = args.query || 'is:unread newer_than:7d';
+      const maxMessages = args.maxMessages || 20;
+
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: `Extract action items from my emails in account ${args.accountId}.
+
+Follow this workflow:
+1. Search for messages using gmail_search_messages with query: "${query}" (limit: ${maxMessages})
+2. For each message, fetch full content with gmail_get_message
+3. Analyze each message for:
+   - Explicit requests ("Can you...", "Please...", "I need you to...")
+   - Deadlines mentioned ("by Friday", "before the meeting", specific dates)
+   - Commitments made by others that require follow-up
+   - Questions that need your response
+   - Meeting requests or scheduling needs
+
+4. Return a structured list of action items:
+
+| Task | Deadline | From | Priority | Message ID |
+|------|----------|------|----------|------------|
+| ... | ... | ... | High/Med/Low | ... |
+
+5. For each action item, explain:
+   - Why this is an action item
+   - Suggested next step
+
+Group items by priority (High > Medium > Low) where:
+- High: Explicit deadline within 48 hours or urgent language
+- Medium: Clear request but flexible timing
+- Low: FYI items that may need future action`,
+            },
+          },
+        ],
+      };
+    },
+  );
+
+  // Prompt: categorize-emails - Suggest labels for uncategorized messages
+  server.registerPrompt(
+    'categorize-emails',
+    {
+      title: 'Categorize Emails',
+      description:
+        'Analyze uncategorized emails and suggest appropriate labels based on content and sender patterns.',
+      argsSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        maxMessages: z
+          .number()
+          .optional()
+          .describe('Maximum messages to analyze (default: 25)'),
+        applyAutomatically: z
+          .boolean()
+          .optional()
+          .describe('If true, apply labels after confirmation. If false, just show suggestions.'),
+      },
+    },
+    async (args) => {
+      const maxMessages = args.maxMessages || 25;
+      const autoApply = args.applyAutomatically ?? false;
+
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: `Help me organize uncategorized emails in account ${args.accountId}.
+
+Follow this workflow:
+1. First, get my existing labels using gmail_list_labels
+2. Search for unlabeled messages: gmail_search_messages with query "-has:userlabel newer_than:14d" (limit: ${maxMessages})
+3. For each message, analyze:
+   - Sender domain (work vs personal vs commercial)
+   - Subject line patterns
+   - Content keywords
+   - Whether it's part of an ongoing thread
+   - Time sensitivity
+
+4. Suggest labels from my existing set. For each message show:
+
+   **From**: sender
+   **Subject**: subject
+   **Suggested Label**: [label name]
+   **Reason**: Brief explanation
+
+5. Group suggestions by label for bulk application.
+
+${autoApply ? `After I confirm, apply the labels using gmail_modify_labels for each message.` : `Show suggestions only - I'll apply labels manually.`}
+
+Tips:
+- Prefer existing labels over suggesting new ones
+- Consider creating parent/child label structures if patterns emerge
+- Flag messages that don't fit any category for manual review`,
+            },
+          },
+        ],
+      };
+    },
+  );
+
   return server;
 }
 
