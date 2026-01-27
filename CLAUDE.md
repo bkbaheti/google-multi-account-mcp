@@ -11,30 +11,55 @@ npm-installable MCP server for multi-Google-account access. Primary: Gmail. Futu
 - Transport: stdio (default), HTTP/SSE (future)
 - Config: `~/.config/mcp-google/config.json`
 
-### MCP Tools (v1)
-Account:
+### MCP Tools (Current)
+
+**Account:**
 - `google_list_accounts` - list connected accounts
 - `google_add_account` - OAuth flow to add account
 - `google_remove_account` - delete account + tokens
 - `google_set_account_labels` - tag accounts
 
-Gmail Read:
+**Gmail Read:**
 - `gmail_search_messages` - search with query
 - `gmail_get_message` - fetch single message
 - `gmail_get_thread` - fetch thread
 
-Gmail Write (with confirm gate):
+**Gmail Write (with confirm gate):**
 - `gmail_create_draft` - create draft
 - `gmail_update_draft` - modify draft
+- `gmail_get_draft` - preview draft before sending
+- `gmail_delete_draft` - delete draft
 - `gmail_send_draft` - send (requires confirm: true)
 - `gmail_reply_in_thread` - reply (requires confirm: true)
 
+**Gmail Inbox Management:**
+- `gmail_list_labels` - list all labels (system + custom)
+- `gmail_modify_labels` - add/remove labels from message
+- `gmail_mark_read_unread` - toggle read status
+- `gmail_archive` - remove from INBOX
+- `gmail_trash` - move to trash
+- `gmail_untrash` - restore from trash
+
+**MCP Prompts:**
+- `compose-email` - guided email composition workflow
+- `reply-to-email` - guided reply workflow with threading
+- `review-drafts` - review and manage pending drafts
+
 ### Implementation Phases
+
+**Completed:**
 - Phase 0: Skeleton (MCP boots, config, empty list_accounts)
 - Phase 1: OAuth + account store
-- Phase 2: Gmail read/search + caching
+- Phase 2: Gmail read/search
 - Phase 3: Draft/send with safety gate
-- Phase 4: Modify tools (labels, archive)
+- Phase 4: Inbox management (labels, archive, trash)
+
+**Pending:**
+- Phase 5: Spec compliance (env config, error model)
+- Phase 6: Attachment support
+- Phase 7: AI productivity prompts
+- Phase 8: Performance & optimization (caching, rate limiting)
+- Phase 9: Advanced features (filters, vacation, batch ops)
 
 ### Non-Negotiable Constraints
 - BYO OAuth credentials (no shared client)
