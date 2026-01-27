@@ -6,6 +6,7 @@ export {
   getTextBody,
   type Draft,
   type DraftInput,
+  type DraftMessage,
   type Message,
   type MessageHeader,
   type MessagePart,

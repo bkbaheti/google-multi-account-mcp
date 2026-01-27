@@ -223,4 +223,47 @@ describe('GmailClient drafts', () => {
       expect(callArgs.requestBody.message.threadId).toBe('thread-existing');
     });
   });
+
+  describe('getDraft', () => {
+    it('retrieves a draft by ID', async () => {
+      const mockDraftResponse = {
+        data: {
+          id: 'draft-123',
+          message: {
+            id: 'msg-456',
+            threadId: 'thread-789',
+            labelIds: ['DRAFT'],
+            snippet: 'This is a preview...',
+            payload: {
+              headers: [
+                { name: 'To', value: 'recipient@example.com' },
+                { name: 'Subject', value: 'Test Subject' },
+                { name: 'From', value: 'sender@example.com' },
+              ],
+              body: {
+                data: Buffer.from('Test body content', 'utf-8').toString('base64url'),
+              },
+            },
+          },
+        },
+      };
+
+      mockDraftsGet.mockResolvedValue(mockDraftResponse);
+
+      const result = await client.getDraft('draft-123');
+
+      expect(result.id).toBe('draft-123');
+      expect(result.message?.id).toBe('msg-456');
+      expect(result.message?.threadId).toBe('thread-789');
+      expect(result.message?.snippet).toBe('This is a preview...');
+      expect(result.message?.labelIds).toContain('DRAFT');
+
+      expect(mockDraftsGet).toHaveBeenCalledWith({
+        userId: 'me',
+        id: 'draft-123',
+        format: 'full',
+      });
+    });
+  });
+
 });

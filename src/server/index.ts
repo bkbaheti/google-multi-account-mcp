@@ -484,6 +484,71 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // gmail_get_draft - Get a draft with preview
+  server.registerTool(
+    'gmail_get_draft',
+    {
+      description: 'Get a draft email with full content for preview before sending',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        draftId: z.string().describe('The draft ID to retrieve'),
+      },
+    },
+    async (args) => {
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const draft = await client.getDraft(args.draftId);
+
+        // Extract headers for easy access
+        const headers = draft.message?.payload?.headers ?? [];
+        const getHeaderValue = (name: string): string | undefined =>
+          headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value;
+
+        // Get body content
+        const bodyContent = draft.message?.payload?.body?.data
+          ? Buffer.from(draft.message.payload.body.data, 'base64url').toString('utf-8')
+          : undefined;
+
+        const response = {
+          id: draft.id,
+          message: {
+            id: draft.message?.id,
+            threadId: draft.message?.threadId,
+            labelIds: draft.message?.labelIds,
+            snippet: draft.message?.snippet,
+            from: getHeaderValue('From'),
+            to: getHeaderValue('To'),
+            cc: getHeaderValue('Cc'),
+            bcc: getHeaderValue('Bcc'),
+            subject: getHeaderValue('Subject'),
+            date: getHeaderValue('Date'),
+            body: bodyContent,
+          },
+        };
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ error: message }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
   return server;
 }
 

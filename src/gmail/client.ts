@@ -54,10 +54,15 @@ export interface Thread {
 
 export interface Draft {
   id: string;
-  message?: {
-    id?: string;
-    threadId?: string;
-  };
+  message?: DraftMessage;
+}
+
+export interface DraftMessage {
+  id?: string;
+  threadId?: string;
+  labelIds?: string[];
+  snippet?: string;
+  payload?: MessagePayload;
 }
 
 export interface DraftInput {
@@ -180,6 +185,21 @@ export class GmailClient {
     return this.convertDraftResponse(response.data);
   }
 
+  async getDraft(
+    draftId: string,
+    format: 'minimal' | 'metadata' | 'full' = 'full',
+  ): Promise<Draft> {
+    const gmail = await this.getGmail();
+
+    const response = await gmail.users.drafts.get({
+      userId: 'me',
+      id: draftId,
+      format,
+    });
+
+    return this.convertDraftResponseFull(response.data);
+  }
+
   private buildDraftRequestBody(input: DraftInput): { message: { raw: string; threadId?: string } } {
     const lines: string[] = [];
     lines.push(`To: ${input.to}`);
@@ -228,6 +248,33 @@ export class GmailClient {
       }
       if (data.message.threadId) {
         result.message.threadId = data.message.threadId;
+      }
+    }
+
+    return result;
+  }
+
+  private convertDraftResponseFull(data: gmail_v1.Schema$Draft): Draft {
+    const result: Draft = {
+      id: data.id ?? '',
+    };
+
+    if (data.message) {
+      result.message = {};
+      if (data.message.id) {
+        result.message.id = data.message.id;
+      }
+      if (data.message.threadId) {
+        result.message.threadId = data.message.threadId;
+      }
+      if (data.message.labelIds) {
+        result.message.labelIds = data.message.labelIds;
+      }
+      if (data.message.snippet) {
+        result.message.snippet = data.message.snippet;
+      }
+      if (data.message.payload) {
+        result.message.payload = this.convertPayload(data.message.payload);
       }
     }
 
