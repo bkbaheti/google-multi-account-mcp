@@ -1,25 +1,19 @@
 # Tasks
 
-## Current Phase: 3 - Draft/Send with Safety Gate
+## Current Phase: 4 - Modify Tools (Optional)
 
-### Active
-<!-- Tasks currently being worked on -->
-- [IN PROGRESS] Write tests for confirmation flow
+---
 
-### Pending
-<!-- Ready to pick up -->
-
-### Identified
-<!-- New tasks discovered during work -->
+## Phase 3 - Draft/Send with Safety Gate (COMPLETED)
 
 ### Completed
-<!-- Format: [DONE] Task description (commit: abc1234) -->
 - [DONE] Implement gmail_create_draft tool (commit: 23efa6c)
 - [DONE] Implement gmail_update_draft tool (commit: cd4099b)
 - [DONE] Implement draft preview rendering (commit: c5d2308)
 - [DONE] Implement gmail_send_draft with confirm gate (commit: ba95d15)
 - [DONE] Implement gmail_reply_in_thread tool (commit: 1ae85bb)
 - [DONE] Add MCP prompts for safe workflows (commit: c2ba597)
+- [DONE] Write tests for confirmation flow (commit: d30b7b0)
 
 ---
 
