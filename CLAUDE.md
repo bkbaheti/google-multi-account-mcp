@@ -126,4 +126,4 @@ tests/
 ```
 
 ## Full Spec Reference
-For complete details: `mcp_google_multi_account_broker_spec_v_0_structure.md`
+For complete details: `docs/SPEC.md`

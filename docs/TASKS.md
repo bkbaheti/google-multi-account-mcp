@@ -1,34 +1,12 @@
 # Tasks
 
-## Current Phase: 0 - Skeleton
+## Current Phase: 1 - OAuth + Account Store
 
 ### Active
 <!-- Tasks currently being worked on -->
 
 ### Pending
 <!-- Ready to pick up -->
-- [ ] Initialize pnpm project with TypeScript strict mode
-- [ ] Configure biome for linting/formatting
-- [ ] Set up vitest for testing
-- [ ] Create directory structure (src/, tests/, docs/)
-- [ ] Add @modelcontextprotocol/sdk dependency
-- [ ] Create config schema with zod validation
-- [ ] Implement config file loader (~/.config/mcp-google/config.json)
-- [ ] Create MCP server skeleton with stdio transport
-- [ ] Implement google_list_accounts tool (returns empty array)
-- [ ] Add CLI entrypoint (bin: mcp-google)
-- [ ] Verify MCP server connects via stdio
-
-### Identified
-<!-- New tasks discovered during work -->
-
-### Completed
-<!-- Format: [DONE] Task description (commit: abc1234) -->
-
----
-
-## Phase 1 - OAuth + Account Store
-### Pending
 - [ ] Design token storage abstraction (keychain vs encrypted file)
 - [ ] Implement OS keychain integration (keytar or similar)
 - [ ] Implement encrypted file fallback
@@ -41,7 +19,27 @@
 - [ ] Write integration tests for OAuth flow
 
 ### Identified
+<!-- New tasks discovered during work -->
+
 ### Completed
+<!-- Format: [DONE] Task description (commit: abc1234) -->
+
+---
+
+## Phase 0 - Skeleton (COMPLETED)
+
+### Completed
+- [DONE] Initialize pnpm project with TypeScript strict mode
+- [DONE] Configure biome for linting/formatting
+- [DONE] Set up vitest for testing
+- [DONE] Create directory structure (src/, tests/, docs/)
+- [DONE] Add @modelcontextprotocol/sdk dependency
+- [DONE] Create config schema with zod validation
+- [DONE] Implement config file loader (~/.config/mcp-google/config.json)
+- [DONE] Create MCP server skeleton with stdio transport
+- [DONE] Implement google_list_accounts tool (returns empty array)
+- [DONE] Add CLI entrypoint (bin: mcp-google)
+- [DONE] Verify MCP server connects via stdio
 
 ---
 
