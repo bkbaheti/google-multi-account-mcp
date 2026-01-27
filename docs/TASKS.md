@@ -1,33 +1,18 @@
 # Tasks
 
-## Current Phase: 5 - Spec Compliance (Pending)
+## Current Phase: 6 - Attachment Support (Pending)
 
 ---
 
-## Phase 5 - Spec Compliance
+## Phase 5 - Spec Compliance (COMPLETED)
 
 Address gaps identified in spec review to ensure full SPEC.md compliance.
 
-### Pending
-
-- [ ] **Add `MCP_GOOGLE_CONFIG_PATH` env override support in config loader**
-
-  Environment variables provide a standard way to configure applications without modifying files, especially useful in containerized deployments, CI/CD pipelines, and multi-environment setups. Currently our config loader hardcodes `~/.config/mcp-google/config.json`, but the spec requires supporting `MCP_GOOGLE_CONFIG_PATH` as an override. This allows users to point to different config files for testing, run multiple instances with different accounts, or integrate with systems that manage config externally. The implementation is simple: check `process.env.MCP_GOOGLE_CONFIG_PATH` before falling back to the default path.
-
-- [ ] **Implement structured error model (`code`, `message`, `details`) across all tools**
-
-  A structured error model makes errors machine-readable and actionable. Instead of just returning `{ error: "Something went wrong" }`, we return `{ code: "ACCOUNT_NOT_FOUND", message: "No account with ID xyz", details: { accountId: "xyz" } }`. This allows MCP clients to programmatically handle errors—retry on `RATE_LIMITED`, prompt for auth on `AUTH_NOT_CONFIGURED`, or suggest scope upgrade on `SCOPE_INSUFFICIENT`. The `code` is a stable identifier for error types, `message` is human-readable, and `details` contains contextual data. This pattern is standard in APIs (Google, Stripe, AWS all use it) and makes debugging and error recovery much easier.
-
-- [ ] **Add scope validation with explicit "needs upgrade" errors for tools requiring higher tiers**
-
-  OAuth scopes control what an application can access. We have three tiers: `readonly` (search/read), `compose` (create drafts, send), and `full` (modify labels, archive). If a user adds an account with `readonly` scope and then tries to send an email, the tool should fail with a clear error like `SCOPE_INSUFFICIENT: This operation requires 'compose' scope. Current account has 'readonly'. Use google_add_account with scopeTier='compose' to upgrade.` This prevents cryptic Google API 403 errors and guides users toward the solution. The implementation checks the account's granted scopes against the tool's requirements before making API calls.
-
-- [ ] **Add unit tests for error model consistency**
-
-  Tests ensure every tool returns errors in the same structured format. We'll create test cases that trigger each error type (missing account, missing auth, insufficient scope, rate limited) and verify the response shape matches our error model schema. This prevents regression where a developer might accidentally return a plain string error instead of the structured format. Consistent error handling is a quality signal—it shows the API is well-designed and maintainable.
-
-### Identified
-- Error codes should follow pattern: `AUTH_NOT_CONFIGURED`, `ACCOUNT_NOT_FOUND`, `SCOPE_INSUFFICIENT`, `RATE_LIMITED`, etc.
+### Completed
+- [DONE] Add `MCP_GOOGLE_CONFIG_PATH` env override support in config loader (commit: 9b0bb99)
+- [DONE] Implement structured error model (`code`, `message`, `details`) across all tools (commit: 5972860)
+- [DONE] Add scope validation with explicit "needs upgrade" errors for tools requiring higher tiers (commit: 378bcd8)
+- [DONE] Add unit tests for error model consistency (commit: 9254e06)
 
 ---
 

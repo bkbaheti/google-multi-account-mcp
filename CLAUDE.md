@@ -53,9 +53,9 @@ npm-installable MCP server for multi-Google-account access. Primary: Gmail. Futu
 - Phase 2: Gmail read/search
 - Phase 3: Draft/send with safety gate
 - Phase 4: Inbox management (labels, archive, trash)
+- Phase 5: Spec compliance (env config, error model, scope validation)
 
 **Pending:**
-- Phase 5: Spec compliance (env config, error model)
 - Phase 6: Attachment support
 - Phase 7: AI productivity prompts
 - Phase 8: Performance & optimization (caching, rate limiting)
