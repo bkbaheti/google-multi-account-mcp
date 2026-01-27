@@ -6,7 +6,27 @@ export const AccountSchema = z.object({
   labels: z.array(z.string()).default([]),
   scopes: z.array(z.string()),
   addedAt: z.iso.datetime(),
+  lastUsedAt: z.iso.datetime().optional(),
 });
+
+// Scope tiers for incremental authorization
+export const SCOPE_TIERS = {
+  readonly: [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  compose: [
+    'https://www.googleapis.com/auth/gmail.compose',
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  full: [
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+} as const;
+
+export type ScopeTier = keyof typeof SCOPE_TIERS;
 
 export type Account = z.infer<typeof AccountSchema>;
 
