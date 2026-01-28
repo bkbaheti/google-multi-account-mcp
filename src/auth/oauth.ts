@@ -149,8 +149,21 @@ export class GoogleOAuth {
       });
 
       server.listen(REDIRECT_PORT, () => {
-        console.error(`\nOpen this URL to authorize:\n\n${authUrl}\n`);
-        console.error(`Waiting for authorization...`);
+        // Output auth URL prominently to stderr (MCP servers use stderr for user-visible logs)
+        const message = `
+
+════════════════════════════════════════════════════════════════════════════════
+  AUTHORIZATION REQUIRED
+
+  Open this URL in your browser to authorize:
+
+  ${authUrl}
+
+  Waiting for authorization...
+════════════════════════════════════════════════════════════════════════════════
+
+`;
+        process.stderr.write(message);
       });
 
       server.on('error', (err) => {

@@ -4,6 +4,19 @@
 
 ---
 
+## Bugfixes
+
+### OAuth URL Visibility Fix
+- **Issue**: OAuth authorization URL was not visible to users during `google_add_account` flow
+- **Cause**: MCP clients (Claude Code, Claude Desktop) may not prominently display `sendLoggingMessage` notifications or stderr output
+- **Fix**: Enhanced OAuth URL visibility via:
+  1. Changed MCP logging level from `info` to `warning` for higher visibility
+  2. Added prominent banner format to stderr output with clear framing
+  3. Added troubleshooting documentation for OAuth URL visibility
+- **Files changed**: `src/auth/oauth.ts`, `src/server/index.ts`, `README.md`
+
+---
+
 ## Phase 8 - Performance & Optimization (COMPLETED)
 
 Infrastructure improvements for reliability and efficiency.

@@ -113,11 +113,12 @@ export function createServer(options: ServerOptions): McpServer {
       try {
         const account = await accountStore.addAccount(scopeTierOrTiers, {
           onAuthUrl: (url) => {
-            // Send auth URL via MCP logging so it appears in the client CLI
+            // Send auth URL via MCP logging with 'warning' level for visibility
+            // Also output to stderr as backup for clients that show stderr
             server.sendLoggingMessage({
-              level: 'info',
+              level: 'warning',
               logger: 'google_add_account',
-              data: `\n\n🔗 Open this URL to authorize:\n\n${url}\n\nWaiting for authorization...`,
+              data: `AUTHORIZATION REQUIRED: Open this URL in your browser: ${url}`,
             });
           },
         });

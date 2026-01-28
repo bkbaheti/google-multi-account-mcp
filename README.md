@@ -483,6 +483,18 @@ This can happen if you've previously authorized the app. To fix:
 2. Find and remove your MCP app
 3. Say "Add my Gmail account" again
 
+### OAuth URL not showing up
+
+When adding an account, the OAuth authorization URL should appear in:
+- **Claude Code**: Look for a warning-level log message with the URL
+- **Claude Desktop**: Check the MCP server logs
+- **Terminal stderr**: The URL is also written to stderr with a visible banner
+
+If you don't see the URL:
+1. Check your MCP client's log output or notification area
+2. The URL is also logged to stderr - check terminal output if running manually
+3. The OAuth flow times out after 5 minutes if not completed
+
 ### Port 8089 already in use
 
 The OAuth callback server uses port 8089. If it's in use:
