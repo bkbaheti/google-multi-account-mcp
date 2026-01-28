@@ -1,7 +1,13 @@
 import { loadConfig, saveConfig } from '../config/index.js';
 import type { Account, ScopeTier } from '../types/index.js';
 import { mergeScopeTiers, SCOPE_TIERS } from '../types/index.js';
-import { GoogleOAuth, type AuthFlowOptions, type OAuth2Client, type OAuthConfig } from './oauth.js';
+import {
+  GoogleOAuth,
+  type AuthFlowOptions,
+  type OAuth2Client,
+  type OAuthConfig,
+  type PendingAuthSession,
+} from './oauth.js';
 import type { TokenStorage } from './token-storage.js';
 
 export class AccountStore {
@@ -39,6 +45,76 @@ export class AccountStore {
     return accounts.find((a) => a.id === accountId) ?? null;
   }
 
+  /**
+   * Start adding an account asynchronously - returns auth URL immediately.
+   * Use checkPendingAuth to poll for completion.
+   */
+  startAddAccount(scopeTierOrTiers: ScopeTier | ScopeTier[] = 'readonly'): PendingAuthSession {
+    const scopes = Array.isArray(scopeTierOrTiers)
+      ? mergeScopeTiers(scopeTierOrTiers)
+      : [...SCOPE_TIERS[scopeTierOrTiers]];
+    const oauth = this.getOAuth();
+    return oauth.startAuthFlowAsync(scopes);
+  }
+
+  /**
+   * Check if a pending auth session completed. If completed, saves the account.
+   * Returns the session status and account if completed.
+   */
+  checkPendingAuth(sessionId: string): {
+    status: 'pending' | 'completed' | 'failed' | 'not_found';
+    account?: Account;
+    error?: string;
+  } {
+    const oauth = this.getOAuth();
+    const session = oauth.getPendingSession(sessionId);
+
+    if (!session) {
+      return { status: 'not_found', error: 'Session not found or expired' };
+    }
+
+    if (session.status === 'pending') {
+      return { status: 'pending' };
+    }
+
+    if (session.status === 'failed') {
+      return { status: 'failed', error: session.error ?? 'Unknown error' };
+    }
+
+    if (session.status === 'completed' && session.result) {
+      // Save the account to config
+      const account: Account = {
+        id: session.result.accountId,
+        email: session.result.email,
+        labels: [],
+        scopes: session.result.scopes,
+        addedAt: new Date().toISOString(),
+      };
+
+      const config = loadConfig();
+      // Check if account already saved (avoid duplicates)
+      if (!config.accounts.find((a) => a.id === account.id)) {
+        config.accounts.push(account);
+        saveConfig(config);
+      }
+
+      return { status: 'completed', account };
+    }
+
+    return { status: 'failed', error: 'Unknown error' };
+  }
+
+  /**
+   * List all pending auth sessions
+   */
+  listPendingSessions(): PendingAuthSession[] {
+    const oauth = this.getOAuth();
+    return oauth.listPendingSessions();
+  }
+
+  /**
+   * Original blocking addAccount method for backwards compatibility
+   */
   async addAccount(
     scopeTierOrTiers: ScopeTier | ScopeTier[] = 'readonly',
     options?: AuthFlowOptions,

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { TokenStorage } from '../auth/index.js';
@@ -19,6 +22,31 @@ import {
 } from '../types/index.js';
 import { cache } from '../utils/index.js';
 
+// Load build info (generated at build time)
+interface BuildInfo {
+  version: string;
+  commit: string;
+  buildDate: string;
+}
+
+function loadBuildInfo(): BuildInfo {
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const buildInfoPath = join(__dirname, '..', 'build-info.json');
+    const content = readFileSync(buildInfoPath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    // Fallback if build-info.json doesn't exist (dev mode)
+    return {
+      version: '0.1.0',
+      commit: 'dev',
+      buildDate: new Date().toISOString(),
+    };
+  }
+}
+
+const buildInfo = loadBuildInfo();
+
 export interface ServerOptions {
   tokenStorage: TokenStorage;
 }
@@ -26,7 +54,7 @@ export interface ServerOptions {
 export function createServer(options: ServerOptions): McpServer {
   const server = new McpServer({
     name: 'mcp-google',
-    version: '0.1.0',
+    version: buildInfo.version,
   });
 
   const accountStore = new AccountStore(options.tokenStorage);
@@ -51,6 +79,23 @@ export function createServer(options: ServerOptions): McpServer {
     return { account };
   }
 
+  // google_version - Get server version and build info
+  server.registerTool(
+    'google_version',
+    {
+      description:
+        'Get the MCP Google server version, git commit, and build date. Use this to verify which version is running.',
+    },
+    async () => {
+      return successResponse({
+        name: 'mcp-google',
+        version: buildInfo.version,
+        commit: buildInfo.commit,
+        buildDate: buildInfo.buildDate,
+      });
+    },
+  );
+
   // google_list_accounts - List all connected Google accounts
   server.registerTool(
     'google_list_accounts',
@@ -72,12 +117,12 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
-  // google_add_account - Add a new Google account via OAuth
+  // google_add_account - Add a new Google account via OAuth (async flow)
   server.registerTool(
     'google_add_account',
     {
       description:
-        'Add a new Google account via OAuth. Opens browser for authorization. Use scopeTier for a single tier, or scopeTiers to combine multiple tiers (e.g., ["full", "settings"] for inbox management + filters). Tiers: readonly (default), compose, full, settings, or all.',
+        'Add a new Google account via OAuth. Returns an authorization URL that you must show to the user. The user opens this URL in their browser to authorize. After authorization, use google_check_pending_auth to complete the process. Tiers: readonly (default), compose, full, settings, or all.',
       inputSchema: {
         scopeTier: z
           .enum(['readonly', 'compose', 'full', 'settings', 'all'])
@@ -111,30 +156,79 @@ export function createServer(options: ServerOptions): McpServer {
         : (args.scopeTier as ScopeTier);
 
       try {
-        const account = await accountStore.addAccount(scopeTierOrTiers, {
-          onAuthUrl: (url) => {
-            // Send auth URL via MCP logging with 'warning' level for visibility
-            // Also output to stderr as backup for clients that show stderr
-            server.sendLoggingMessage({
-              level: 'warning',
-              logger: 'google_add_account',
-              data: `AUTHORIZATION REQUIRED: Open this URL in your browser: ${url}`,
-            });
-          },
-        });
+        // Start async auth flow - returns immediately with auth URL
+        const session = accountStore.startAddAccount(scopeTierOrTiers);
 
         return successResponse({
-          success: true,
-          message: `Successfully added account ${account.email}`,
-          account: {
-            id: account.id,
-            email: account.email,
-            scopes: account.scopes,
-          },
+          status: 'authorization_required',
+          message:
+            'Please open the authorization URL below in your browser to connect your Google account.',
+          sessionId: session.sessionId,
+          authUrl: session.authUrl,
+          instructions: [
+            '1. Open the authorization URL in your browser',
+            '2. Sign in to your Google account and grant permissions',
+            '3. After authorization, call google_check_pending_auth with the sessionId to complete setup',
+          ],
+          expiresIn: '5 minutes',
         });
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
+    },
+  );
+
+  // google_check_pending_auth - Check status of pending authorization
+  server.registerTool(
+    'google_check_pending_auth',
+    {
+      description:
+        'Check the status of a pending Google account authorization. Call this after the user has completed the OAuth flow in their browser. Returns the connected account info if successful.',
+      inputSchema: {
+        sessionId: z.string().describe('The session ID returned by google_add_account'),
+      },
+    },
+    async (args) => {
+      const result = accountStore.checkPendingAuth(args.sessionId);
+
+      if (result.status === 'not_found') {
+        return errorResponse({
+          code: 'SESSION_NOT_FOUND',
+          message: 'Authorization session not found or expired. Please start a new authorization with google_add_account.',
+        });
+      }
+
+      if (result.status === 'pending') {
+        return successResponse({
+          status: 'pending',
+          message: 'Authorization still pending. The user needs to complete the OAuth flow in their browser.',
+          instructions: 'If the user has already authorized, wait a moment and check again.',
+        });
+      }
+
+      if (result.status === 'failed') {
+        return errorResponse({
+          code: 'AUTH_FAILED',
+          message: result.error ?? 'Authorization failed',
+        });
+      }
+
+      if (result.status === 'completed' && result.account) {
+        return successResponse({
+          status: 'completed',
+          message: `Successfully connected account ${result.account.email}`,
+          account: {
+            id: result.account.id,
+            email: result.account.email,
+            scopes: result.account.scopes,
+          },
+        });
+      }
+
+      return errorResponse({
+        code: 'UNKNOWN_ERROR',
+        message: 'Unknown error checking authorization status',
+      });
     },
   );
 

@@ -14,8 +14,10 @@ npm-installable MCP server for multi-Google-account access. Primary: Gmail. Futu
 ### MCP Tools (Current)
 
 **Account:**
+- `google_version` - get server version, commit, build date
 - `google_list_accounts` - list connected accounts
-- `google_add_account` - OAuth flow to add account
+- `google_add_account` - start OAuth flow (returns auth URL + session ID)
+- `google_check_pending_auth` - check/complete pending auth session
 - `google_remove_account` - delete account + tokens
 - `google_set_account_labels` - tag accounts
 
@@ -54,12 +56,13 @@ npm-installable MCP server for multi-Google-account access. Primary: Gmail. Futu
 - Phase 3: Draft/send with safety gate
 - Phase 4: Inbox management (labels, archive, trash)
 - Phase 5: Spec compliance (env config, error model, scope validation)
-
-**Pending:**
 - Phase 6: Attachment support
 - Phase 7: AI productivity prompts
 - Phase 8: Performance & optimization (caching, rate limiting)
 - Phase 9: Advanced features (filters, vacation, batch ops)
+
+**Pending:**
+- HTTP/SSE transport support (deferred - significant architectural work)
 
 ### Non-Negotiable Constraints
 - BYO OAuth credentials (no shared client)

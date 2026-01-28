@@ -182,17 +182,20 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 
 1. Start Claude Code (or restart if already running to pick up config changes)
 
-2. Verify the server is connected:
+2. Verify the server is connected and check the version:
    ```
-   "Show my connected Google accounts"
+   "What version of the Google MCP server is running?"
    ```
-   Should return an empty list initially.
+   Claude will show the version, git commit, and build date.
 
 3. Add a Google account:
    ```
    "Add my Gmail account"
    ```
-   Claude will ask which permissions you need, then show an authorization URL. Open it in your browser to complete OAuth.
+   Claude will:
+   - Ask which permissions you need (readonly, compose, full, etc.)
+   - Show you an authorization URL to open in your browser
+   - After you complete OAuth in the browser, Claude will confirm the account was added
 
 4. Start using your email:
    ```

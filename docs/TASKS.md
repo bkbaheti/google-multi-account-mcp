@@ -4,9 +4,24 @@
 
 ---
 
-## Bugfixes
+## Bugfixes & Enhancements
 
-### OAuth URL Visibility Fix
+### Version Tool
+- **Issue**: No way for users to verify which version of the MCP server they're running
+- **Fix**: Added `google_version` tool that returns version, git commit hash, and build date
+- **Files changed**: `src/server/index.ts`, `package.json`, `scripts/generate-build-info.js`
+
+### OAuth URL Visibility Fix (v2)
+- **Issue**: OAuth authorization URL was not visible to users during `google_add_account` flow
+- **Cause**: MCP tools can only return once, but the auth flow blocks waiting for user interaction. MCP logging and stderr output may not be displayed to users.
+- **Fix**: Implemented async two-phase auth flow:
+  1. `google_add_account` now returns immediately with the auth URL and session ID
+  2. New `google_check_pending_auth` tool to poll for completion status
+  3. Auth callback server runs in background and updates session status
+  4. This ensures the auth URL is always visible in the tool response
+- **Files changed**: `src/auth/oauth.ts`, `src/auth/account-store.ts`, `src/server/index.ts`
+
+### OAuth URL Visibility Fix (v1 - superseded)
 - **Issue**: OAuth authorization URL was not visible to users during `google_add_account` flow
 - **Cause**: MCP clients (Claude Code, Claude Desktop) may not prominently display `sendLoggingMessage` notifications or stderr output
 - **Fix**: Enhanced OAuth URL visibility via:

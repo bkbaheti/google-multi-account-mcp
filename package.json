@@ -12,7 +12,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/generate-build-info.js",
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
     "test": "vitest run",
