@@ -1,7 +1,7 @@
 import { loadConfig, saveConfig } from '../config/index.js';
 import type { Account, ScopeTier } from '../types/index.js';
-import { SCOPE_TIERS } from '../types/index.js';
-import { GoogleOAuth, type OAuth2Client, type OAuthConfig } from './oauth.js';
+import { mergeScopeTiers, SCOPE_TIERS } from '../types/index.js';
+import { GoogleOAuth, type AuthFlowOptions, type OAuth2Client, type OAuthConfig } from './oauth.js';
 import type { TokenStorage } from './token-storage.js';
 
 export class AccountStore {
@@ -39,10 +39,16 @@ export class AccountStore {
     return accounts.find((a) => a.id === accountId) ?? null;
   }
 
-  async addAccount(scopeTier: ScopeTier = 'readonly'): Promise<Account> {
-    const scopes = SCOPE_TIERS[scopeTier];
+  async addAccount(
+    scopeTierOrTiers: ScopeTier | ScopeTier[] = 'readonly',
+    options?: AuthFlowOptions,
+  ): Promise<Account> {
+    // Support both single tier (backwards compat) and array of tiers
+    const scopes = Array.isArray(scopeTierOrTiers)
+      ? mergeScopeTiers(scopeTierOrTiers)
+      : [...SCOPE_TIERS[scopeTierOrTiers]];
     const oauth = this.getOAuth();
-    const result = await oauth.startAuthFlow([...scopes]);
+    const result = await oauth.startAuthFlow(scopes, options);
 
     const account: Account = {
       id: result.accountId,

@@ -77,19 +77,50 @@ export function createServer(options: ServerOptions): McpServer {
     'google_add_account',
     {
       description:
-        'Add a new Google account via OAuth. Opens browser for authorization. Scope tier: readonly (default), compose (send emails), full (modify labels/archive), or settings (filters/vacation).',
+        'Add a new Google account via OAuth. Opens browser for authorization. Use scopeTier for a single tier, or scopeTiers to combine multiple tiers (e.g., ["full", "settings"] for inbox management + filters). Tiers: readonly (default), compose, full, settings, or all.',
       inputSchema: {
         scopeTier: z
-          .enum(['readonly', 'compose', 'full', 'settings'])
+          .enum(['readonly', 'compose', 'full', 'settings', 'all'])
           .optional()
-          .describe('Permission level: readonly, compose, full, or settings'),
+          .describe('Single permission tier (use scopeTiers for multiple)'),
+        scopeTiers: z
+          .array(z.enum(['readonly', 'compose', 'full', 'settings', 'all']))
+          .optional()
+          .describe('Combine multiple tiers (e.g., ["full", "settings"])'),
       },
     },
     async (args) => {
-      const scopeTier = (args.scopeTier ?? 'readonly') as ScopeTier;
+      // If no scope specified, prompt for selection
+      if (!args.scopeTier && !args.scopeTiers) {
+        return successResponse({
+          needsScopeSelection: true,
+          message: 'Which permissions would you like for this account?',
+          options: [
+            { tier: 'readonly', description: 'Read and search emails only' },
+            { tier: 'compose', description: 'Also compose and send emails (recommended)' },
+            { tier: 'full', description: 'Also manage labels, archive, trash' },
+            { tier: 'settings', description: 'Also manage filters and vacation responder' },
+            { tier: 'all', description: 'All permissions' },
+          ],
+        });
+      }
+
+      // scopeTiers takes precedence if provided
+      const scopeTierOrTiers: ScopeTier | ScopeTier[] = args.scopeTiers
+        ? (args.scopeTiers as ScopeTier[])
+        : (args.scopeTier as ScopeTier);
 
       try {
-        const account = await accountStore.addAccount(scopeTier);
+        const account = await accountStore.addAccount(scopeTierOrTiers, {
+          onAuthUrl: (url) => {
+            // Send auth URL via MCP logging so it appears in the client CLI
+            server.sendLoggingMessage({
+              level: 'info',
+              logger: 'google_add_account',
+              data: `\n\n🔗 Open this URL to authorize:\n\n${url}\n\nWaiting for authorization...`,
+            });
+          },
+        });
 
         return successResponse({
           success: true,

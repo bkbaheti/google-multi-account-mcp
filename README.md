@@ -2,16 +2,27 @@
 
 An MCP (Model Context Protocol) server for accessing multiple Google accounts (primarily Gmail) from Claude Code, Claude Desktop, or any MCP-compatible client.
 
+**Just talk to Claude naturally:**
+```
+"Check my email"
+"Find messages from my boss this week"
+"Write a reply thanking them for the update"
+"Send it"
+```
+
+No special commands to memorize - Claude understands what you want.
+
 ## Features
 
-- **Multi-account support**: Connect and manage multiple Google accounts simultaneously
-- **Gmail access**: Search, read, compose, send, and organize emails
+- **Natural language**: Just describe what you want - "find my unread emails", "draft a reply"
+- **Multi-account support**: Connect work, personal, and other accounts - search across all of them
+- **Full Gmail access**: Search, read, compose, send, and organize emails
 - **Attachments**: Download and send file attachments
 - **Inbox management**: Labels, archive, trash, read/unread status
 - **Filters & vacation**: Create email filters and configure vacation responders
-- **AI productivity prompts**: Thread summarization, smart replies, action item extraction
-- **Safety gates**: Draft-first workflow with confirmation required for all sends
-- **Local-first**: All credentials stored locally, BYO OAuth credentials
+- **AI productivity**: Thread summaries, smart reply suggestions, action item extraction
+- **Safety first**: All sends require confirmation - Claude shows you the draft before sending
+- **Privacy focused**: All credentials stored locally, you bring your own OAuth credentials
 
 ## Installation
 
@@ -169,118 +180,278 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 
 ### Getting Started
 
-1. Start Claude Code (or restart if already running)
+1. Start Claude Code (or restart if already running to pick up config changes)
+
 2. Verify the server is connected:
    ```
-   Run google_list_accounts
+   "Show my connected Google accounts"
    ```
-   Should return an empty array.
+   Should return an empty list initially.
 
 3. Add a Google account:
    ```
-   Run google_add_account with scopeTier "compose"
+   "Add my Gmail account"
    ```
-   This opens a browser for OAuth authorization.
+   Claude will ask which permissions you need, then show an authorization URL. Open it in your browser to complete OAuth.
 
-4. Complete the OAuth flow in your browser
-5. Search your emails:
+4. Start using your email:
    ```
-   Run gmail_search_messages with query "is:unread"
+   "Find my unread emails"
+   "Search for emails from john@example.com"
+   "Draft a reply to the last email"
    ```
+
+**Note:** These examples are natural language - Claude understands your intent and uses the appropriate MCP tools automatically. You don't need to know the tool names.
+
+### Example Conversations
+
+Here are some real-world examples of how to interact with Claude using this MCP server:
+
+#### Reading and Searching Email
+
+```
+You: "Check my email for anything from Amazon in the last week"
+Claude: [Searches and returns matching emails with subjects, dates, and snippets]
+
+You: "Show me the full email about my order"
+Claude: [Fetches the complete message with body content]
+
+You: "What attachments are in that email?"
+Claude: [Lists any attachments with filenames and sizes]
+```
+
+#### Composing and Sending
+
+```
+You: "Write an email to sarah@example.com thanking her for the meeting"
+Claude: I'll draft that email for you.
+       [Creates draft]
+       Here's the draft:
+       To: sarah@example.com
+       Subject: Thank you for the meeting
+       ...
+       Would you like me to send it, or make any changes?
+
+You: "Looks good, send it"
+Claude: [Sends the email with confirmation]
+```
+
+#### Managing Your Inbox
+
+```
+You: "Archive all emails from newsletters@example.com"
+Claude: [Archives matching messages]
+
+You: "Create a label called 'Urgent' with a red color"
+Claude: [Creates the label]
+
+You: "Mark the last 5 unread emails as read"
+Claude: [Updates the messages]
+```
+
+#### Multi-Account Workflows
+
+```
+You: "Add my work Gmail account"
+Claude: Which permissions would you like?
+        - readonly: Read and search only
+        - compose: Also send emails (recommended)
+        - full: Also manage labels, archive, trash
+        ...
+
+You: "Compose, please"
+Claude: [Opens OAuth flow for work account]
+
+You: "Label my work account as 'work' and my personal as 'personal'"
+Claude: [Sets labels on both accounts]
+
+You: "Search for 'project update' across all my accounts"
+Claude: [Searches both accounts and shows combined results]
+```
+
+#### AI-Powered Productivity
+
+```
+You: "Summarize this email thread"
+Claude: [Analyzes the thread and provides]:
+        - Main topic: Q3 budget review
+        - Participants: Finance team (5 people)
+        - Key decisions: Budget approved with 10% increase
+        - Action items: Submit receipts by Friday
+
+You: "What action items do I have from my unread emails?"
+Claude: [Scans unread messages and extracts tasks with deadlines]
+
+You: "Suggest a reply to the last email"
+Claude: Based on the context, here are 3 options:
+        1. Brief: "Thanks, I'll review and get back to you."
+        2. Detailed: [longer response addressing all points]
+        ...
+        Which would you like me to draft?
+```
+
+#### Setting Up Automation
+
+```
+You: "Create a filter to auto-archive emails from noreply@example.com"
+Claude: I'll create that filter. This will automatically archive
+        all future emails from that sender. Confirm?
+
+You: "Yes"
+Claude: [Creates the filter]
+
+You: "Set up my vacation responder - I'm out Dec 20-27"
+Claude: What message would you like to send?
+
+You: "Just say I'm on holiday and will respond when I return"
+Claude: [Configures vacation responder with dates]
+```
 
 ### Scope Tiers
 
-When adding an account, choose a scope tier based on what you need:
+When adding an account, Claude will ask which permissions you need:
 
-| Tier | Permissions | Use Case |
-|------|-------------|----------|
-| `readonly` | Search and read emails | Just reading/searching |
-| `compose` | + Create drafts and send | Composing and sending emails |
-| `full` | + Labels, archive, trash | Full inbox management |
+| Tier | What You Can Do | Best For |
+|------|-----------------|----------|
+| `readonly` | Read and search emails | Checking email, research |
+| `compose` | + Create drafts and send | Daily email use (recommended) |
+| `full` | + Labels, archive, trash | Inbox organization |
 | `settings` | + Filters, vacation responder | Email automation |
+| `all` | Everything above | Full control |
 
-Add accounts with the desired tier:
+**How it works:**
+- `readonly` → `compose` → `full` builds on each other
+- `settings` is separate (for filters/vacation only)
+- You can combine them: "I want inbox management AND filters" → `full` + `settings`
+
+**Examples:**
 ```
-google_add_account with scopeTier "full"
+You: "Add my Gmail account"
+Claude: Which permissions would you like?
+        [Shows options]
+
+You: "I just want to read emails"
+Claude: [Adds with readonly scope]
+
+You: "Actually, I need to send emails too"
+Claude: You'll need to remove and re-add with compose permissions.
+        Want me to do that?
 ```
 
 ## Available Tools
 
+You don't need to memorize tool names - just describe what you want. Here's what's available:
+
 ### Account Management
 
-| Tool | Description |
-|------|-------------|
-| `google_list_accounts` | List all connected Google accounts |
-| `google_add_account` | Add a new account via OAuth |
-| `google_remove_account` | Remove an account and revoke tokens |
-| `google_set_account_labels` | Tag accounts (e.g., "work", "personal") |
+| Just Say... | What Happens |
+|-------------|--------------|
+| "Show my Google accounts" | Lists all connected accounts |
+| "Add my Gmail account" | Starts OAuth flow to add account |
+| "Remove my work account" | Disconnects account and revokes tokens |
+| "Label this account as 'personal'" | Tags account for easy reference |
 
-### Gmail - Reading
+### Reading Email (readonly scope)
 
-| Tool | Description | Scope |
-|------|-------------|-------|
-| `gmail_search_messages` | Search with Gmail query syntax | readonly |
-| `gmail_get_message` | Get a single message | readonly |
-| `gmail_get_messages_batch` | Get multiple messages (max 50) | readonly |
-| `gmail_get_thread` | Get a thread with all messages | readonly |
-| `gmail_list_attachments` | List attachments in a message | readonly |
-| `gmail_get_attachment` | Download an attachment | readonly |
+| Just Say... | What Happens |
+|-------------|--------------|
+| "Find emails from john@example.com" | Searches with Gmail query syntax |
+| "Show me unread emails from this week" | Returns matching messages |
+| "Get the full email about the project" | Fetches complete message content |
+| "Show me that entire conversation" | Gets thread with all messages |
+| "What attachments are in this email?" | Lists files with names and sizes |
+| "Download the PDF attachment" | Retrieves the file data |
 
-### Gmail - Composing
+**Gmail search tips:** Use Gmail's search syntax for powerful queries:
+- `from:someone@example.com` - From specific sender
+- `subject:meeting` - Subject contains word
+- `is:unread` - Unread messages only
+- `has:attachment` - Messages with attachments
+- `newer_than:7d` - Last 7 days
+- `label:important` - Has specific label
 
-| Tool | Description | Scope |
-|------|-------------|-------|
-| `gmail_create_draft` | Create a draft email | compose |
-| `gmail_create_draft_with_attachment` | Create draft with attachments | compose |
-| `gmail_update_draft` | Update an existing draft | compose |
-| `gmail_get_draft` | Preview a draft | compose |
-| `gmail_delete_draft` | Delete a draft | compose |
-| `gmail_send_draft` | Send a draft (requires `confirm: true`) | compose |
-| `gmail_reply_in_thread` | Reply to a thread | compose |
+### Composing Email (compose scope)
 
-### Gmail - Inbox Management
+| Just Say... | What Happens |
+|-------------|--------------|
+| "Write an email to sarah@example.com" | Creates a draft for review |
+| "Draft a reply to the last email" | Creates reply with proper threading |
+| "Attach report.pdf to this draft" | Adds attachment to draft |
+| "Update the draft - change the subject" | Modifies existing draft |
+| "Show me my draft before sending" | Previews the draft |
+| "Delete that draft" | Removes the draft |
+| "Send the email" | Sends after confirmation |
 
-| Tool | Description | Scope |
-|------|-------------|-------|
-| `gmail_list_labels` | List all labels | full |
-| `gmail_create_label` | Create a new label | full |
-| `gmail_update_label` | Update label name/color | full |
-| `gmail_delete_label` | Delete a label | full |
-| `gmail_modify_labels` | Add/remove labels from message | full |
-| `gmail_batch_modify_labels` | Bulk label modification (max 1000) | full |
-| `gmail_mark_read_unread` | Toggle read/unread status | full |
-| `gmail_archive` | Remove from INBOX | full |
-| `gmail_trash` | Move to trash | full |
-| `gmail_untrash` | Restore from trash | full |
+**Safety feature:** All emails go through a draft-first workflow. Claude will always show you the draft and ask for confirmation before sending.
 
-### Gmail - Settings (Filters & Vacation)
+### Inbox Management (full scope)
 
-| Tool | Description | Scope |
-|------|-------------|-------|
-| `gmail_list_filters` | List all email filters | settings |
-| `gmail_create_filter` | Create a filter (requires `confirm: true`) | settings |
-| `gmail_delete_filter` | Delete a filter (requires `confirm: true`) | settings |
-| `gmail_get_vacation` | Get vacation responder settings | settings |
-| `gmail_set_vacation` | Configure vacation responder | settings |
+| Just Say... | What Happens |
+|-------------|--------------|
+| "Show my labels" | Lists all Gmail labels |
+| "Create a 'Projects' label in blue" | Creates label with color |
+| "Rename 'Old' label to 'Archive'" | Updates label properties |
+| "Delete the 'Temp' label" | Removes label (keeps messages) |
+| "Add the 'Important' label to this email" | Applies label to message |
+| "Label these 50 emails as 'Done'" | Bulk label operation |
+| "Mark this as read" | Changes read status |
+| "Archive this email" | Removes from inbox |
+| "Delete this email" | Moves to trash |
+| "Restore from trash" | Recovers deleted message |
 
-### MCP Prompts
+### Filters & Vacation (settings scope)
 
-| Prompt | Description |
-|--------|-------------|
-| `compose-email` | Guided email composition workflow |
-| `reply-to-email` | Guided reply with proper threading |
-| `review-drafts` | Review and manage pending drafts |
-| `summarize-thread` | AI-assisted thread summarization |
-| `smart-reply` | Context-aware reply suggestions |
-| `extract-action-items` | Find TODOs and deadlines |
-| `categorize-emails` | Suggest labels for uncategorized messages |
+| Just Say... | What Happens |
+|-------------|--------------|
+| "Show my email filters" | Lists automatic rules |
+| "Create a filter for newsletters" | Sets up auto-processing |
+| "Delete the filter for old@example.com" | Removes automation rule |
+| "Check my vacation settings" | Shows auto-reply config |
+| "Turn on vacation responder" | Enables auto-reply |
+| "I'm back - disable vacation reply" | Turns off auto-reply |
 
-### MCP Resources
+### AI Productivity Prompts
 
-| Resource URI | Description |
-|--------------|-------------|
-| `accounts://list` | List connected accounts (read-only) |
-| `cache://stats` | Cache statistics |
+These prompts guide Claude through complex workflows:
+
+| Just Say... | What Happens |
+|-------------|--------------|
+| "Help me compose an email" | Guided drafting with preview and confirmation |
+| "Help me reply to this thread" | Proper threading, tone matching |
+| "Review my pending drafts" | Shows drafts, offers send/edit/delete |
+| "Summarize this email thread" | Extracts key points, decisions, action items |
+| "Suggest replies for this email" | Offers brief/standard/detailed options |
+| "What action items do I have?" | Scans emails for tasks and deadlines |
+| "Help me organize my inbox" | Suggests labels for uncategorized emails |
+
+### Technical Reference
+
+<details>
+<summary>Click to see exact tool names (for advanced users)</summary>
+
+**Account Management:**
+- `google_list_accounts`, `google_add_account`, `google_remove_account`, `google_set_account_labels`
+
+**Gmail Reading:**
+- `gmail_search_messages`, `gmail_get_message`, `gmail_get_messages_batch`, `gmail_get_thread`, `gmail_list_attachments`, `gmail_get_attachment`
+
+**Gmail Composing:**
+- `gmail_create_draft`, `gmail_create_draft_with_attachment`, `gmail_update_draft`, `gmail_get_draft`, `gmail_delete_draft`, `gmail_send_draft`, `gmail_reply_in_thread`
+
+**Inbox Management:**
+- `gmail_list_labels`, `gmail_create_label`, `gmail_update_label`, `gmail_delete_label`, `gmail_modify_labels`, `gmail_batch_modify_labels`, `gmail_mark_read_unread`, `gmail_archive`, `gmail_trash`, `gmail_untrash`
+
+**Settings:**
+- `gmail_list_filters`, `gmail_create_filter`, `gmail_delete_filter`, `gmail_get_vacation`, `gmail_set_vacation`
+
+**MCP Prompts:**
+- `compose-email`, `reply-to-email`, `review-drafts`, `summarize-thread`, `smart-reply`, `extract-action-items`, `categorize-emails`
+
+**MCP Resources:**
+- `accounts://list` - List connected accounts
+- `cache://stats` - Cache statistics
+
+</details>
 
 ## Environment Variables
 
@@ -310,7 +481,7 @@ Your `config.json` is missing OAuth credentials. Ensure you have:
 This can happen if you've previously authorized the app. To fix:
 1. Go to [Google Account Permissions](https://myaccount.google.com/permissions)
 2. Find and remove your MCP app
-3. Run `google_add_account` again
+3. Say "Add my Gmail account" again
 
 ### Port 8089 already in use
 
@@ -333,9 +504,16 @@ Tokens will be encrypted with AES-256-GCM using this passphrase.
 
 ### "Scope insufficient" errors
 
-You're trying to use a tool that requires a higher scope tier than the account has. Either:
-- Remove and re-add the account with a higher scope tier
-- Use a different account that has the required scope
+You're trying to do something that requires more permissions than the account has.
+
+```
+You: "Archive this email"
+Claude: This account only has readonly permissions. You need 'full' scope
+        to archive emails. Would you like me to remove and re-add the
+        account with higher permissions?
+```
+
+**Fix:** Say "Remove my account and add it back with full permissions"
 
 ### MCP server not connecting
 
@@ -343,6 +521,20 @@ You're trying to use a tool that requires a higher scope tier than the account h
 2. Ensure you've run `pnpm build` to compile TypeScript
 3. Check that `dist/cli.js` exists
 4. Try running manually: `node /path/to/dist/cli.js`
+
+### Common Questions
+
+**Q: Can I use multiple Google accounts?**
+Yes! Just say "Add another Gmail account" and repeat the OAuth flow. You can label them ("Label my work account as 'work'") and search across all of them.
+
+**Q: Will Claude send emails without asking?**
+No. All sends require explicit confirmation. Claude will always show you the draft first and ask "Would you like me to send this?"
+
+**Q: What happens if I accidentally delete an email?**
+Emails go to Trash first and stay there for 30 days. Say "Show my trash" or "Restore that email from trash" to recover it.
+
+**Q: Can Claude read my emails when I'm not using it?**
+No. The MCP server only runs when Claude Code/Desktop is active, and only accesses emails when you ask it to.
 
 ## Development
 

@@ -13,6 +13,7 @@ export const AccountSchema = z.object({
 // Tier hierarchy: readonly < compose < full (linear)
 //                 readonly < settings (parallel branch)
 // Settings and full are parallel - neither satisfies the other
+// 'all' combines everything: full + settings + compose
 export const SCOPE_TIERS = {
   readonly: [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -33,9 +34,30 @@ export const SCOPE_TIERS = {
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
   ],
+  all: [
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.labels',
+    'https://www.googleapis.com/auth/gmail.settings.basic',
+    'https://www.googleapis.com/auth/gmail.compose',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
 } as const;
 
 export type ScopeTier = keyof typeof SCOPE_TIERS;
+
+/**
+ * Merge scopes from multiple tiers into a single deduplicated array.
+ * This allows combining independent branches like 'full' + 'settings'.
+ */
+export function mergeScopeTiers(tiers: ScopeTier[]): string[] {
+  const scopeSet = new Set<string>();
+  for (const tier of tiers) {
+    for (const scope of SCOPE_TIERS[tier]) {
+      scopeSet.add(scope);
+    }
+  }
+  return Array.from(scopeSet);
+}
 
 export type Account = z.infer<typeof AccountSchema>;
 
@@ -66,6 +88,11 @@ export function getScopeTier(scopes: string[]): ScopeTier {
   const hasCompose = scopes.includes('https://www.googleapis.com/auth/gmail.compose');
   const hasSettings = scopes.includes('https://www.googleapis.com/auth/gmail.settings.basic');
 
+  // 'all' tier has both full (modify/labels) AND settings
+  if ((hasModify || hasLabels) && hasSettings) {
+    return 'all';
+  }
+
   // full tier has modify + labels
   if (hasModify || hasLabels) {
     return 'full';
@@ -90,8 +117,19 @@ export function getScopeTier(scopes: string[]): ScopeTier {
 //   readonly < compose < full (linear chain)
 //   readonly < settings (parallel branch)
 // Settings and full/compose are parallel - neither satisfies the other
+// 'all' tier satisfies any requirement, but only 'all' satisfies 'all'
 export function hasSufficientScope(accountScopes: string[], requiredTier: ScopeTier): boolean {
   const accountTier = getScopeTier(accountScopes);
+
+  // 'all' tier satisfies any requirement
+  if (accountTier === 'all') {
+    return true;
+  }
+
+  // Only 'all' tier can satisfy 'all' requirement
+  if (requiredTier === 'all') {
+    return false;
+  }
 
   // Same tier always satisfies
   if (accountTier === requiredTier) {
@@ -103,7 +141,7 @@ export function hasSufficientScope(accountScopes: string[], requiredTier: ScopeT
     return true;
   }
 
-  // settings tier is a parallel branch - only settings satisfies settings
+  // settings tier is a parallel branch - only settings or all satisfies settings
   if (requiredTier === 'settings') {
     return accountTier === 'settings';
   }

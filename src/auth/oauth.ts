@@ -20,6 +20,10 @@ export interface OAuthResult {
   scopes: string[];
 }
 
+export interface AuthFlowOptions {
+  onAuthUrl?: (url: string) => void;
+}
+
 export class GoogleOAuth {
   private readonly config: OAuthConfig;
   private readonly tokenStorage: TokenStorage;
@@ -33,7 +37,7 @@ export class GoogleOAuth {
     return new google.auth.OAuth2(this.config.clientId, this.config.clientSecret, REDIRECT_URI);
   }
 
-  async startAuthFlow(scopes: string[]): Promise<OAuthResult> {
+  async startAuthFlow(scopes: string[], options?: AuthFlowOptions): Promise<OAuthResult> {
     const oauth2Client = this.createOAuth2Client();
     const state = crypto.randomBytes(16).toString('hex');
 
@@ -43,6 +47,11 @@ export class GoogleOAuth {
       state,
       prompt: 'consent', // Force consent to get refresh token
     });
+
+    // Notify caller of the auth URL if callback provided
+    if (options?.onAuthUrl) {
+      options.onAuthUrl(authUrl);
+    }
 
     // Start local server to receive callback
     const code = await this.waitForCallback(state, authUrl);
