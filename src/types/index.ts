@@ -10,6 +10,9 @@ export const AccountSchema = z.object({
 });
 
 // Scope tiers for incremental authorization
+// Tier hierarchy: readonly < compose < full (linear)
+//                 readonly < settings (parallel branch)
+// Settings and full are parallel - neither satisfies the other
 export const SCOPE_TIERS = {
   readonly: [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -23,6 +26,11 @@ export const SCOPE_TIERS = {
   full: [
     'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/gmail.labels',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  settings: [
+    'https://www.googleapis.com/auth/gmail.settings.basic',
+    'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
   ],
 } as const;
@@ -56,10 +64,16 @@ export function getScopeTier(scopes: string[]): ScopeTier {
   const hasModify = scopes.includes('https://www.googleapis.com/auth/gmail.modify');
   const hasLabels = scopes.includes('https://www.googleapis.com/auth/gmail.labels');
   const hasCompose = scopes.includes('https://www.googleapis.com/auth/gmail.compose');
+  const hasSettings = scopes.includes('https://www.googleapis.com/auth/gmail.settings.basic');
 
   // full tier has modify + labels
   if (hasModify || hasLabels) {
     return 'full';
+  }
+
+  // settings tier has gmail.settings.basic
+  if (hasSettings) {
+    return 'settings';
   }
 
   // compose tier has compose (and usually readonly too)
@@ -72,13 +86,38 @@ export function getScopeTier(scopes: string[]): ScopeTier {
 }
 
 // Check if account scopes satisfy the required tier
+// Tier hierarchy:
+//   readonly < compose < full (linear chain)
+//   readonly < settings (parallel branch)
+// Settings and full/compose are parallel - neither satisfies the other
 export function hasSufficientScope(accountScopes: string[], requiredTier: ScopeTier): boolean {
   const accountTier = getScopeTier(accountScopes);
 
-  // Tier hierarchy: full > compose > readonly
-  const tierOrder: ScopeTier[] = ['readonly', 'compose', 'full'];
-  const accountTierIndex = tierOrder.indexOf(accountTier);
-  const requiredTierIndex = tierOrder.indexOf(requiredTier);
+  // Same tier always satisfies
+  if (accountTier === requiredTier) {
+    return true;
+  }
+
+  // readonly is satisfied by all other tiers
+  if (requiredTier === 'readonly') {
+    return true;
+  }
+
+  // settings tier is a parallel branch - only settings satisfies settings
+  if (requiredTier === 'settings') {
+    return accountTier === 'settings';
+  }
+
+  // For compose and full requirements, use the linear hierarchy
+  // full > compose > readonly
+  // settings does NOT satisfy compose or full
+  if (accountTier === 'settings') {
+    return false;
+  }
+
+  const linearTiers: ScopeTier[] = ['readonly', 'compose', 'full'];
+  const accountTierIndex = linearTiers.indexOf(accountTier);
+  const requiredTierIndex = linearTiers.indexOf(requiredTier);
 
   return accountTierIndex >= requiredTierIndex;
 }
@@ -105,4 +144,11 @@ export const OPERATION_SCOPE_REQUIREMENTS = {
   archive: 'full',
   trash: 'full',
   untrash: 'full',
+
+  // Settings operations - settings tier (parallel branch)
+  listFilters: 'settings',
+  createFilter: 'settings',
+  deleteFilter: 'settings',
+  getVacation: 'settings',
+  setVacation: 'settings',
 } as const satisfies Record<string, ScopeTier>;

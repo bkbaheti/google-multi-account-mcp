@@ -20,6 +20,8 @@ export const ErrorCode = {
   THREAD_NOT_FOUND: 'THREAD_NOT_FOUND',
   DRAFT_NOT_FOUND: 'DRAFT_NOT_FOUND',
   LABEL_NOT_FOUND: 'LABEL_NOT_FOUND',
+  FILTER_NOT_FOUND: 'FILTER_NOT_FOUND',
+  FILTER_LIMIT_EXCEEDED: 'FILTER_LIMIT_EXCEEDED',
 
   // Validation errors
   VALIDATION_ERROR: 'VALIDATION_ERROR',
@@ -134,6 +136,18 @@ export function draftNotFound(draftId: string): McpToolError {
 
 export function validationError(message: string, field?: string): McpToolError {
   return new McpToolError(ErrorCode.VALIDATION_ERROR, message, field ? { field } : undefined);
+}
+
+export function filterNotFound(filterId: string): McpToolError {
+  return new McpToolError(ErrorCode.FILTER_NOT_FOUND, `Filter not found: ${filterId}`, { filterId });
+}
+
+export function filterLimitExceeded(): McpToolError {
+  return new McpToolError(
+    ErrorCode.FILTER_LIMIT_EXCEEDED,
+    'Gmail filter limit exceeded. Maximum 1000 filters allowed per account.',
+    { limit: 1000 },
+  );
 }
 
 export function internalError(message: string): McpToolError {

@@ -77,12 +77,12 @@ export function createServer(options: ServerOptions): McpServer {
     'google_add_account',
     {
       description:
-        'Add a new Google account via OAuth. Opens browser for authorization. Scope tier: readonly (default), compose (send emails), or full (modify labels/archive).',
+        'Add a new Google account via OAuth. Opens browser for authorization. Scope tier: readonly (default), compose (send emails), full (modify labels/archive), or settings (filters/vacation).',
       inputSchema: {
         scopeTier: z
-          .enum(['readonly', 'compose', 'full'])
+          .enum(['readonly', 'compose', 'full', 'settings'])
           .optional()
-          .describe('Permission level: readonly, compose, or full'),
+          .describe('Permission level: readonly, compose, full, or settings'),
       },
     },
     async (args) => {
@@ -1213,6 +1213,269 @@ export function createServer(options: ServerOptions): McpServer {
             messageId: draft.message?.id,
             threadId: draft.message?.threadId,
           },
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // === Phase 9: Filter and Vacation Tools (requires settings scope) ===
+
+  // gmail_list_filters - List all email filters
+  server.registerTool(
+    'gmail_list_filters',
+    {
+      description:
+        'List all Gmail filters for an account. Filters automatically process incoming messages based on criteria. Requires settings scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'settings');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const filters = await client.listFilters();
+
+        return successResponse({
+          filters,
+          count: filters.length,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_create_filter - Create a new email filter
+  server.registerTool(
+    'gmail_create_filter',
+    {
+      description:
+        'Create a Gmail filter to automatically process incoming messages. Criteria define which messages match; actions define what happens to them. Requires settings scope and confirmation.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        criteria: z
+          .object({
+            from: z.string().optional().describe('Match messages from this sender'),
+            to: z.string().optional().describe('Match messages to this recipient'),
+            subject: z.string().optional().describe('Match messages with this subject'),
+            query: z.string().optional().describe('Match messages matching this Gmail search query'),
+            negatedQuery: z.string().optional().describe('Exclude messages matching this query'),
+            hasAttachment: z.boolean().optional().describe('Match only messages with attachments'),
+            excludeChats: z.boolean().optional().describe('Exclude chat messages'),
+            size: z.number().optional().describe('Message size threshold in bytes'),
+            sizeComparison: z
+              .enum(['larger', 'smaller'])
+              .optional()
+              .describe('Compare size as larger or smaller than threshold'),
+          })
+          .describe('Criteria for matching messages'),
+        action: z
+          .object({
+            addLabelIds: z.array(z.string()).optional().describe('Label IDs to add to matched messages'),
+            removeLabelIds: z
+              .array(z.string())
+              .optional()
+              .describe('Label IDs to remove from matched messages'),
+            forward: z.string().optional().describe('Email address to forward matched messages to'),
+          })
+          .describe('Actions to perform on matched messages'),
+        confirm: z
+          .boolean()
+          .describe('Must be true to create the filter. This is a safety gate.'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'settings');
+      if ('error' in validation) return validation.error;
+
+      if (args.confirm !== true) {
+        return errorResponse(
+          confirmationRequired(
+            'create this filter',
+            'Filters automatically process all matching incoming messages. Set confirm: true to proceed.',
+          ).toResponse(),
+        );
+      }
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+
+        // Build criteria object without undefined values
+        const criteria: Parameters<typeof client.createFilter>[0] = {};
+        if (args.criteria.from !== undefined) criteria.from = args.criteria.from;
+        if (args.criteria.to !== undefined) criteria.to = args.criteria.to;
+        if (args.criteria.subject !== undefined) criteria.subject = args.criteria.subject;
+        if (args.criteria.query !== undefined) criteria.query = args.criteria.query;
+        if (args.criteria.negatedQuery !== undefined) criteria.negatedQuery = args.criteria.negatedQuery;
+        if (args.criteria.hasAttachment !== undefined) criteria.hasAttachment = args.criteria.hasAttachment;
+        if (args.criteria.excludeChats !== undefined) criteria.excludeChats = args.criteria.excludeChats;
+        if (args.criteria.size !== undefined) criteria.size = args.criteria.size;
+        if (args.criteria.sizeComparison !== undefined) criteria.sizeComparison = args.criteria.sizeComparison;
+
+        // Build action object without undefined values
+        const action: Parameters<typeof client.createFilter>[1] = {};
+        if (args.action.addLabelIds !== undefined) action.addLabelIds = args.action.addLabelIds;
+        if (args.action.removeLabelIds !== undefined) action.removeLabelIds = args.action.removeLabelIds;
+        if (args.action.forward !== undefined) action.forward = args.action.forward;
+
+        const filter = await client.createFilter(criteria, action);
+
+        return successResponse({
+          success: true,
+          message: 'Filter created successfully',
+          filter,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_delete_filter - Delete an email filter
+  server.registerTool(
+    'gmail_delete_filter',
+    {
+      description:
+        'Delete a Gmail filter by ID. Use gmail_list_filters to see existing filters. Requires settings scope and confirmation.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        filterId: z.string().describe('The filter ID to delete'),
+        confirm: z
+          .boolean()
+          .describe('Must be true to delete the filter. This is a safety gate.'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'settings');
+      if ('error' in validation) return validation.error;
+
+      if (args.confirm !== true) {
+        return errorResponse(
+          confirmationRequired(
+            'delete this filter',
+            'Filter deletion is permanent. Set confirm: true to proceed.',
+          ).toResponse(),
+        );
+      }
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        await client.deleteFilter(args.filterId);
+
+        return successResponse({
+          success: true,
+          message: 'Filter deleted successfully',
+          deletedFilterId: args.filterId,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_get_vacation - Get vacation responder settings
+  server.registerTool(
+    'gmail_get_vacation',
+    {
+      description:
+        'Get the vacation auto-reply settings for an account. Shows whether vacation responder is enabled and its configuration. Requires settings scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'settings');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+        const vacation = await client.getVacation();
+
+        return successResponse({
+          vacation,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_set_vacation - Set vacation responder settings
+  server.registerTool(
+    'gmail_set_vacation',
+    {
+      description:
+        'Configure the vacation auto-reply settings. Can enable or disable the vacation responder. Enabling requires confirmation. Requires settings scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID'),
+        enableAutoReply: z.boolean().describe('Whether to enable the vacation auto-reply'),
+        responseSubject: z.string().optional().describe('Subject line for the auto-reply'),
+        responseBodyPlainText: z.string().optional().describe('Plain text body of the auto-reply'),
+        responseBodyHtml: z.string().optional().describe('HTML body of the auto-reply (optional)'),
+        restrictToContacts: z
+          .boolean()
+          .optional()
+          .describe('Only send auto-reply to people in contacts'),
+        restrictToDomain: z
+          .boolean()
+          .optional()
+          .describe('Only send auto-reply to people in the same domain'),
+        startTime: z
+          .number()
+          .optional()
+          .describe('Start time for vacation responder (epoch milliseconds)'),
+        endTime: z
+          .number()
+          .optional()
+          .describe('End time for vacation responder (epoch milliseconds)'),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe('Required when enabling vacation responder. Safety gate.'),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'settings');
+      if ('error' in validation) return validation.error;
+
+      // Confirmation required only when enabling
+      if (args.enableAutoReply && args.confirm !== true) {
+        return errorResponse(
+          confirmationRequired(
+            'enable vacation responder',
+            'This will automatically reply to incoming emails. Set confirm: true to proceed.',
+          ).toResponse(),
+        );
+      }
+
+      try {
+        const client = new GmailClient(accountStore, args.accountId);
+
+        // Build vacation settings without undefined values
+        const settings: Parameters<typeof client.setVacation>[0] = {
+          enableAutoReply: args.enableAutoReply,
+        };
+        if (args.responseSubject !== undefined) settings.responseSubject = args.responseSubject;
+        if (args.responseBodyPlainText !== undefined) settings.responseBodyPlainText = args.responseBodyPlainText;
+        if (args.responseBodyHtml !== undefined) settings.responseBodyHtml = args.responseBodyHtml;
+        if (args.restrictToContacts !== undefined) settings.restrictToContacts = args.restrictToContacts;
+        if (args.restrictToDomain !== undefined) settings.restrictToDomain = args.restrictToDomain;
+        if (args.startTime !== undefined) settings.startTime = args.startTime;
+        if (args.endTime !== undefined) settings.endTime = args.endTime;
+
+        const vacation = await client.setVacation(settings);
+
+        return successResponse({
+          success: true,
+          message: args.enableAutoReply
+            ? 'Vacation responder enabled'
+            : 'Vacation responder disabled',
+          vacation,
         });
       } catch (error) {
         return errorResponse(toMcpError(error));

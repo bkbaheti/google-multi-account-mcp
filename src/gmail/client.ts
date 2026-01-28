@@ -134,6 +134,43 @@ export interface AttachmentData {
   data: string; // base64-encoded
 }
 
+// Filter types
+export interface FilterCriteria {
+  from?: string;
+  to?: string;
+  subject?: string;
+  query?: string;
+  negatedQuery?: string;
+  hasAttachment?: boolean;
+  excludeChats?: boolean;
+  size?: number;
+  sizeComparison?: 'larger' | 'smaller';
+}
+
+export interface FilterAction {
+  addLabelIds?: string[];
+  removeLabelIds?: string[];
+  forward?: string;
+}
+
+export interface Filter {
+  id: string;
+  criteria?: FilterCriteria;
+  action?: FilterAction;
+}
+
+// Vacation settings
+export interface VacationSettings {
+  enableAutoReply: boolean;
+  responseSubject?: string;
+  responseBodyPlainText?: string;
+  responseBodyHtml?: string;
+  restrictToContacts?: boolean;
+  restrictToDomain?: boolean;
+  startTime?: number; // epoch ms
+  endTime?: number; // epoch ms
+}
+
 export class GmailClient {
   private readonly accountStore: AccountStore;
   private readonly accountId: string;
@@ -747,6 +784,174 @@ export class GmailClient {
     });
 
     return this.convertDraftResponse(response.data);
+  }
+
+  // === Filter methods (requires settings scope) ===
+
+  async listFilters(): Promise<Filter[]> {
+    const gmail = await this.getGmail();
+
+    const response = await gmail.users.settings.filters.list({
+      userId: 'me',
+    });
+
+    return (response.data.filter ?? []).map((f) => this.convertFilter(f));
+  }
+
+  async createFilter(criteria: FilterCriteria, action: FilterAction): Promise<Filter> {
+    const gmail = await this.getGmail();
+
+    const requestBody: gmail_v1.Schema$Filter = {
+      criteria: this.buildFilterCriteria(criteria),
+      action: this.buildFilterAction(action),
+    };
+
+    const response = await gmail.users.settings.filters.create({
+      userId: 'me',
+      requestBody,
+    });
+
+    return this.convertFilter(response.data);
+  }
+
+  async deleteFilter(filterId: string): Promise<void> {
+    const gmail = await this.getGmail();
+
+    await gmail.users.settings.filters.delete({
+      userId: 'me',
+      id: filterId,
+    });
+  }
+
+  private buildFilterCriteria(criteria: FilterCriteria): gmail_v1.Schema$FilterCriteria {
+    const result: gmail_v1.Schema$FilterCriteria = {};
+
+    if (criteria.from !== undefined) result.from = criteria.from;
+    if (criteria.to !== undefined) result.to = criteria.to;
+    if (criteria.subject !== undefined) result.subject = criteria.subject;
+    if (criteria.query !== undefined) result.query = criteria.query;
+    if (criteria.negatedQuery !== undefined) result.negatedQuery = criteria.negatedQuery;
+    if (criteria.hasAttachment !== undefined) result.hasAttachment = criteria.hasAttachment;
+    if (criteria.excludeChats !== undefined) result.excludeChats = criteria.excludeChats;
+    if (criteria.size !== undefined) result.size = criteria.size;
+    if (criteria.sizeComparison !== undefined) result.sizeComparison = criteria.sizeComparison;
+
+    return result;
+  }
+
+  private buildFilterAction(action: FilterAction): gmail_v1.Schema$FilterAction {
+    const result: gmail_v1.Schema$FilterAction = {};
+
+    if (action.addLabelIds !== undefined) result.addLabelIds = action.addLabelIds;
+    if (action.removeLabelIds !== undefined) result.removeLabelIds = action.removeLabelIds;
+    if (action.forward !== undefined) result.forward = action.forward;
+
+    return result;
+  }
+
+  private convertFilter(f: gmail_v1.Schema$Filter): Filter {
+    const result: Filter = {
+      id: f.id ?? '',
+    };
+
+    if (f.criteria) {
+      result.criteria = {};
+      if (f.criteria.from) result.criteria.from = f.criteria.from;
+      if (f.criteria.to) result.criteria.to = f.criteria.to;
+      if (f.criteria.subject) result.criteria.subject = f.criteria.subject;
+      if (f.criteria.query) result.criteria.query = f.criteria.query;
+      if (f.criteria.negatedQuery) result.criteria.negatedQuery = f.criteria.negatedQuery;
+      if (f.criteria.hasAttachment !== undefined && f.criteria.hasAttachment !== null) {
+        result.criteria.hasAttachment = f.criteria.hasAttachment;
+      }
+      if (f.criteria.excludeChats !== undefined && f.criteria.excludeChats !== null) {
+        result.criteria.excludeChats = f.criteria.excludeChats;
+      }
+      if (f.criteria.size !== undefined && f.criteria.size !== null) {
+        result.criteria.size = f.criteria.size;
+      }
+      if (f.criteria.sizeComparison) {
+        result.criteria.sizeComparison = f.criteria.sizeComparison as 'larger' | 'smaller';
+      }
+    }
+
+    if (f.action) {
+      result.action = {};
+      if (f.action.addLabelIds) result.action.addLabelIds = f.action.addLabelIds;
+      if (f.action.removeLabelIds) result.action.removeLabelIds = f.action.removeLabelIds;
+      if (f.action.forward) result.action.forward = f.action.forward;
+    }
+
+    return result;
+  }
+
+  // === Vacation responder methods (requires settings scope) ===
+
+  async getVacation(): Promise<VacationSettings> {
+    const gmail = await this.getGmail();
+
+    const response = await gmail.users.settings.getVacation({
+      userId: 'me',
+    });
+
+    return this.convertVacationSettings(response.data);
+  }
+
+  async setVacation(settings: VacationSettings): Promise<VacationSettings> {
+    const gmail = await this.getGmail();
+
+    const requestBody: gmail_v1.Schema$VacationSettings = {
+      enableAutoReply: settings.enableAutoReply,
+    };
+
+    if (settings.responseSubject !== undefined) {
+      requestBody.responseSubject = settings.responseSubject;
+    }
+    if (settings.responseBodyPlainText !== undefined) {
+      requestBody.responseBodyPlainText = settings.responseBodyPlainText;
+    }
+    if (settings.responseBodyHtml !== undefined) {
+      requestBody.responseBodyHtml = settings.responseBodyHtml;
+    }
+    if (settings.restrictToContacts !== undefined) {
+      requestBody.restrictToContacts = settings.restrictToContacts;
+    }
+    if (settings.restrictToDomain !== undefined) {
+      requestBody.restrictToDomain = settings.restrictToDomain;
+    }
+    if (settings.startTime !== undefined) {
+      requestBody.startTime = String(settings.startTime);
+    }
+    if (settings.endTime !== undefined) {
+      requestBody.endTime = String(settings.endTime);
+    }
+
+    const response = await gmail.users.settings.updateVacation({
+      userId: 'me',
+      requestBody,
+    });
+
+    return this.convertVacationSettings(response.data);
+  }
+
+  private convertVacationSettings(v: gmail_v1.Schema$VacationSettings): VacationSettings {
+    const result: VacationSettings = {
+      enableAutoReply: v.enableAutoReply ?? false,
+    };
+
+    if (v.responseSubject) result.responseSubject = v.responseSubject;
+    if (v.responseBodyPlainText) result.responseBodyPlainText = v.responseBodyPlainText;
+    if (v.responseBodyHtml) result.responseBodyHtml = v.responseBodyHtml;
+    if (v.restrictToContacts !== undefined && v.restrictToContacts !== null) {
+      result.restrictToContacts = v.restrictToContacts;
+    }
+    if (v.restrictToDomain !== undefined && v.restrictToDomain !== null) {
+      result.restrictToDomain = v.restrictToDomain;
+    }
+    if (v.startTime) result.startTime = parseInt(v.startTime, 10);
+    if (v.endTime) result.endTime = parseInt(v.endTime, 10);
+
+    return result;
   }
 
   private convertMessage(m: gmail_v1.Schema$Message): Message {

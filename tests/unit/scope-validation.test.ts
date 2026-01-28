@@ -49,6 +49,24 @@ describe('Scope Validation', () => {
       const scopes = ['https://www.googleapis.com/auth/userinfo.email'];
       expect(getScopeTier(scopes)).toBe('readonly');
     });
+
+    it('returns settings when gmail.settings.basic is present', () => {
+      const scopes = SCOPE_TIERS.settings;
+      expect(getScopeTier([...scopes])).toBe('settings');
+    });
+
+    it('returns settings for gmail.settings.basic scope alone', () => {
+      const scopes = ['https://www.googleapis.com/auth/gmail.settings.basic'];
+      expect(getScopeTier(scopes)).toBe('settings');
+    });
+
+    it('returns full over settings when both are present', () => {
+      const scopes = [
+        'https://www.googleapis.com/auth/gmail.modify',
+        'https://www.googleapis.com/auth/gmail.settings.basic',
+      ];
+      expect(getScopeTier(scopes)).toBe('full');
+    });
   });
 
   describe('hasSufficientScope', () => {
@@ -82,11 +100,43 @@ describe('Scope Validation', () => {
       expect(hasSufficientScope([...scopes], 'full')).toBe(false);
     });
 
-    it('full tier satisfies all requirements', () => {
+    it('full tier satisfies all requirements except settings', () => {
       const scopes = SCOPE_TIERS.full;
       expect(hasSufficientScope([...scopes], 'readonly')).toBe(true);
       expect(hasSufficientScope([...scopes], 'compose')).toBe(true);
       expect(hasSufficientScope([...scopes], 'full')).toBe(true);
+      expect(hasSufficientScope([...scopes], 'settings')).toBe(false);
+    });
+
+    // Settings tier tests (parallel branch)
+    it('settings tier satisfies readonly requirement', () => {
+      const scopes = SCOPE_TIERS.settings;
+      expect(hasSufficientScope([...scopes], 'readonly')).toBe(true);
+    });
+
+    it('settings tier satisfies settings requirement', () => {
+      const scopes = SCOPE_TIERS.settings;
+      expect(hasSufficientScope([...scopes], 'settings')).toBe(true);
+    });
+
+    it('settings tier does not satisfy compose requirement', () => {
+      const scopes = SCOPE_TIERS.settings;
+      expect(hasSufficientScope([...scopes], 'compose')).toBe(false);
+    });
+
+    it('settings tier does not satisfy full requirement', () => {
+      const scopes = SCOPE_TIERS.settings;
+      expect(hasSufficientScope([...scopes], 'full')).toBe(false);
+    });
+
+    it('compose tier does not satisfy settings requirement', () => {
+      const scopes = SCOPE_TIERS.compose;
+      expect(hasSufficientScope([...scopes], 'settings')).toBe(false);
+    });
+
+    it('readonly tier does not satisfy settings requirement', () => {
+      const scopes = SCOPE_TIERS.readonly;
+      expect(hasSufficientScope([...scopes], 'settings')).toBe(false);
     });
   });
 
@@ -113,6 +163,14 @@ describe('Scope Validation', () => {
       expect(OPERATION_SCOPE_REQUIREMENTS.archive).toBe('full');
       expect(OPERATION_SCOPE_REQUIREMENTS.trash).toBe('full');
       expect(OPERATION_SCOPE_REQUIREMENTS.untrash).toBe('full');
+    });
+
+    it('settings operations require settings scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.listFilters).toBe('settings');
+      expect(OPERATION_SCOPE_REQUIREMENTS.createFilter).toBe('settings');
+      expect(OPERATION_SCOPE_REQUIREMENTS.deleteFilter).toBe('settings');
+      expect(OPERATION_SCOPE_REQUIREMENTS.getVacation).toBe('settings');
+      expect(OPERATION_SCOPE_REQUIREMENTS.setVacation).toBe('settings');
     });
   });
 
@@ -146,6 +204,16 @@ describe('Scope Validation', () => {
       expect(SCOPE_TIERS.readonly).toContain(emailScope);
       expect(SCOPE_TIERS.compose).toContain(emailScope);
       expect(SCOPE_TIERS.full).toContain(emailScope);
+      expect(SCOPE_TIERS.settings).toContain(emailScope);
+    });
+
+    it('settings tier has gmail.settings.basic and gmail.readonly', () => {
+      expect(SCOPE_TIERS.settings).toContain(
+        'https://www.googleapis.com/auth/gmail.settings.basic',
+      );
+      expect(SCOPE_TIERS.settings).toContain(
+        'https://www.googleapis.com/auth/gmail.readonly',
+      );
     });
   });
 });

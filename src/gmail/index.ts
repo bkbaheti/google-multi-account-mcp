@@ -10,6 +10,9 @@ export {
   type Draft,
   type DraftInput,
   type DraftMessage,
+  type Filter,
+  type FilterAction,
+  type FilterCriteria,
   type Label,
   type Message,
   type MessageHeader,
@@ -19,6 +22,7 @@ export {
   type SearchResult,
   type SentMessage,
   type Thread,
+  type VacationSettings,
 } from './client.js';
 
 export {

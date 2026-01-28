@@ -79,10 +79,15 @@ Lower priority features for power users.
 - [DONE] Implement `gmail_batch_modify_labels` tool - Bulk label modification up to 1000 messages (commit: 2c40d9f)
 - [DONE] Implement label management tools - gmail_create_label, gmail_update_label, gmail_delete_label (commit: 2c40d9f)
 - [DONE] Add MCP Resources - accounts://list and cache://stats for inspection (commit: 2c40d9f)
-
-### Deferred (Requires New OAuth Scopes)
-- [ ] **Implement filter/automation tools** (`gmail_list_filters`, `gmail_create_filter`) - Requires `gmail.settings.basic` scope
-- [ ] **Implement vacation responder tools** (`gmail_get_vacation`, `gmail_set_vacation`) - Requires `gmail.settings.basic` scope
+- [DONE] Implement `settings` scope tier (parallel to full) - `gmail.settings.basic` + `gmail.readonly` + `userinfo.email`
+- [DONE] Implement `gmail_list_filters` tool - List all email filters
+- [DONE] Implement `gmail_create_filter` tool - Create filter with criteria/action (requires confirm: true)
+- [DONE] Implement `gmail_delete_filter` tool - Delete filter by ID (requires confirm: true)
+- [DONE] Implement `gmail_get_vacation` tool - Get vacation responder settings
+- [DONE] Implement `gmail_set_vacation` tool - Configure vacation responder (requires confirm: true to enable)
+- [DONE] Add FILTER_NOT_FOUND and FILTER_LIMIT_EXCEEDED error codes
+- [DONE] Add unit tests for settings operations - 11 tests
+- [DONE] Update scope validation tests for parallel tier logic - 13 new tests
 
 ### Deferred (Significant Architectural Work)
 - [ ] **HTTP/SSE transport support** - Requires HTTP server, authentication, message format adaptation
@@ -91,6 +96,9 @@ Lower priority features for power users.
 - Batch modify requires confirm: true for operations affecting >100 messages
 - Label delete requires confirm: true for safety
 - MCP Resources are read-only inspection endpoints
+- Settings tier is parallel to full tier (neither satisfies the other)
+- Filter/vacation tools require `settings` scope tier when adding account
+- Gmail has a limit of 1000 filters per account
 
 ---
 
