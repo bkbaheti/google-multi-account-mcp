@@ -128,6 +128,28 @@ Add to your Claude Code settings (`~/.claude/settings.json` or project-level `.c
 
 Replace `/absolute/path/to/google-multi-account-mcp` with the actual path to this project.
 
+### Configure Claude Code (CLI)
+
+Alternatively, use the Claude CLI to add the MCP server:
+
+```bash
+# Add to current project only (default)
+claude mcp add google node /absolute/path/to/google-multi-account-mcp/dist/cli.js
+
+# Add globally (available in all projects)
+claude mcp add -s user google node /absolute/path/to/google-multi-account-mcp/dist/cli.js
+
+# With passphrase for token encryption
+claude mcp add -s user google node /absolute/path/to/google-multi-account-mcp/dist/cli.js \
+  -e MCP_GOOGLE_PASSPHRASE=optional-passphrase-for-token-encryption
+```
+
+To verify or remove:
+```bash
+claude mcp list          # List configured servers
+claude mcp remove google # Remove this server
+```
+
 ### Configure Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
