@@ -9,59 +9,59 @@ import {
 
 describe('Scope Validation', () => {
   describe('getScopeTier', () => {
-    it('returns readonly for readonly scopes', () => {
-      const scopes = SCOPE_TIERS.readonly;
-      expect(getScopeTier([...scopes])).toBe('readonly');
+    it('returns mail_readonly for mail_readonly scopes', () => {
+      const scopes = SCOPE_TIERS.mail_readonly;
+      expect(getScopeTier([...scopes])).toBe('mail_readonly');
     });
 
-    it('returns compose for compose scopes', () => {
-      const scopes = SCOPE_TIERS.compose;
-      expect(getScopeTier([...scopes])).toBe('compose');
+    it('returns mail_compose for mail_compose scopes', () => {
+      const scopes = SCOPE_TIERS.mail_compose;
+      expect(getScopeTier([...scopes])).toBe('mail_compose');
     });
 
-    it('returns full for full scopes', () => {
-      const scopes = SCOPE_TIERS.full;
-      expect(getScopeTier([...scopes])).toBe('full');
+    it('returns mail_full for mail_full scopes', () => {
+      const scopes = SCOPE_TIERS.mail_full;
+      expect(getScopeTier([...scopes])).toBe('mail_full');
     });
 
-    it('returns full when gmail.modify is present', () => {
+    it('returns mail_full when gmail.modify is present', () => {
       const scopes = ['https://www.googleapis.com/auth/gmail.modify'];
-      expect(getScopeTier(scopes)).toBe('full');
+      expect(getScopeTier(scopes)).toBe('mail_full');
     });
 
-    it('returns full when gmail.labels is present', () => {
+    it('returns mail_full when gmail.labels is present', () => {
       const scopes = ['https://www.googleapis.com/auth/gmail.labels'];
-      expect(getScopeTier(scopes)).toBe('full');
+      expect(getScopeTier(scopes)).toBe('mail_full');
     });
 
-    it('returns compose when gmail.compose is present without modify/labels', () => {
+    it('returns mail_compose when gmail.compose is present without modify/labels', () => {
       const scopes = [
         'https://www.googleapis.com/auth/gmail.compose',
         'https://www.googleapis.com/auth/gmail.readonly',
       ];
-      expect(getScopeTier(scopes)).toBe('compose');
+      expect(getScopeTier(scopes)).toBe('mail_compose');
     });
 
-    it('returns readonly for empty scopes', () => {
-      expect(getScopeTier([])).toBe('readonly');
+    it('returns mail_readonly for empty scopes', () => {
+      expect(getScopeTier([])).toBe('mail_readonly');
     });
 
-    it('returns readonly for unknown scopes', () => {
+    it('returns mail_readonly for unknown scopes', () => {
       const scopes = ['https://www.googleapis.com/auth/userinfo.email'];
-      expect(getScopeTier(scopes)).toBe('readonly');
+      expect(getScopeTier(scopes)).toBe('mail_readonly');
     });
 
-    it('returns settings when gmail.settings.basic is present', () => {
-      const scopes = SCOPE_TIERS.settings;
-      expect(getScopeTier([...scopes])).toBe('settings');
+    it('returns mail_settings when gmail.settings.basic is present', () => {
+      const scopes = SCOPE_TIERS.mail_settings;
+      expect(getScopeTier([...scopes])).toBe('mail_settings');
     });
 
-    it('returns settings for gmail.settings.basic scope alone', () => {
+    it('returns mail_settings for gmail.settings.basic scope alone', () => {
       const scopes = ['https://www.googleapis.com/auth/gmail.settings.basic'];
-      expect(getScopeTier(scopes)).toBe('settings');
+      expect(getScopeTier(scopes)).toBe('mail_settings');
     });
 
-    it('returns all when both full (modify/labels) and settings are present', () => {
+    it('returns all when both mail_full (modify/labels) and mail_settings are present', () => {
       const scopes = [
         'https://www.googleapis.com/auth/gmail.modify',
         'https://www.googleapis.com/auth/gmail.settings.basic',
@@ -73,168 +73,311 @@ describe('Scope Validation', () => {
       const scopes = SCOPE_TIERS.all;
       expect(getScopeTier([...scopes])).toBe('all');
     });
+
+    it('returns drive_readonly for drive.readonly scope', () => {
+      const scopes = SCOPE_TIERS.drive_readonly;
+      expect(getScopeTier([...scopes])).toBe('drive_readonly');
+    });
+
+    it('returns drive_full for drive.file scope', () => {
+      const scopes = SCOPE_TIERS.drive_full;
+      expect(getScopeTier([...scopes])).toBe('drive_full');
+    });
+
+    it('returns calendar_readonly for calendar.readonly scope', () => {
+      const scopes = SCOPE_TIERS.calendar_readonly;
+      expect(getScopeTier([...scopes])).toBe('calendar_readonly');
+    });
+
+    it('returns calendar_full for calendar.events scope', () => {
+      const scopes = SCOPE_TIERS.calendar_full;
+      expect(getScopeTier([...scopes])).toBe('calendar_full');
+    });
   });
 
   describe('hasSufficientScope', () => {
-    it('readonly tier satisfies readonly requirement', () => {
-      const scopes = SCOPE_TIERS.readonly;
-      expect(hasSufficientScope([...scopes], 'readonly')).toBe(true);
+    it('mail_readonly tier satisfies mail_readonly requirement', () => {
+      const scopes = SCOPE_TIERS.mail_readonly;
+      expect(hasSufficientScope([...scopes], 'mail_readonly')).toBe(true);
     });
 
-    it('readonly tier does not satisfy compose requirement', () => {
-      const scopes = SCOPE_TIERS.readonly;
-      expect(hasSufficientScope([...scopes], 'compose')).toBe(false);
+    it('mail_readonly tier does not satisfy mail_compose requirement', () => {
+      const scopes = SCOPE_TIERS.mail_readonly;
+      expect(hasSufficientScope([...scopes], 'mail_compose')).toBe(false);
     });
 
-    it('readonly tier does not satisfy full requirement', () => {
-      const scopes = SCOPE_TIERS.readonly;
-      expect(hasSufficientScope([...scopes], 'full')).toBe(false);
+    it('mail_readonly tier does not satisfy mail_full requirement', () => {
+      const scopes = SCOPE_TIERS.mail_readonly;
+      expect(hasSufficientScope([...scopes], 'mail_full')).toBe(false);
     });
 
-    it('compose tier satisfies readonly requirement', () => {
-      const scopes = SCOPE_TIERS.compose;
-      expect(hasSufficientScope([...scopes], 'readonly')).toBe(true);
+    it('mail_compose tier satisfies mail_readonly requirement', () => {
+      const scopes = SCOPE_TIERS.mail_compose;
+      expect(hasSufficientScope([...scopes], 'mail_readonly')).toBe(true);
     });
 
-    it('compose tier satisfies compose requirement', () => {
-      const scopes = SCOPE_TIERS.compose;
-      expect(hasSufficientScope([...scopes], 'compose')).toBe(true);
+    it('mail_compose tier satisfies mail_compose requirement', () => {
+      const scopes = SCOPE_TIERS.mail_compose;
+      expect(hasSufficientScope([...scopes], 'mail_compose')).toBe(true);
     });
 
-    it('compose tier does not satisfy full requirement', () => {
-      const scopes = SCOPE_TIERS.compose;
-      expect(hasSufficientScope([...scopes], 'full')).toBe(false);
+    it('mail_compose tier does not satisfy mail_full requirement', () => {
+      const scopes = SCOPE_TIERS.mail_compose;
+      expect(hasSufficientScope([...scopes], 'mail_full')).toBe(false);
     });
 
-    it('full tier satisfies all requirements except settings', () => {
-      const scopes = SCOPE_TIERS.full;
-      expect(hasSufficientScope([...scopes], 'readonly')).toBe(true);
-      expect(hasSufficientScope([...scopes], 'compose')).toBe(true);
-      expect(hasSufficientScope([...scopes], 'full')).toBe(true);
-      expect(hasSufficientScope([...scopes], 'settings')).toBe(false);
+    // mail_full and mail_compose are independent: mail_full does NOT have
+    // gmail.compose or gmail.readonly, so it cannot satisfy mail_compose.
+    // mail_compose does NOT have gmail.modify or gmail.labels, so it cannot satisfy mail_full.
+    it('mail_full tier satisfies mail_full requirement', () => {
+      const scopes = SCOPE_TIERS.mail_full;
+      expect(hasSufficientScope([...scopes], 'mail_full')).toBe(true);
+    });
+
+    it('mail_full tier does not satisfy mail_compose requirement (independent branches)', () => {
+      const scopes = SCOPE_TIERS.mail_full;
+      expect(hasSufficientScope([...scopes], 'mail_compose')).toBe(false);
+    });
+
+    it('mail_full tier does not satisfy mail_readonly requirement (no gmail.readonly URL)', () => {
+      const scopes = SCOPE_TIERS.mail_full;
+      expect(hasSufficientScope([...scopes], 'mail_readonly')).toBe(false);
+    });
+
+    it('mail_full tier does not satisfy mail_settings requirement', () => {
+      const scopes = SCOPE_TIERS.mail_full;
+      expect(hasSufficientScope([...scopes], 'mail_settings')).toBe(false);
     });
 
     // Settings tier tests (parallel branch)
-    it('settings tier satisfies readonly requirement', () => {
-      const scopes = SCOPE_TIERS.settings;
-      expect(hasSufficientScope([...scopes], 'readonly')).toBe(true);
+    it('mail_settings tier satisfies mail_readonly requirement', () => {
+      const scopes = SCOPE_TIERS.mail_settings;
+      expect(hasSufficientScope([...scopes], 'mail_readonly')).toBe(true);
     });
 
-    it('settings tier satisfies settings requirement', () => {
-      const scopes = SCOPE_TIERS.settings;
-      expect(hasSufficientScope([...scopes], 'settings')).toBe(true);
+    it('mail_settings tier satisfies mail_settings requirement', () => {
+      const scopes = SCOPE_TIERS.mail_settings;
+      expect(hasSufficientScope([...scopes], 'mail_settings')).toBe(true);
     });
 
-    it('settings tier does not satisfy compose requirement', () => {
-      const scopes = SCOPE_TIERS.settings;
-      expect(hasSufficientScope([...scopes], 'compose')).toBe(false);
+    it('mail_settings tier does not satisfy mail_compose requirement', () => {
+      const scopes = SCOPE_TIERS.mail_settings;
+      expect(hasSufficientScope([...scopes], 'mail_compose')).toBe(false);
     });
 
-    it('settings tier does not satisfy full requirement', () => {
-      const scopes = SCOPE_TIERS.settings;
-      expect(hasSufficientScope([...scopes], 'full')).toBe(false);
+    it('mail_settings tier does not satisfy mail_full requirement', () => {
+      const scopes = SCOPE_TIERS.mail_settings;
+      expect(hasSufficientScope([...scopes], 'mail_full')).toBe(false);
     });
 
-    it('compose tier does not satisfy settings requirement', () => {
-      const scopes = SCOPE_TIERS.compose;
-      expect(hasSufficientScope([...scopes], 'settings')).toBe(false);
+    it('mail_compose tier does not satisfy mail_settings requirement', () => {
+      const scopes = SCOPE_TIERS.mail_compose;
+      expect(hasSufficientScope([...scopes], 'mail_settings')).toBe(false);
     });
 
-    it('readonly tier does not satisfy settings requirement', () => {
-      const scopes = SCOPE_TIERS.readonly;
-      expect(hasSufficientScope([...scopes], 'settings')).toBe(false);
+    it('mail_readonly tier does not satisfy mail_settings requirement', () => {
+      const scopes = SCOPE_TIERS.mail_readonly;
+      expect(hasSufficientScope([...scopes], 'mail_settings')).toBe(false);
     });
 
     // 'all' tier tests
-    it('all tier satisfies all requirements', () => {
+    // Note: the 'all' tier does NOT include gmail.readonly URL, so it cannot
+    // satisfy mail_compose or mail_settings (which require gmail.readonly).
+    // It does satisfy mail_full (gmail.modify + gmail.labels + userinfo.email).
+    it('all tier satisfies mail_full and all requirements', () => {
       const scopes = SCOPE_TIERS.all;
-      expect(hasSufficientScope([...scopes], 'readonly')).toBe(true);
-      expect(hasSufficientScope([...scopes], 'compose')).toBe(true);
-      expect(hasSufficientScope([...scopes], 'full')).toBe(true);
-      expect(hasSufficientScope([...scopes], 'settings')).toBe(true);
+      expect(hasSufficientScope([...scopes], 'mail_full')).toBe(true);
       expect(hasSufficientScope([...scopes], 'all')).toBe(true);
     });
 
-    it('full tier does not satisfy all requirement', () => {
-      const scopes = SCOPE_TIERS.full;
+    it('all tier does not satisfy mail_compose (missing gmail.readonly URL)', () => {
+      const scopes = SCOPE_TIERS.all;
+      expect(hasSufficientScope([...scopes], 'mail_compose')).toBe(false);
+    });
+
+    it('all tier does not satisfy mail_settings (missing gmail.readonly URL)', () => {
+      const scopes = SCOPE_TIERS.all;
+      expect(hasSufficientScope([...scopes], 'mail_settings')).toBe(false);
+    });
+
+    it('all tier satisfies drive and calendar requirements', () => {
+      const scopes = SCOPE_TIERS.all;
+      expect(hasSufficientScope([...scopes], 'drive_readonly')).toBe(true);
+      expect(hasSufficientScope([...scopes], 'drive_full')).toBe(true);
+      expect(hasSufficientScope([...scopes], 'calendar_readonly')).toBe(true);
+      expect(hasSufficientScope([...scopes], 'calendar_full')).toBe(true);
+    });
+
+    it('mail_full tier does not satisfy all requirement', () => {
+      const scopes = SCOPE_TIERS.mail_full;
       expect(hasSufficientScope([...scopes], 'all')).toBe(false);
     });
 
-    it('settings tier does not satisfy all requirement', () => {
-      const scopes = SCOPE_TIERS.settings;
+    it('mail_settings tier does not satisfy all requirement', () => {
+      const scopes = SCOPE_TIERS.mail_settings;
       expect(hasSufficientScope([...scopes], 'all')).toBe(false);
+    });
+  });
+
+  describe('Drive scope tiers', () => {
+    it('drive_readonly tier has drive.readonly scope', () => {
+      expect(SCOPE_TIERS.drive_readonly).toContain('https://www.googleapis.com/auth/drive.readonly');
+    });
+    it('drive_full tier has drive.file scope', () => {
+      expect(SCOPE_TIERS.drive_full).toContain('https://www.googleapis.com/auth/drive.file');
+    });
+    it('drive_readonly account satisfies drive_readonly requirement', () => {
+      expect(hasSufficientScope([...SCOPE_TIERS.drive_readonly], 'drive_readonly')).toBe(true);
+    });
+    it('drive_readonly account does not satisfy drive_full requirement', () => {
+      expect(hasSufficientScope([...SCOPE_TIERS.drive_readonly], 'drive_full')).toBe(false);
+    });
+    it('drive_full account does not satisfy mail_readonly requirement', () => {
+      expect(hasSufficientScope([...SCOPE_TIERS.drive_full], 'mail_readonly')).toBe(false);
+    });
+  });
+
+  describe('Calendar scope tiers', () => {
+    it('calendar_readonly tier has calendar.readonly scope', () => {
+      expect(SCOPE_TIERS.calendar_readonly).toContain('https://www.googleapis.com/auth/calendar.readonly');
+    });
+    it('calendar_full tier has calendar.events scope', () => {
+      expect(SCOPE_TIERS.calendar_full).toContain('https://www.googleapis.com/auth/calendar.events');
+    });
+    it('calendar_readonly satisfies calendar_readonly', () => {
+      expect(hasSufficientScope([...SCOPE_TIERS.calendar_readonly], 'calendar_readonly')).toBe(true);
+    });
+    it('calendar_readonly does not satisfy calendar_full', () => {
+      expect(hasSufficientScope([...SCOPE_TIERS.calendar_readonly], 'calendar_full')).toBe(false);
+    });
+  });
+
+  describe('Cross-service isolation', () => {
+    it('mail_full does not satisfy drive_readonly', () => {
+      expect(hasSufficientScope([...SCOPE_TIERS.mail_full], 'drive_readonly')).toBe(false);
+    });
+    it('drive_full does not satisfy calendar_readonly', () => {
+      expect(hasSufficientScope([...SCOPE_TIERS.drive_full], 'calendar_readonly')).toBe(false);
+    });
+    it('merged tiers satisfy both', () => {
+      const scopes = mergeScopeTiers(['mail_full', 'drive_readonly']);
+      expect(hasSufficientScope(scopes, 'mail_full')).toBe(true);
+      expect(hasSufficientScope(scopes, 'drive_readonly')).toBe(true);
+      expect(hasSufficientScope(scopes, 'calendar_readonly')).toBe(false);
     });
   });
 
   describe('OPERATION_SCOPE_REQUIREMENTS', () => {
-    it('read operations require readonly scope', () => {
-      expect(OPERATION_SCOPE_REQUIREMENTS.search).toBe('readonly');
-      expect(OPERATION_SCOPE_REQUIREMENTS.getMessage).toBe('readonly');
-      expect(OPERATION_SCOPE_REQUIREMENTS.getThread).toBe('readonly');
+    it('read operations require mail_readonly scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.search).toBe('mail_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.getMessage).toBe('mail_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.getThread).toBe('mail_readonly');
     });
 
-    it('compose operations require compose scope', () => {
-      expect(OPERATION_SCOPE_REQUIREMENTS.createDraft).toBe('compose');
-      expect(OPERATION_SCOPE_REQUIREMENTS.updateDraft).toBe('compose');
-      expect(OPERATION_SCOPE_REQUIREMENTS.getDraft).toBe('compose');
-      expect(OPERATION_SCOPE_REQUIREMENTS.sendDraft).toBe('compose');
-      expect(OPERATION_SCOPE_REQUIREMENTS.deleteDraft).toBe('compose');
-      expect(OPERATION_SCOPE_REQUIREMENTS.replyToThread).toBe('compose');
+    it('compose operations require mail_compose scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.createDraft).toBe('mail_compose');
+      expect(OPERATION_SCOPE_REQUIREMENTS.updateDraft).toBe('mail_compose');
+      expect(OPERATION_SCOPE_REQUIREMENTS.getDraft).toBe('mail_compose');
+      expect(OPERATION_SCOPE_REQUIREMENTS.sendDraft).toBe('mail_compose');
+      expect(OPERATION_SCOPE_REQUIREMENTS.deleteDraft).toBe('mail_compose');
+      expect(OPERATION_SCOPE_REQUIREMENTS.replyToThread).toBe('mail_compose');
     });
 
-    it('modify operations require full scope', () => {
-      expect(OPERATION_SCOPE_REQUIREMENTS.listLabels).toBe('full');
-      expect(OPERATION_SCOPE_REQUIREMENTS.modifyLabels).toBe('full');
-      expect(OPERATION_SCOPE_REQUIREMENTS.markReadUnread).toBe('full');
-      expect(OPERATION_SCOPE_REQUIREMENTS.archive).toBe('full');
-      expect(OPERATION_SCOPE_REQUIREMENTS.trash).toBe('full');
-      expect(OPERATION_SCOPE_REQUIREMENTS.untrash).toBe('full');
+    it('modify operations require mail_full scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.listLabels).toBe('mail_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.modifyLabels).toBe('mail_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.markReadUnread).toBe('mail_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.archive).toBe('mail_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.trash).toBe('mail_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.untrash).toBe('mail_full');
     });
 
-    it('settings operations require settings scope', () => {
-      expect(OPERATION_SCOPE_REQUIREMENTS.listFilters).toBe('settings');
-      expect(OPERATION_SCOPE_REQUIREMENTS.createFilter).toBe('settings');
-      expect(OPERATION_SCOPE_REQUIREMENTS.deleteFilter).toBe('settings');
-      expect(OPERATION_SCOPE_REQUIREMENTS.getVacation).toBe('settings');
-      expect(OPERATION_SCOPE_REQUIREMENTS.setVacation).toBe('settings');
+    it('settings operations require mail_settings scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.listFilters).toBe('mail_settings');
+      expect(OPERATION_SCOPE_REQUIREMENTS.createFilter).toBe('mail_settings');
+      expect(OPERATION_SCOPE_REQUIREMENTS.deleteFilter).toBe('mail_settings');
+      expect(OPERATION_SCOPE_REQUIREMENTS.getVacation).toBe('mail_settings');
+      expect(OPERATION_SCOPE_REQUIREMENTS.setVacation).toBe('mail_settings');
+    });
+
+    it('drive read operations require drive_readonly scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveSearch).toBe('drive_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveListFiles).toBe('drive_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveGetFile).toBe('drive_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveGetContent).toBe('drive_readonly');
+    });
+
+    it('drive write operations require drive_full scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveUpload).toBe('drive_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveCreateFolder).toBe('drive_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveMoveFile).toBe('drive_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveCopyFile).toBe('drive_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveRenameFile).toBe('drive_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveTrashFile).toBe('drive_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveShareFile).toBe('drive_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveUpdatePermissions).toBe('drive_full');
+    });
+
+    it('calendar read operations require calendar_readonly scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarListCalendars).toBe('calendar_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarListEvents).toBe('calendar_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarGetEvent).toBe('calendar_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarSearchEvents).toBe('calendar_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarFreeBusy).toBe('calendar_readonly');
+    });
+
+    it('calendar write operations require calendar_full scope', () => {
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarCreateEvent).toBe('calendar_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarUpdateEvent).toBe('calendar_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarDeleteEvent).toBe('calendar_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarRsvp).toBe('calendar_full');
+      expect(OPERATION_SCOPE_REQUIREMENTS.calendarMoveEvent).toBe('calendar_full');
     });
   });
 
   describe('SCOPE_TIERS', () => {
-    it('readonly tier has gmail.readonly', () => {
-      expect(SCOPE_TIERS.readonly).toContain(
+    it('mail_readonly tier has gmail.readonly', () => {
+      expect(SCOPE_TIERS.mail_readonly).toContain(
         'https://www.googleapis.com/auth/gmail.readonly',
       );
     });
 
-    it('compose tier has gmail.compose and gmail.readonly', () => {
-      expect(SCOPE_TIERS.compose).toContain(
+    it('mail_compose tier has gmail.compose and gmail.readonly', () => {
+      expect(SCOPE_TIERS.mail_compose).toContain(
         'https://www.googleapis.com/auth/gmail.compose',
       );
-      expect(SCOPE_TIERS.compose).toContain(
+      expect(SCOPE_TIERS.mail_compose).toContain(
         'https://www.googleapis.com/auth/gmail.readonly',
       );
     });
 
-    it('full tier has gmail.modify and gmail.labels', () => {
-      expect(SCOPE_TIERS.full).toContain(
+    it('mail_full tier has gmail.modify and gmail.labels', () => {
+      expect(SCOPE_TIERS.mail_full).toContain(
         'https://www.googleapis.com/auth/gmail.modify',
       );
-      expect(SCOPE_TIERS.full).toContain(
+      expect(SCOPE_TIERS.mail_full).toContain(
         'https://www.googleapis.com/auth/gmail.labels',
       );
     });
 
-    it('all tiers include userinfo.email', () => {
+    it('all mail tiers include userinfo.email', () => {
       const emailScope = 'https://www.googleapis.com/auth/userinfo.email';
-      expect(SCOPE_TIERS.readonly).toContain(emailScope);
-      expect(SCOPE_TIERS.compose).toContain(emailScope);
-      expect(SCOPE_TIERS.full).toContain(emailScope);
-      expect(SCOPE_TIERS.settings).toContain(emailScope);
+      expect(SCOPE_TIERS.mail_readonly).toContain(emailScope);
+      expect(SCOPE_TIERS.mail_compose).toContain(emailScope);
+      expect(SCOPE_TIERS.mail_full).toContain(emailScope);
+      expect(SCOPE_TIERS.mail_settings).toContain(emailScope);
       expect(SCOPE_TIERS.all).toContain(emailScope);
     });
 
-    it('all tier has modify, labels, settings, and compose', () => {
+    it('drive and calendar tiers include userinfo.email', () => {
+      const emailScope = 'https://www.googleapis.com/auth/userinfo.email';
+      expect(SCOPE_TIERS.drive_readonly).toContain(emailScope);
+      expect(SCOPE_TIERS.drive_full).toContain(emailScope);
+      expect(SCOPE_TIERS.calendar_readonly).toContain(emailScope);
+      expect(SCOPE_TIERS.calendar_full).toContain(emailScope);
+    });
+
+    it('all tier has mail modify, labels, settings, compose, drive, and calendar scopes', () => {
       expect(SCOPE_TIERS.all).toContain(
         'https://www.googleapis.com/auth/gmail.modify',
       );
@@ -247,13 +390,25 @@ describe('Scope Validation', () => {
       expect(SCOPE_TIERS.all).toContain(
         'https://www.googleapis.com/auth/gmail.compose',
       );
+      expect(SCOPE_TIERS.all).toContain(
+        'https://www.googleapis.com/auth/drive.readonly',
+      );
+      expect(SCOPE_TIERS.all).toContain(
+        'https://www.googleapis.com/auth/drive.file',
+      );
+      expect(SCOPE_TIERS.all).toContain(
+        'https://www.googleapis.com/auth/calendar.readonly',
+      );
+      expect(SCOPE_TIERS.all).toContain(
+        'https://www.googleapis.com/auth/calendar.events',
+      );
     });
 
-    it('settings tier has gmail.settings.basic and gmail.readonly', () => {
-      expect(SCOPE_TIERS.settings).toContain(
+    it('mail_settings tier has gmail.settings.basic and gmail.readonly', () => {
+      expect(SCOPE_TIERS.mail_settings).toContain(
         'https://www.googleapis.com/auth/gmail.settings.basic',
       );
-      expect(SCOPE_TIERS.settings).toContain(
+      expect(SCOPE_TIERS.mail_settings).toContain(
         'https://www.googleapis.com/auth/gmail.readonly',
       );
     });
@@ -261,13 +416,13 @@ describe('Scope Validation', () => {
 
   describe('mergeScopeTiers', () => {
     it('merges a single tier', () => {
-      const scopes = mergeScopeTiers(['readonly']);
-      expect(scopes).toEqual(expect.arrayContaining(SCOPE_TIERS.readonly));
-      expect(scopes.length).toBe(SCOPE_TIERS.readonly.length);
+      const scopes = mergeScopeTiers(['mail_readonly']);
+      expect(scopes).toEqual(expect.arrayContaining([...SCOPE_TIERS.mail_readonly]));
+      expect(scopes.length).toBe(SCOPE_TIERS.mail_readonly.length);
     });
 
-    it('merges two independent tiers (full + settings)', () => {
-      const scopes = mergeScopeTiers(['full', 'settings']);
+    it('merges two independent mail tiers (mail_full + mail_settings)', () => {
+      const scopes = mergeScopeTiers(['mail_full', 'mail_settings']);
       // Should include all scopes from both tiers, deduplicated
       expect(scopes).toContain('https://www.googleapis.com/auth/gmail.modify');
       expect(scopes).toContain('https://www.googleapis.com/auth/gmail.labels');
@@ -276,13 +431,13 @@ describe('Scope Validation', () => {
       expect(scopes).toContain('https://www.googleapis.com/auth/userinfo.email');
     });
 
-    it('merging full + settings is detected as all tier', () => {
-      const scopes = mergeScopeTiers(['full', 'settings']);
+    it('merging mail_full + mail_settings is detected as all tier by getScopeTier', () => {
+      const scopes = mergeScopeTiers(['mail_full', 'mail_settings']);
       expect(getScopeTier(scopes)).toBe('all');
     });
 
     it('deduplicates overlapping scopes', () => {
-      const scopes = mergeScopeTiers(['readonly', 'compose']);
+      const scopes = mergeScopeTiers(['mail_readonly', 'mail_compose']);
       // Both have gmail.readonly and userinfo.email, so no duplicates
       const readonlyCount = scopes.filter(
         (s) => s === 'https://www.googleapis.com/auth/gmail.readonly',
@@ -295,14 +450,39 @@ describe('Scope Validation', () => {
       expect(scopes).toEqual([]);
     });
 
-    it('merging compose + full + settings includes all tier capabilities', () => {
-      const merged = mergeScopeTiers(['compose', 'full', 'settings']);
+    it('merges cross-service tiers (mail_full + drive_readonly)', () => {
+      const scopes = mergeScopeTiers(['mail_full', 'drive_readonly']);
+      expect(scopes).toContain('https://www.googleapis.com/auth/gmail.modify');
+      expect(scopes).toContain('https://www.googleapis.com/auth/gmail.labels');
+      expect(scopes).toContain('https://www.googleapis.com/auth/drive.readonly');
+      expect(scopes).toContain('https://www.googleapis.com/auth/userinfo.email');
+      // Should not contain calendar scopes
+      expect(scopes).not.toContain('https://www.googleapis.com/auth/calendar.readonly');
+    });
+
+    it('merges three services (mail + drive + calendar)', () => {
+      const scopes = mergeScopeTiers(['mail_readonly', 'drive_readonly', 'calendar_readonly']);
+      expect(scopes).toContain('https://www.googleapis.com/auth/gmail.readonly');
+      expect(scopes).toContain('https://www.googleapis.com/auth/drive.readonly');
+      expect(scopes).toContain('https://www.googleapis.com/auth/calendar.readonly');
+      expect(scopes).toContain('https://www.googleapis.com/auth/userinfo.email');
+      // userinfo.email should be deduplicated
+      const emailCount = scopes.filter(
+        (s) => s === 'https://www.googleapis.com/auth/userinfo.email',
+      ).length;
+      expect(emailCount).toBe(1);
+    });
+
+    it('merging all mail + drive + calendar tiers includes all tier capabilities', () => {
+      const merged = mergeScopeTiers([
+        'mail_compose', 'mail_full', 'mail_settings',
+        'drive_readonly', 'drive_full',
+        'calendar_readonly', 'calendar_full',
+      ]);
       // Should include all scopes from 'all' tier
       for (const scope of SCOPE_TIERS.all) {
         expect(merged).toContain(scope);
       }
-      // May also include gmail.readonly from compose/settings tiers
-      // (which is redundant with gmail.modify but not harmful)
       expect(getScopeTier(merged)).toBe('all');
     });
   });
