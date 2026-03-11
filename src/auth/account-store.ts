@@ -49,7 +49,7 @@ export class AccountStore {
    * Start adding an account asynchronously - returns auth URL immediately.
    * Use checkPendingAuth to poll for completion.
    */
-  startAddAccount(scopeTierOrTiers: ScopeTier | ScopeTier[] = 'readonly'): PendingAuthSession {
+  startAddAccount(scopeTierOrTiers: ScopeTier | ScopeTier[] = 'mail_readonly'): PendingAuthSession {
     const scopes = Array.isArray(scopeTierOrTiers)
       ? mergeScopeTiers(scopeTierOrTiers)
       : [...SCOPE_TIERS[scopeTierOrTiers]];
@@ -116,7 +116,7 @@ export class AccountStore {
    * Original blocking addAccount method for backwards compatibility
    */
   async addAccount(
-    scopeTierOrTiers: ScopeTier | ScopeTier[] = 'readonly',
+    scopeTierOrTiers: ScopeTier | ScopeTier[] = 'mail_readonly',
     options?: AuthFlowOptions,
   ): Promise<Account> {
     // Support both single tier (backwards compat) and array of tiers

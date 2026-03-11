@@ -117,21 +117,46 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // Helper to migrate legacy tier names to new namespaced names
+  function migrateTierName(tier: string): ScopeTier {
+    const LEGACY_MAP: Record<string, ScopeTier> = {
+      readonly: 'mail_readonly',
+      compose: 'mail_compose',
+      full: 'mail_full',
+      settings: 'mail_settings',
+    };
+    return (LEGACY_MAP[tier] ?? tier) as ScopeTier;
+  }
+
   // google_add_account - Add a new Google account via OAuth (async flow)
   server.registerTool(
     'google_add_account',
     {
       description:
-        'Add a new Google account via OAuth. Returns an authorization URL that you must show to the user. The user opens this URL in their browser to authorize. After authorization, use google_check_pending_auth to complete the process. Tiers: readonly (default), compose, full, settings, or all.',
+        'Add a new Google account via OAuth. Returns an authorization URL that you must show to the user. The user opens this URL in their browser to authorize. After authorization, use google_check_pending_auth to complete the process. Tiers: mail_readonly (default), mail_compose, mail_full, mail_settings, drive_readonly, drive_full, calendar_readonly, calendar_full, or all.',
       inputSchema: {
         scopeTier: z
-          .enum(['readonly', 'compose', 'full', 'settings', 'all'])
+          .enum([
+            'mail_readonly', 'mail_compose', 'mail_full', 'mail_settings',
+            'drive_readonly', 'drive_full',
+            'calendar_readonly', 'calendar_full',
+            'all',
+            // Legacy aliases
+            'readonly', 'compose', 'full', 'settings',
+          ])
           .optional()
           .describe('Single permission tier (use scopeTiers for multiple)'),
         scopeTiers: z
-          .array(z.enum(['readonly', 'compose', 'full', 'settings', 'all']))
+          .array(z.enum([
+            'mail_readonly', 'mail_compose', 'mail_full', 'mail_settings',
+            'drive_readonly', 'drive_full',
+            'calendar_readonly', 'calendar_full',
+            'all',
+            // Legacy aliases
+            'readonly', 'compose', 'full', 'settings',
+          ]))
           .optional()
-          .describe('Combine multiple tiers (e.g., ["full", "settings"])'),
+          .describe('Combine multiple tiers (e.g., ["mail_full", "drive_readonly"])'),
       },
     },
     async (args) => {
@@ -141,19 +166,23 @@ export function createServer(options: ServerOptions): McpServer {
           needsScopeSelection: true,
           message: 'Which permissions would you like for this account?',
           options: [
-            { tier: 'readonly', description: 'Read and search emails only' },
-            { tier: 'compose', description: 'Also compose and send emails (recommended)' },
-            { tier: 'full', description: 'Also manage labels, archive, trash' },
-            { tier: 'settings', description: 'Also manage filters and vacation responder' },
-            { tier: 'all', description: 'All permissions' },
+            { tier: 'mail_readonly', description: 'Read and search emails only' },
+            { tier: 'mail_compose', description: 'Also compose and send emails' },
+            { tier: 'mail_full', description: 'Also manage labels, archive, trash' },
+            { tier: 'mail_settings', description: 'Also manage filters and vacation responder' },
+            { tier: 'drive_readonly', description: 'Read Google Drive files' },
+            { tier: 'drive_full', description: 'Read and write Google Drive files' },
+            { tier: 'calendar_readonly', description: 'Read Google Calendar events' },
+            { tier: 'calendar_full', description: 'Read and write Google Calendar events' },
+            { tier: 'all', description: 'All permissions across all services' },
           ],
         });
       }
 
-      // scopeTiers takes precedence if provided
+      // scopeTiers takes precedence if provided; migrate any legacy tier names
       const scopeTierOrTiers: ScopeTier | ScopeTier[] = args.scopeTiers
-        ? (args.scopeTiers as ScopeTier[])
-        : (args.scopeTier as ScopeTier);
+        ? (args.scopeTiers as string[]).map(migrateTierName) as ScopeTier[]
+        : migrateTierName(args.scopeTier as string);
 
       try {
         // Start async auth flow - returns immediately with auth URL
@@ -287,7 +316,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'readonly');
+      const validation = validateAccountScope(args.accountId, 'mail_readonly');
       if ('error' in validation) return validation.error;
 
       try {
@@ -323,7 +352,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'readonly');
+      const validation = validateAccountScope(args.accountId, 'mail_readonly');
       if ('error' in validation) return validation.error;
 
       try {
@@ -366,7 +395,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'readonly');
+      const validation = validateAccountScope(args.accountId, 'mail_readonly');
       if ('error' in validation) return validation.error;
 
       try {
@@ -429,7 +458,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'readonly');
+      const validation = validateAccountScope(args.accountId, 'mail_readonly');
       if ('error' in validation) return validation.error;
 
       try {
@@ -482,7 +511,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'compose');
+      const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -541,7 +570,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'compose');
+      const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -585,7 +614,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'compose');
+      const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -643,7 +672,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'compose');
+      const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
       // Safety gate: require explicit confirmation
@@ -686,7 +715,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'compose');
+      const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -730,7 +759,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'compose');
+      const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -814,7 +843,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       try {
@@ -851,7 +880,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       try {
@@ -903,7 +932,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       // Require confirmation for large operations
@@ -961,7 +990,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1011,7 +1040,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1055,7 +1084,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       if (!args.confirm) {
@@ -1095,7 +1124,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1133,7 +1162,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1167,7 +1196,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1200,7 +1229,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'full');
+      const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1236,7 +1265,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'readonly');
+      const validation = validateAccountScope(args.accountId, 'mail_readonly');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1266,7 +1295,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'readonly');
+      const validation = validateAccountScope(args.accountId, 'mail_readonly');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1314,7 +1343,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'compose');
+      const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1359,7 +1388,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'settings');
+      const validation = validateAccountScope(args.accountId, 'mail_settings');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1416,7 +1445,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'settings');
+      const validation = validateAccountScope(args.accountId, 'mail_settings');
       if ('error' in validation) return validation.error;
 
       if (args.confirm !== true) {
@@ -1477,7 +1506,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'settings');
+      const validation = validateAccountScope(args.accountId, 'mail_settings');
       if ('error' in validation) return validation.error;
 
       if (args.confirm !== true) {
@@ -1515,7 +1544,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'settings');
+      const validation = validateAccountScope(args.accountId, 'mail_settings');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1566,7 +1595,7 @@ export function createServer(options: ServerOptions): McpServer {
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'settings');
+      const validation = validateAccountScope(args.accountId, 'mail_settings');
       if ('error' in validation) return validation.error;
 
       // Confirmation required only when enabling
