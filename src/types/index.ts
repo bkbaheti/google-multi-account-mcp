@@ -10,28 +10,44 @@ export const AccountSchema = z.object({
 });
 
 // Scope tiers for incremental authorization
-// Tier hierarchy: readonly < compose < full (linear)
-//                 readonly < settings (parallel branch)
-// Settings and full are parallel - neither satisfies the other
-// 'all' combines everything: full + settings + compose
+// Mail tier hierarchy: mail_readonly < mail_compose < mail_full (linear)
+//                      mail_readonly < mail_settings (parallel branch)
+// mail_settings and mail_full are parallel - neither satisfies the other
+// 'all' combines everything: mail + drive + calendar
 export const SCOPE_TIERS = {
-  readonly: [
+  mail_readonly: [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
   ],
-  compose: [
+  mail_compose: [
     'https://www.googleapis.com/auth/gmail.compose',
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
   ],
-  full: [
+  mail_full: [
     'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/gmail.labels',
     'https://www.googleapis.com/auth/userinfo.email',
   ],
-  settings: [
+  mail_settings: [
     'https://www.googleapis.com/auth/gmail.settings.basic',
     'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  drive_readonly: [
+    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  drive_full: [
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  calendar_readonly: [
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ],
+  calendar_full: [
+    'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/userinfo.email',
   ],
   all: [
@@ -39,6 +55,10 @@ export const SCOPE_TIERS = {
     'https://www.googleapis.com/auth/gmail.labels',
     'https://www.googleapis.com/auth/gmail.settings.basic',
     'https://www.googleapis.com/auth/gmail.compose',
+    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/userinfo.email',
   ],
 } as const;
@@ -87,106 +107,120 @@ export function getScopeTier(scopes: string[]): ScopeTier {
   const hasLabels = scopes.includes('https://www.googleapis.com/auth/gmail.labels');
   const hasCompose = scopes.includes('https://www.googleapis.com/auth/gmail.compose');
   const hasSettings = scopes.includes('https://www.googleapis.com/auth/gmail.settings.basic');
+  const hasDriveReadonly = scopes.includes('https://www.googleapis.com/auth/drive.readonly');
+  const hasDriveFile = scopes.includes('https://www.googleapis.com/auth/drive.file');
+  const hasCalendarReadonly = scopes.includes('https://www.googleapis.com/auth/calendar.readonly');
+  const hasCalendarEvents = scopes.includes('https://www.googleapis.com/auth/calendar.events');
 
-  // 'all' tier has both full (modify/labels) AND settings
+  // 'all' tier has mail full + settings + drive + calendar
+  if ((hasModify || hasLabels) && hasSettings && (hasDriveReadonly || hasDriveFile) && (hasCalendarReadonly || hasCalendarEvents)) {
+    return 'all';
+  }
+
+  // Drive tiers
+  if (hasDriveFile) {
+    return 'drive_full';
+  }
+  if (hasDriveReadonly) {
+    return 'drive_readonly';
+  }
+
+  // Calendar tiers
+  if (hasCalendarEvents) {
+    return 'calendar_full';
+  }
+  if (hasCalendarReadonly) {
+    return 'calendar_readonly';
+  }
+
+  // Mail tiers: 'all' mail tier has both full (modify/labels) AND settings
   if ((hasModify || hasLabels) && hasSettings) {
     return 'all';
   }
 
-  // full tier has modify + labels
+  // mail_full tier has modify + labels
   if (hasModify || hasLabels) {
-    return 'full';
+    return 'mail_full';
   }
 
-  // settings tier has gmail.settings.basic
+  // mail_settings tier has gmail.settings.basic
   if (hasSettings) {
-    return 'settings';
+    return 'mail_settings';
   }
 
-  // compose tier has compose (and usually readonly too)
+  // mail_compose tier has compose (and usually readonly too)
   if (hasCompose) {
-    return 'compose';
+    return 'mail_compose';
   }
 
-  // default to readonly
-  return 'readonly';
+  // default to mail_readonly
+  return 'mail_readonly';
 }
 
 // Check if account scopes satisfy the required tier
-// Tier hierarchy:
-//   readonly < compose < full (linear chain)
-//   readonly < settings (parallel branch)
-// Settings and full/compose are parallel - neither satisfies the other
-// 'all' tier satisfies any requirement, but only 'all' satisfies 'all'
+// Simple scope-URL based check: account must have all scope URLs in the required tier
 export function hasSufficientScope(accountScopes: string[], requiredTier: ScopeTier): boolean {
-  const accountTier = getScopeTier(accountScopes);
-
-  // 'all' tier satisfies any requirement
-  if (accountTier === 'all') {
-    return true;
-  }
-
-  // Only 'all' tier can satisfy 'all' requirement
-  if (requiredTier === 'all') {
-    return false;
-  }
-
-  // Same tier always satisfies
-  if (accountTier === requiredTier) {
-    return true;
-  }
-
-  // readonly is satisfied by all other tiers
-  if (requiredTier === 'readonly') {
-    return true;
-  }
-
-  // settings tier is a parallel branch - only settings or all satisfies settings
-  if (requiredTier === 'settings') {
-    return accountTier === 'settings';
-  }
-
-  // For compose and full requirements, use the linear hierarchy
-  // full > compose > readonly
-  // settings does NOT satisfy compose or full
-  if (accountTier === 'settings') {
-    return false;
-  }
-
-  const linearTiers: ScopeTier[] = ['readonly', 'compose', 'full'];
-  const accountTierIndex = linearTiers.indexOf(accountTier);
-  const requiredTierIndex = linearTiers.indexOf(requiredTier);
-
-  return accountTierIndex >= requiredTierIndex;
+  const requiredScopes = SCOPE_TIERS[requiredTier];
+  return requiredScopes.every(scope => accountScopes.includes(scope));
 }
 
 // Get the scope tier required for each operation category
 export const OPERATION_SCOPE_REQUIREMENTS = {
-  // Read operations - readonly tier
-  search: 'readonly',
-  getMessage: 'readonly',
-  getThread: 'readonly',
+  // Mail read operations - mail_readonly tier
+  search: 'mail_readonly',
+  getMessage: 'mail_readonly',
+  getThread: 'mail_readonly',
 
-  // Compose operations - compose tier
-  createDraft: 'compose',
-  updateDraft: 'compose',
-  getDraft: 'compose',
-  sendDraft: 'compose',
-  deleteDraft: 'compose',
-  replyToThread: 'compose',
+  // Mail compose operations - mail_compose tier
+  createDraft: 'mail_compose',
+  updateDraft: 'mail_compose',
+  getDraft: 'mail_compose',
+  sendDraft: 'mail_compose',
+  deleteDraft: 'mail_compose',
+  replyToThread: 'mail_compose',
 
-  // Modify operations - full tier
-  listLabels: 'full',
-  modifyLabels: 'full',
-  markReadUnread: 'full',
-  archive: 'full',
-  trash: 'full',
-  untrash: 'full',
+  // Mail modify operations - mail_full tier
+  listLabels: 'mail_full',
+  modifyLabels: 'mail_full',
+  markReadUnread: 'mail_full',
+  archive: 'mail_full',
+  trash: 'mail_full',
+  untrash: 'mail_full',
 
-  // Settings operations - settings tier (parallel branch)
-  listFilters: 'settings',
-  createFilter: 'settings',
-  deleteFilter: 'settings',
-  getVacation: 'settings',
-  setVacation: 'settings',
+  // Mail settings operations - mail_settings tier (parallel branch)
+  listFilters: 'mail_settings',
+  createFilter: 'mail_settings',
+  deleteFilter: 'mail_settings',
+  getVacation: 'mail_settings',
+  setVacation: 'mail_settings',
+
+  // Drive read operations - drive_readonly tier
+  driveSearch: 'drive_readonly',
+  driveListFiles: 'drive_readonly',
+  driveGetFile: 'drive_readonly',
+  driveGetContent: 'drive_readonly',
+
+  // Drive write operations - drive_full tier
+  driveUpload: 'drive_full',
+  driveCreateFolder: 'drive_full',
+  driveMoveFile: 'drive_full',
+  driveCopyFile: 'drive_full',
+  driveRenameFile: 'drive_full',
+  driveTrashFile: 'drive_full',
+  driveShareFile: 'drive_full',
+  driveUpdatePermissions: 'drive_full',
+
+  // Calendar read operations - calendar_readonly tier
+  calendarListCalendars: 'calendar_readonly',
+  calendarListEvents: 'calendar_readonly',
+  calendarGetEvent: 'calendar_readonly',
+  calendarSearchEvents: 'calendar_readonly',
+  calendarFreeBusy: 'calendar_readonly',
+
+  // Calendar write operations - calendar_full tier
+  calendarCreateEvent: 'calendar_full',
+  calendarUpdateEvent: 'calendar_full',
+  calendarDeleteEvent: 'calendar_full',
+  calendarRsvp: 'calendar_full',
+  calendarMoveEvent: 'calendar_full',
 } as const satisfies Record<string, ScopeTier>;
