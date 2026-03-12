@@ -19,6 +19,7 @@ import {
   type ScopeTier,
 } from '../types/index.js';
 import { cache } from '../utils/index.js';
+import { registerDriveTools } from './drive-tools.js';
 import { registerGmailTools } from './gmail-tools.js';
 
 // Load build info (generated at build time)
@@ -303,6 +304,9 @@ export function createServer(options: ServerOptions): McpServer {
 
   // Register all Gmail tools (gmail_search_messages, gmail_get_message, etc.)
   registerGmailTools(server, accountStore, validateAccountScope);
+
+  // Register all Drive tools (drive_search_files, drive_get_file, etc.)
+  registerDriveTools(server, accountStore, validateAccountScope);
 
   // === MCP Prompts for Safe Email Workflows ===
 
