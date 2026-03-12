@@ -23,6 +23,17 @@ export const ErrorCode = {
   FILTER_NOT_FOUND: 'FILTER_NOT_FOUND',
   FILTER_LIMIT_EXCEEDED: 'FILTER_LIMIT_EXCEEDED',
 
+  // Drive resource errors
+  FILE_NOT_FOUND: 'FILE_NOT_FOUND',
+  FOLDER_NOT_FOUND: 'FOLDER_NOT_FOUND',
+  DRIVE_API_ERROR: 'DRIVE_API_ERROR',
+  DRIVE_QUOTA_EXCEEDED: 'DRIVE_QUOTA_EXCEEDED',
+
+  // Calendar resource errors
+  EVENT_NOT_FOUND: 'EVENT_NOT_FOUND',
+  CALENDAR_NOT_FOUND: 'CALENDAR_NOT_FOUND',
+  CALENDAR_API_ERROR: 'CALENDAR_API_ERROR',
+
   // Validation errors
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   CONFIRMATION_REQUIRED: 'CONFIRMATION_REQUIRED',
@@ -148,6 +159,43 @@ export function filterLimitExceeded(): McpToolError {
     'Gmail filter limit exceeded. Maximum 1000 filters allowed per account.',
     { limit: 1000 },
   );
+}
+
+export function fileNotFound(fileId: string): McpToolError {
+  return new McpToolError(ErrorCode.FILE_NOT_FOUND, `File not found: ${fileId}`, { fileId });
+}
+
+export function folderNotFound(folderId: string): McpToolError {
+  return new McpToolError(ErrorCode.FOLDER_NOT_FOUND, `Folder not found: ${folderId}`, { folderId });
+}
+
+export function driveApiError(originalMessage: string, statusCode?: number): McpToolError {
+  return new McpToolError(ErrorCode.DRIVE_API_ERROR, `Drive API error: ${originalMessage}`, {
+    originalMessage,
+    ...(statusCode && { statusCode }),
+  });
+}
+
+export function driveQuotaExceeded(): McpToolError {
+  return new McpToolError(
+    ErrorCode.DRIVE_QUOTA_EXCEEDED,
+    'Drive storage quota exceeded.',
+  );
+}
+
+export function eventNotFound(eventId: string): McpToolError {
+  return new McpToolError(ErrorCode.EVENT_NOT_FOUND, `Event not found: ${eventId}`, { eventId });
+}
+
+export function calendarNotFound(calendarId: string): McpToolError {
+  return new McpToolError(ErrorCode.CALENDAR_NOT_FOUND, `Calendar not found: ${calendarId}`, { calendarId });
+}
+
+export function calendarApiError(originalMessage: string, statusCode?: number): McpToolError {
+  return new McpToolError(ErrorCode.CALENDAR_API_ERROR, `Calendar API error: ${originalMessage}`, {
+    originalMessage,
+    ...(statusCode && { statusCode }),
+  });
 }
 
 export function internalError(message: string): McpToolError {
