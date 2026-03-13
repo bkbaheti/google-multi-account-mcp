@@ -3,7 +3,7 @@
 ## Quick Reference
 
 ### What This Is
-npm-installable MCP server for multi-Google-account access. Primary: Gmail. Future: Calendar/Drive.
+npm-installable MCP server for multi-Google-account access. Supports: Gmail, Google Drive, Google Calendar.
 
 ### Package Info
 - Name: `@anthropic/mcp-google`
@@ -42,6 +42,32 @@ npm-installable MCP server for multi-Google-account access. Primary: Gmail. Futu
 - `gmail_trash` - move to trash
 - `gmail_untrash` - restore from trash
 
+**Drive:**
+- `drive_search_files` - search files in Drive
+- `drive_list_files` - list files in folder
+- `drive_get_file` - get file metadata
+- `drive_get_file_content` - download/export file content
+- `drive_upload_file` - upload a file
+- `drive_create_folder` - create folder
+- `drive_move_file` - move file to folder
+- `drive_copy_file` - copy a file
+- `drive_rename_file` - rename a file
+- `drive_trash_file` - move to trash
+- `drive_share_file` - share file (requires confirm: true)
+- `drive_update_permissions` - modify permissions (requires confirm: true)
+
+**Calendar:**
+- `calendar_list_calendars` - list all calendars
+- `calendar_list_events` - list events in time range
+- `calendar_get_event` - get event details
+- `calendar_search_events` - search events by text
+- `calendar_freebusy` - check free/busy status
+- `calendar_create_event` - create event (confirm if attendees)
+- `calendar_update_event` - update event (confirm if attendees)
+- `calendar_delete_event` - delete event (confirm if attendees)
+- `calendar_rsvp` - respond to invitation
+- `calendar_move_event` - move to different calendar
+
 **MCP Prompts:**
 - `compose-email` - guided email composition workflow
 - `reply-to-email` - guided reply workflow with threading
@@ -60,6 +86,9 @@ npm-installable MCP server for multi-Google-account access. Primary: Gmail. Futu
 - Phase 7: AI productivity prompts
 - Phase 8: Performance & optimization (caching, rate limiting)
 - Phase 9: Advanced features (filters, vacation, batch ops)
+- Phase 10: Scope tier refactor (mail_ prefix, drive/calendar tiers)
+- Phase 11-12: Drive support (12 tools: search, list, get, upload, share, permissions)
+- Phase 13-14: Calendar support (10 tools: list, get, search, create, update, RSVP)
 
 **Pending:**
 - HTTP/SSE transport support (deferred - significant architectural work)
@@ -69,7 +98,7 @@ npm-installable MCP server for multi-Google-account access. Primary: Gmail. Futu
 - Local-first stdio MCP server
 - Account isolation (tokens, cache, rate limits)
 - Draft-first + confirm gate for all sends
-- Tiered scopes with explicit upgrade
+- Tiered scopes with explicit upgrade (mail_readonly, mail_compose, mail_full, mail_settings, drive_readonly, drive_full, calendar_readonly, calendar_full, all)
 
 ---
 
@@ -146,6 +175,8 @@ src/
   server/                # MCP server setup
   auth/                  # OAuth, token storage
   gmail/                 # Gmail client, caching
+  drive/                 # Drive client, file operations
+  calendar/              # Calendar client, event operations
   config/                # Config schema, loader
   types/                 # Shared types
 tests/

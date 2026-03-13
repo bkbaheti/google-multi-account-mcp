@@ -1,6 +1,27 @@
 # Tasks
 
-## Current Phase: 9 - Advanced Features (COMPLETED)
+## Current Phase: 14 - Calendar Support (COMPLETED)
+
+---
+
+## Phase 10-14: Drive & Calendar Support (COMPLETED)
+
+### Phase 10: Scope Tier Refactor
+- [DONE] Rename scope tiers to mail_ prefix (readonly -> mail_readonly, etc.)
+- [DONE] Add drive_readonly, drive_full, calendar_readonly, calendar_full tiers
+- [DONE] Update hasSufficientScope to URL-based checking
+- [DONE] Update all scope validation tests (73 tests)
+- [DONE] Update server tool registrations for new tier names
+- [DONE] Extract Gmail tools to server/gmail-tools.ts
+- [DONE] Add Drive and Calendar error codes
+
+### Phase 11-12: Drive Support
+- [DONE] Create DriveClient with read/write methods
+- [DONE] Register 12 Drive tools (4 read + 6 write + 2 confirm-gated)
+
+### Phase 13-14: Calendar Support
+- [DONE] Create CalendarClient with read/write methods
+- [DONE] Register 10 Calendar tools (5 read + 5 write with conditional confirm)
 
 ---
 
