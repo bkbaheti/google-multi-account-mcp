@@ -19,6 +19,7 @@ import {
   type ScopeTier,
 } from '../types/index.js';
 import { cache } from '../utils/index.js';
+import { registerCalendarTools } from './calendar-tools.js';
 import { registerDriveTools } from './drive-tools.js';
 import { registerGmailTools } from './gmail-tools.js';
 
@@ -307,6 +308,9 @@ export function createServer(options: ServerOptions): McpServer {
 
   // Register all Drive tools (drive_search_files, drive_get_file, etc.)
   registerDriveTools(server, accountStore, validateAccountScope);
+
+  // Register all Calendar tools (calendar_list_calendars, calendar_create_event, etc.)
+  registerCalendarTools(server, accountStore, validateAccountScope);
 
   // === MCP Prompts for Safe Email Workflows ===
 
