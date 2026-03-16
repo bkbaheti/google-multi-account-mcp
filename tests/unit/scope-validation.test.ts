@@ -139,9 +139,9 @@ describe('Scope Validation', () => {
       expect(hasSufficientScope([...scopes], 'mail_compose')).toBe(false);
     });
 
-    it('mail_full tier does not satisfy mail_readonly requirement (no gmail.readonly URL)', () => {
+    it('mail_full tier satisfies mail_readonly requirement (gmail.modify implies gmail.readonly)', () => {
       const scopes = SCOPE_TIERS.mail_full;
-      expect(hasSufficientScope([...scopes], 'mail_readonly')).toBe(false);
+      expect(hasSufficientScope([...scopes], 'mail_readonly')).toBe(true);
     });
 
     it('mail_full tier does not satisfy mail_settings requirement', () => {
@@ -190,14 +190,14 @@ describe('Scope Validation', () => {
       expect(hasSufficientScope([...scopes], 'all')).toBe(true);
     });
 
-    it('all tier does not satisfy mail_compose (missing gmail.readonly URL)', () => {
+    it('all tier satisfies mail_compose (gmail.modify implies gmail.readonly)', () => {
       const scopes = SCOPE_TIERS.all;
-      expect(hasSufficientScope([...scopes], 'mail_compose')).toBe(false);
+      expect(hasSufficientScope([...scopes], 'mail_compose')).toBe(true);
     });
 
-    it('all tier does not satisfy mail_settings (missing gmail.readonly URL)', () => {
+    it('all tier satisfies mail_settings (gmail.modify implies gmail.readonly)', () => {
       const scopes = SCOPE_TIERS.all;
-      expect(hasSufficientScope([...scopes], 'mail_settings')).toBe(false);
+      expect(hasSufficientScope([...scopes], 'mail_settings')).toBe(true);
     });
 
     it('all tier satisfies drive and calendar requirements', () => {

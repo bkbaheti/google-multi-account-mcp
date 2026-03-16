@@ -157,11 +157,45 @@ export function getScopeTier(scopes: string[]): ScopeTier {
   return 'mail_readonly';
 }
 
+// Google OAuth scope hierarchy: broader scopes imply narrower ones.
+// gmail.modify includes all of gmail.readonly permissions.
+// drive.file includes all of drive.readonly permissions.
+// calendar.events includes all of calendar.readonly permissions.
+const SCOPE_IMPLIES: Record<string, string[]> = {
+  'https://www.googleapis.com/auth/gmail.modify': [
+    'https://www.googleapis.com/auth/gmail.readonly',
+  ],
+  'https://www.googleapis.com/auth/drive.file': [
+    'https://www.googleapis.com/auth/drive.readonly',
+  ],
+  'https://www.googleapis.com/auth/calendar.events': [
+    'https://www.googleapis.com/auth/calendar.readonly',
+  ],
+};
+
+/**
+ * Expand account scopes to include implied scopes based on Google's hierarchy.
+ * e.g. if account has gmail.modify, it effectively also has gmail.readonly.
+ */
+function expandScopes(scopes: string[]): Set<string> {
+  const expanded = new Set(scopes);
+  for (const scope of scopes) {
+    const implied = SCOPE_IMPLIES[scope];
+    if (implied) {
+      for (const s of implied) {
+        expanded.add(s);
+      }
+    }
+  }
+  return expanded;
+}
+
 // Check if account scopes satisfy the required tier
-// Simple scope-URL based check: account must have all scope URLs in the required tier
+// Accounts with broader scopes (e.g. gmail.modify) satisfy narrower requirements (e.g. gmail.readonly)
 export function hasSufficientScope(accountScopes: string[], requiredTier: ScopeTier): boolean {
   const requiredScopes = SCOPE_TIERS[requiredTier];
-  return requiredScopes.every(scope => accountScopes.includes(scope));
+  const effectiveScopes = expandScopes(accountScopes);
+  return requiredScopes.every(scope => effectiveScopes.has(scope));
 }
 
 // Get the scope tier required for each operation category
