@@ -26,8 +26,11 @@
     "mcp",
     "google",
     "gmail",
+    "drive",
+    "calendar",
     "oauth",
-    "multi-account"
+    "multi-account",
+    "zero-config"
   ],
   "author": "Anthropic",
   "license": "MIT",

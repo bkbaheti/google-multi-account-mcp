@@ -1,6 +1,6 @@
 # MCP Google Multi-Account Server
 
-An MCP (Model Context Protocol) server for accessing multiple Google accounts (primarily Gmail) from Claude Code, Claude Desktop, or any MCP-compatible client.
+An MCP (Model Context Protocol) server for accessing multiple Google accounts from Claude Code, Claude Desktop, or any MCP-compatible client. Supports Gmail, Google Drive, and Google Calendar.
 
 **Just talk to Claude naturally:**
 ```
@@ -12,30 +12,56 @@ An MCP (Model Context Protocol) server for accessing multiple Google accounts (p
 
 No special commands to memorize - Claude understands what you want.
 
+## Quick Start
+
+No Google Cloud setup needed -- just install and connect your Google account:
+
+**Claude Code CLI:**
+```bash
+claude mcp add google -- npx -y @anthropic/mcp-google
+```
+
+**Claude Desktop** -- add to your `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "google": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-google"]
+    }
+  }
+}
+```
+
+Then use the `google_add_account` tool to connect your Google account. That's it!
+
 ## Features
 
+- **Zero config**: Works out of the box -- no Google Cloud project setup required
 - **Natural language**: Just describe what you want - "find my unread emails", "draft a reply"
 - **Multi-account support**: Connect work, personal, and other accounts - search across all of them
 - **Full Gmail access**: Search, read, compose, send, and organize emails
+- **Google Drive**: Search, upload, download, and share files
+- **Google Calendar**: View, create, update, and manage events
 - **Attachments**: Download and send file attachments
 - **Inbox management**: Labels, archive, trash, read/unread status
 - **Filters & vacation**: Create email filters and configure vacation responders
 - **AI productivity**: Thread summaries, smart reply suggestions, action item extraction
 - **Safety first**: All sends require confirmation - Claude shows you the draft before sending
-- **Privacy focused**: All credentials stored locally, you bring your own OAuth credentials
+- **Privacy focused**: All credentials stored locally on your machine
 
 ## Installation
 
-### From npm (when published)
+### From npm
 
 ```bash
-npm install -g @anthropic/mcp-google
+npx -y @anthropic/mcp-google
 ```
 
 ### Local Development
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/bkbaheti/google-multi-account-mcp.git
 cd google-multi-account-mcp
 pnpm install
 pnpm build
@@ -44,115 +70,23 @@ pnpm build
 ## Prerequisites
 
 1. **Node.js 20+** - Required runtime
-2. **Google Cloud OAuth credentials** - You must create your own (see below)
-3. **Claude Code or Claude Desktop** - MCP client to connect to this server
+2. **Claude Code or Claude Desktop** - MCP client to connect to this server
 
-## Google Cloud OAuth Setup
-
-You must create your own OAuth credentials. This server does not ship with shared credentials.
-
-### Step 1: Create a Google Cloud Project
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or select an existing one)
-3. Note your project name
-
-### Step 2: Enable the Gmail API
-
-1. Go to **APIs & Services** > **Library**
-2. Search for "Gmail API"
-3. Click **Enable**
-
-### Step 3: Configure OAuth Consent Screen
-
-1. Go to **APIs & Services** > **OAuth consent screen**
-2. Select **External** user type (unless you have Google Workspace)
-3. Fill in the required fields:
-   - App name: e.g., "My MCP Gmail"
-   - User support email: your email
-   - Developer contact: your email
-4. Click **Save and Continue**
-5. On **Scopes**, click **Add or Remove Scopes** and add:
-   - `https://www.googleapis.com/auth/gmail.readonly`
-   - `https://www.googleapis.com/auth/gmail.compose`
-   - `https://www.googleapis.com/auth/gmail.modify`
-   - `https://www.googleapis.com/auth/gmail.settings.basic`
-   - `https://www.googleapis.com/auth/userinfo.email`
-6. Click **Save and Continue**
-7. On **Test users**, add your Google email addresses that will use this app
-8. Click **Save and Continue**
-
-### Step 4: Create OAuth 2.0 Client ID
-
-1. Go to **APIs & Services** > **Credentials**
-2. Click **Create Credentials** > **OAuth client ID**
-3. Select **Desktop app** as the application type
-4. Name it (e.g., "MCP Gmail Desktop")
-5. Click **Create**
-6. **Important**: Copy the **Client ID** and **Client Secret**
-
-### Step 5: Add Redirect URI
-
-1. Click on your newly created OAuth client
-2. Under **Authorized redirect URIs**, add:
-   ```
-   http://localhost:8089/callback
-   ```
-3. Click **Save**
+That's it! OAuth credentials are built in. See [Advanced: Bring Your Own OAuth Credentials](#advanced-bring-your-own-oauth-credentials) if you want to use your own GCP project.
 
 ## Configuration
 
-### Configure the MCP Server
-
-Create the configuration file at `~/.config/mcp-google/config.json`:
-
-```json
-{
-  "version": 1,
-  "oauth": {
-    "clientId": "YOUR_CLIENT_ID.apps.googleusercontent.com",
-    "clientSecret": "YOUR_CLIENT_SECRET"
-  },
-  "accounts": []
-}
-```
-
-Replace `YOUR_CLIENT_ID` and `YOUR_CLIENT_SECRET` with the values from Google Cloud Console.
-
-### Configure Claude Code
-
-Add to your Claude Code settings (`~/.claude/settings.json` or project-level `.claude/settings.json`):
-
-```json
-{
-  "mcpServers": {
-    "google": {
-      "command": "node",
-      "args": ["/absolute/path/to/google-multi-account-mcp/dist/cli.js"],
-      "env": {
-        "MCP_GOOGLE_PASSPHRASE": "optional-passphrase-for-token-encryption"
-      }
-    }
-  }
-}
-```
-
-Replace `/absolute/path/to/google-multi-account-mcp` with the actual path to this project.
-
 ### Configure Claude Code (CLI)
-
-Alternatively, use the Claude CLI to add the MCP server:
 
 ```bash
 # Add to current project only (default)
-claude mcp add google node /absolute/path/to/google-multi-account-mcp/dist/cli.js
+claude mcp add google -- npx -y @anthropic/mcp-google
 
 # Add globally (available in all projects)
-claude mcp add -s user google node /absolute/path/to/google-multi-account-mcp/dist/cli.js
+claude mcp add -s user google -- npx -y @anthropic/mcp-google
 
 # With passphrase for token encryption
-claude mcp add -s user google node /absolute/path/to/google-multi-account-mcp/dist/cli.js \
-  -e MCP_GOOGLE_PASSPHRASE=optional-passphrase-for-token-encryption
+claude mcp add -s user google -e MCP_GOOGLE_PASSPHRASE=optional-passphrase -- npx -y @anthropic/mcp-google
 ```
 
 To verify or remove:
@@ -169,12 +103,74 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 {
   "mcpServers": {
     "google": {
-      "command": "node",
-      "args": ["/absolute/path/to/dist/cli.js"]
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-google"]
     }
   }
 }
 ```
+
+### Advanced: Bring Your Own OAuth Credentials
+
+If you prefer to use your own GCP project, you can override the built-in defaults:
+
+- **Environment variables**: Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+- **Config file**: Add `oauth.clientId` and `oauth.clientSecret` to `~/.config/mcp-google/config.json`
+
+Priority: environment variables > config file > built-in defaults.
+
+<details>
+<summary>Click for full GCP setup instructions</summary>
+
+#### Step 1: Create a Google Cloud Project
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or select an existing one)
+
+#### Step 2: Enable APIs
+
+1. Go to **APIs & Services** > **Library**
+2. Enable the APIs you need: **Gmail API**, **Google Drive API**, **Google Calendar API**
+
+#### Step 3: Configure OAuth Consent Screen
+
+1. Go to **APIs & Services** > **OAuth consent screen**
+2. Select **External** user type (unless you have Google Workspace)
+3. Fill in the required fields (app name, support email, developer contact)
+4. Add the scopes you need (e.g., Gmail, Drive, Calendar)
+5. Add your Google email as a test user
+
+#### Step 4: Create OAuth 2.0 Client ID
+
+1. Go to **APIs & Services** > **Credentials**
+2. Click **Create Credentials** > **OAuth client ID**
+3. Select **Desktop app** as the application type
+4. Copy the **Client ID** and **Client Secret**
+
+#### Step 5: Add Redirect URI
+
+1. Under **Authorized redirect URIs**, add: `http://localhost:8089/callback`
+
+#### Step 6: Configure
+
+Set via environment variables:
+```bash
+export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GOOGLE_CLIENT_SECRET="your-client-secret"
+```
+
+Or add to `~/.config/mcp-google/config.json`:
+```json
+{
+  "version": 1,
+  "oauth": {
+    "clientId": "your-client-id.apps.googleusercontent.com",
+    "clientSecret": "your-client-secret"
+  }
+}
+```
+
+</details>
 
 ## Usage
 
@@ -316,10 +312,14 @@ When adding an account, Claude will ask which permissions you need:
 
 | Tier | What You Can Do | Best For |
 |------|-----------------|----------|
-| `readonly` | Read and search emails | Checking email, research |
-| `compose` | + Create drafts and send | Daily email use (recommended) |
-| `full` | + Labels, archive, trash | Inbox organization |
-| `settings` | + Filters, vacation responder | Email automation |
+| `mail_readonly` | Read and search emails | Checking email, research |
+| `mail_compose` | + Create drafts and send | Daily email use (recommended) |
+| `mail_full` | + Labels, archive, trash | Inbox organization |
+| `mail_settings` | + Filters, vacation responder | Email automation |
+| `drive_readonly` | Browse and download files | Reading documents |
+| `drive_full` | + Upload, share, organize | File management |
+| `calendar_readonly` | View events and calendars | Checking schedule |
+| `calendar_full` | + Create, update, delete events | Schedule management |
 | `all` | Everything above | Full control |
 
 **How it works:**
@@ -433,7 +433,7 @@ These prompts guide Claude through complex workflows:
 <summary>Click to see exact tool names (for advanced users)</summary>
 
 **Account Management:**
-- `google_list_accounts`, `google_add_account`, `google_remove_account`, `google_set_account_labels`
+- `google_version`, `google_list_accounts`, `google_add_account`, `google_check_pending_auth`, `google_remove_account`, `google_set_account_labels`
 
 **Gmail Reading:**
 - `gmail_search_messages`, `gmail_get_message`, `gmail_get_messages_batch`, `gmail_get_thread`, `gmail_list_attachments`, `gmail_get_attachment`
@@ -446,6 +446,12 @@ These prompts guide Claude through complex workflows:
 
 **Settings:**
 - `gmail_list_filters`, `gmail_create_filter`, `gmail_delete_filter`, `gmail_get_vacation`, `gmail_set_vacation`
+
+**Google Drive:**
+- `drive_search_files`, `drive_list_files`, `drive_get_file`, `drive_get_file_content`, `drive_upload_file`, `drive_create_folder`, `drive_move_file`, `drive_copy_file`, `drive_rename_file`, `drive_trash_file`, `drive_share_file`, `drive_update_permissions`
+
+**Google Calendar:**
+- `calendar_list_calendars`, `calendar_list_events`, `calendar_get_event`, `calendar_search_events`, `calendar_freebusy`, `calendar_create_event`, `calendar_update_event`, `calendar_delete_event`, `calendar_rsvp`, `calendar_move_event`
 
 **MCP Prompts:**
 - `compose-email`, `reply-to-email`, `review-drafts`, `summarize-thread`, `smart-reply`, `extract-action-items`, `categorize-emails`
@@ -465,19 +471,6 @@ These prompts guide Claude through complex workflows:
 | `MCP_GOOGLE_LOG_LEVEL` | Log level: `debug`, `info`, `warn`, `error` |
 
 ## Troubleshooting
-
-### "OAuth credentials not configured"
-
-Your `config.json` is missing OAuth credentials. Ensure you have:
-```json
-{
-  "version": 1,
-  "oauth": {
-    "clientId": "...",
-    "clientSecret": "..."
-  }
-}
-```
 
 ### "No refresh token received"
 
@@ -573,11 +566,11 @@ pnpm format
 
 ## Security Notes
 
-- **BYO OAuth**: You must provide your own Google Cloud OAuth credentials
+- **Zero-config OAuth**: Ships with built-in OAuth credentials (Desktop app type, same pattern as gcloud CLI). You can override with your own credentials if preferred.
 - **Local storage**: All tokens are stored locally on your machine
 - **Keychain preferred**: Uses OS keychain when available, falls back to encrypted file
 - **Draft-first**: All sends require creating a draft first, then explicit confirmation
-- **No shared credentials**: This server never uses shared OAuth credentials
+- **Account isolation**: Each account's tokens, cache, and rate limits are isolated
 
 ## License
 
