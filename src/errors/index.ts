@@ -87,7 +87,7 @@ export function accountNotFound(accountId: string): McpToolError {
 export function authNotConfigured(accountId: string): McpToolError {
   return new McpToolError(
     ErrorCode.AUTH_NOT_CONFIGURED,
-    `OAuth credentials not configured. Please set clientId and clientSecret in config.`,
+    `OAuth authentication failed. Try re-adding the account with google_add_account.`,
     { accountId },
   );
 }
