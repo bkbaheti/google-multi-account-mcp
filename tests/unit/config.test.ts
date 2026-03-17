@@ -74,4 +74,90 @@ describe('Config', () => {
       expect(reloaded.version).toBe(2);
     });
   });
+
+  describe('resolveOAuthConfig', () => {
+    afterEach(() => {
+      delete process.env.GOOGLE_CLIENT_ID;
+      delete process.env.GOOGLE_CLIENT_SECRET;
+    });
+
+    it('should use env vars when both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set', async () => {
+      process.env.GOOGLE_CLIENT_ID = 'env-client-id';
+      process.env.GOOGLE_CLIENT_SECRET = 'env-client-secret';
+      const customPath = path.join(TEST_CONFIG_DIR, 'oauth-env', 'config.json');
+      process.env.MCP_GOOGLE_CONFIG_PATH = customPath;
+
+      vi.resetModules();
+      const { resolveOAuthConfig } = await import('../../src/config/index.js');
+
+      const result = resolveOAuthConfig();
+      expect(result.clientId).toBe('env-client-id');
+      expect(result.clientSecret).toBe('env-client-secret');
+    });
+
+    it('should use config file values when env vars are not set', async () => {
+      delete process.env.GOOGLE_CLIENT_ID;
+      delete process.env.GOOGLE_CLIENT_SECRET;
+      const customPath = path.join(TEST_CONFIG_DIR, 'oauth-config', 'config.json');
+      process.env.MCP_GOOGLE_CONFIG_PATH = customPath;
+
+      vi.resetModules();
+      const { saveConfig } = await import('../../src/config/index.js');
+      saveConfig({
+        version: 1,
+        accounts: [],
+        oauth: {
+          clientId: 'config-client-id',
+          clientSecret: 'config-client-secret',
+        },
+      });
+
+      vi.resetModules();
+      const { resolveOAuthConfig } = await import('../../src/config/index.js');
+
+      const result = resolveOAuthConfig();
+      expect(result.clientId).toBe('config-client-id');
+      expect(result.clientSecret).toBe('config-client-secret');
+    });
+
+    it('should fall back to package defaults when nothing else is configured', async () => {
+      delete process.env.GOOGLE_CLIENT_ID;
+      delete process.env.GOOGLE_CLIENT_SECRET;
+      const customPath = path.join(TEST_CONFIG_DIR, 'oauth-defaults', 'config.json');
+      process.env.MCP_GOOGLE_CONFIG_PATH = customPath;
+
+      vi.resetModules();
+      const { resolveOAuthConfig } = await import('../../src/config/index.js');
+      const { DEFAULT_OAUTH_CLIENT_ID, DEFAULT_OAUTH_CLIENT_SECRET } = await import('../../src/auth/oauth-defaults.js');
+
+      const result = resolveOAuthConfig();
+      expect(result.clientId).toBe(DEFAULT_OAUTH_CLIENT_ID);
+      expect(result.clientSecret).toBe(DEFAULT_OAUTH_CLIENT_SECRET);
+    });
+
+    it('should prefer env vars over config file', async () => {
+      process.env.GOOGLE_CLIENT_ID = 'env-wins-id';
+      process.env.GOOGLE_CLIENT_SECRET = 'env-wins-secret';
+      const customPath = path.join(TEST_CONFIG_DIR, 'oauth-priority', 'config.json');
+      process.env.MCP_GOOGLE_CONFIG_PATH = customPath;
+
+      vi.resetModules();
+      const { saveConfig } = await import('../../src/config/index.js');
+      saveConfig({
+        version: 1,
+        accounts: [],
+        oauth: {
+          clientId: 'config-client-id',
+          clientSecret: 'config-client-secret',
+        },
+      });
+
+      vi.resetModules();
+      const { resolveOAuthConfig } = await import('../../src/config/index.js');
+
+      const result = resolveOAuthConfig();
+      expect(result.clientId).toBe('env-wins-id');
+      expect(result.clientSecret).toBe('env-wins-secret');
+    });
+  });
 });
