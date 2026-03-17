@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP Google Multi-Account</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms of Service</a>
+  </nav>
+
+  <h1>MCP Google Multi-Account</h1>
+
+  <p>
+    A local MCP (Model Context Protocol) server that gives AI assistants like Claude
+    secure access to your Google accounts. Connect multiple Google accounts and work
+    with Gmail, Google Drive, and Google Calendar — all from a single server running
+    on your machine.
+  </p>
+
+  <h2>Quick Start</h2>
+
+  <h3>Claude Code CLI</h3>
+  <p>Add the server in one command:</p>
+  <pre><code>claude mcp add google-multi-account -- npx -y @anthropic/mcp-google</code></pre>
+
+  <h3>Claude Desktop</h3>
+  <p>Add the following to your Claude Desktop configuration file (<code>claude_desktop_config.json</code>):</p>
+  <pre><code>{
+  "mcpServers": {
+    "google": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-google"]
+    }
+  }
+}</code></pre>
+
+  <p>
+    On first use, the server will prompt you to provide your own Google OAuth
+    client credentials and guide you through connecting your Google account.
+  </p>
+
+  <h2>Features</h2>
+  <ul>
+    <li><strong>Multi-account support</strong> — Connect and switch between multiple Google accounts seamlessly</li>
+    <li><strong>Gmail</strong> — Search, read, draft, send, reply, manage labels, archive, and trash messages</li>
+    <li><strong>Google Drive</strong> — Search, list, read, upload, copy, move, rename, share, and manage files</li>
+    <li><strong>Google Calendar</strong> — List, search, create, update, delete events, check availability, and RSVP</li>
+    <li><strong>Zero-config</strong> — Install and run with a single <code>npx</code> command, no build step required</li>
+    <li><strong>Local tokens</strong> — OAuth tokens are stored only on your machine at <code>~/.config/mcp-google/</code></li>
+    <li><strong>Safety gates</strong> — Destructive actions like sending email or sharing files require explicit confirmation</li>
+    <li><strong>Tiered scopes</strong> — Request only the Google API permissions you need</li>
+  </ul>
+
+  <h2>Source Code</h2>
+  <p>
+    This project is open source under the MIT License. View the code, report issues, and contribute on GitHub:
+  </p>
+  <p>
+    <a href="https://github.com/bkbaheti/google-multi-account-mcp">github.com/bkbaheti/google-multi-account-mcp</a>
+  </p>
+
+  <footer>
+    <a href="/privacy">Privacy Policy</a> &middot;
+    <a href="/terms">Terms of Service</a> &middot;
+    <a href="https://github.com/bkbaheti/google-multi-account-mcp">GitHub</a>
+  </footer>
+</body>
+</html>
