@@ -1,4 +1,4 @@
-import { loadConfig, saveConfig } from '../config/index.js';
+import { loadConfig, saveConfig, resolveOAuthConfig } from '../config/index.js';
 import type { Account, ScopeTier } from '../types/index.js';
 import { mergeScopeTiers, SCOPE_TIERS } from '../types/index.js';
 import {
@@ -20,16 +20,7 @@ export class AccountStore {
 
   private getOAuth(): GoogleOAuth {
     if (!this.oauth) {
-      const config = loadConfig();
-      if (!config.oauth?.clientId || !config.oauth?.clientSecret) {
-        throw new Error(
-          'OAuth credentials not configured. Set clientId and clientSecret in ~/.config/mcp-google/config.json',
-        );
-      }
-      const oauthConfig: OAuthConfig = {
-        clientId: config.oauth.clientId,
-        clientSecret: config.oauth.clientSecret,
-      };
+      const oauthConfig: OAuthConfig = resolveOAuthConfig();
       this.oauth = new GoogleOAuth(oauthConfig, this.tokenStorage);
     }
     return this.oauth;
