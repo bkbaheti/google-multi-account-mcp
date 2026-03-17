@@ -2,11 +2,9 @@
 /**
  * Quick test script for OAuth flow.
  *
- * Prerequisites:
- * 1. Create OAuth credentials at https://console.cloud.google.com/apis/credentials
- * 2. Enable Gmail API at https://console.cloud.google.com/apis/library/gmail.googleapis.com
- * 3. Add http://localhost:8089/callback as authorized redirect URI
- * 4. Update ~/.config/mcp-google/config.json with your clientId and clientSecret
+ * Built-in OAuth credentials are used by default. To override, set
+ * GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables,
+ * or add oauth.clientId / oauth.clientSecret to ~/.config/mcp-google/config.json.
  *
  * Usage:
  *   npx tsx scripts/test-oauth.ts add [readonly|compose|full]
@@ -15,7 +13,7 @@
  */
 
 import { AccountStore, createTokenStorage } from '../src/index.js';
-import { loadConfig } from '../src/config/index.js';
+import { resolveOAuthConfig } from '../src/config/index.js';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
@@ -24,20 +22,10 @@ const TOKENS_DIR = path.join(os.homedir(), '.config', 'mcp-google', 'tokens');
 async function main() {
   const command = process.argv[2];
 
-  // Check config first
-  const config = loadConfig();
-  if (command === 'add' && (!config.oauth?.clientId || !config.oauth?.clientSecret)) {
-    console.error('Error: OAuth credentials not configured.');
-    console.error('Edit ~/.config/mcp-google/config.json and add:');
-    console.error(JSON.stringify({
-      version: 1,
-      accounts: [],
-      oauth: {
-        clientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
-        clientSecret: 'YOUR_CLIENT_SECRET'
-      }
-    }, null, 2));
-    process.exit(1);
+  // Resolve OAuth credentials (env vars > config file > built-in defaults)
+  if (command === 'add') {
+    const oauthConfig = resolveOAuthConfig();
+    console.log(`Using OAuth client ID: ${oauthConfig.clientId.slice(0, 20)}...`);
   }
 
   // Initialize token storage
