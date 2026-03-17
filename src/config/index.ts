@@ -1,10 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {
-  DEFAULT_OAUTH_CLIENT_ID,
-  DEFAULT_OAUTH_CLIENT_SECRET,
-} from '../auth/oauth-defaults.js';
+import { DEFAULT_OAUTH_CLIENT_ID, DEFAULT_OAUTH_CLIENT_SECRET } from '../auth/oauth-defaults.js';
 import { type Config, ConfigSchema, DEFAULT_CONFIG } from '../types/index.js';
 
 const DEFAULT_CONFIG_DIR = path.join(os.homedir(), '.config', 'mcp-google');
@@ -65,7 +62,9 @@ export interface OAuthCredentials {
  * 3. Package defaults (shared public OAuth client)
  */
 export function resolveOAuthConfig(): OAuthCredentials {
+  // biome-ignore lint/complexity/useLiteralKeys: env vars require bracket notation
   const envId = process.env['GOOGLE_CLIENT_ID'];
+  // biome-ignore lint/complexity/useLiteralKeys: env vars require bracket notation
   const envSecret = process.env['GOOGLE_CLIENT_SECRET'];
   if (envId && envSecret) {
     return { clientId: envId, clientSecret: envSecret };
