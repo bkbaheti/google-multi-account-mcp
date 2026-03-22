@@ -18,7 +18,7 @@ No Google Cloud setup needed -- just install and connect your Google account:
 
 **Claude Code CLI:**
 ```bash
-claude mcp add google -- npx -y @procedure/mcp-google
+claude mcp add google -- npx -y @procedure-tech/mcp-google
 ```
 
 **Claude Desktop** -- add to your `claude_desktop_config.json`:
@@ -27,7 +27,7 @@ claude mcp add google -- npx -y @procedure/mcp-google
   "mcpServers": {
     "google": {
       "command": "npx",
-      "args": ["-y", "@procedure/mcp-google"]
+      "args": ["-y", "@procedure-tech/mcp-google"]
     }
   }
 }
@@ -55,7 +55,7 @@ Then use the `google_add_account` tool to connect your Google account. That's it
 ### From npm
 
 ```bash
-npx -y @procedure/mcp-google
+npx -y @procedure-tech/mcp-google
 ```
 
 ### Local Development
@@ -80,13 +80,13 @@ That's it! OAuth credentials are built in. See [Advanced: Bring Your Own OAuth C
 
 ```bash
 # Add to current project only (default)
-claude mcp add google -- npx -y @procedure/mcp-google
+claude mcp add google -- npx -y @procedure-tech/mcp-google
 
 # Add globally (available in all projects)
-claude mcp add -s user google -- npx -y @procedure/mcp-google
+claude mcp add -s user google -- npx -y @procedure-tech/mcp-google
 
 # With passphrase for token encryption
-claude mcp add -s user google -e MCP_GOOGLE_PASSPHRASE=optional-passphrase -- npx -y @procedure/mcp-google
+claude mcp add -s user google -e MCP_GOOGLE_PASSPHRASE=optional-passphrase -- npx -y @procedure-tech/mcp-google
 ```
 
 To verify or remove:
@@ -104,7 +104,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
   "mcpServers": {
     "google": {
       "command": "npx",
-      "args": ["-y", "@procedure/mcp-google"]
+      "args": ["-y", "@procedure-tech/mcp-google"]
     }
   }
 }

@@ -6,7 +6,7 @@
 npm-installable MCP server for multi-Google-account access. Supports: Gmail, Google Drive, Google Calendar.
 
 ### Package Info
-- Name: `@procedure/mcp-google`
+- Name: `@procedure-tech/mcp-google`
 - Runtime: Node.js LTS, TypeScript, pnpm
 - Transport: stdio (default), HTTP/SSE (future)
 - Config: `~/.config/mcp-google/config.json`
