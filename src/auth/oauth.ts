@@ -7,7 +7,7 @@ import type { TokenData, TokenStorage } from './token-storage.js';
 export type OAuth2Client = Auth.OAuth2Client;
 
 const REDIRECT_PORT = 8089;
-const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
+const REDIRECT_URI = `http://127.0.0.1:${REDIRECT_PORT}/callback`;
 
 export interface OAuthConfig {
   clientId: string;
