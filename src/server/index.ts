@@ -12,12 +12,7 @@ import {
   successResponse,
   toMcpError,
 } from '../errors/index.js';
-import {
-  getScopeTier,
-  hasSufficientScope,
-  SCOPE_TIERS,
-  type ScopeTier,
-} from '../types/index.js';
+import { getScopeTier, hasSufficientScope, SCOPE_TIERS, type ScopeTier } from '../types/index.js';
 import { cache } from '../utils/index.js';
 import { registerCalendarTools } from './calendar-tools.js';
 import { registerDriveTools } from './drive-tools.js';
@@ -64,7 +59,9 @@ export function createServer(options: ServerOptions): McpServer {
   function validateAccountScope(
     accountId: string,
     requiredTier: ScopeTier,
-  ): { error: ReturnType<typeof errorResponse> } | { account: NonNullable<ReturnType<typeof accountStore.getAccount>> } {
+  ):
+    | { error: ReturnType<typeof errorResponse> }
+    | { account: NonNullable<ReturnType<typeof accountStore.getAccount>> } {
     const account = accountStore.getAccount(accountId);
     if (!account) {
       return { error: errorResponse(accountNotFound(accountId).toResponse()) };
@@ -138,24 +135,42 @@ export function createServer(options: ServerOptions): McpServer {
       inputSchema: {
         scopeTier: z
           .enum([
-            'mail_readonly', 'mail_compose', 'mail_full', 'mail_settings',
-            'drive_readonly', 'drive_full',
-            'calendar_readonly', 'calendar_full',
+            'mail_readonly',
+            'mail_compose',
+            'mail_full',
+            'mail_settings',
+            'drive_readonly',
+            'drive_full',
+            'calendar_readonly',
+            'calendar_full',
             'all',
             // Legacy aliases
-            'readonly', 'compose', 'full', 'settings',
+            'readonly',
+            'compose',
+            'full',
+            'settings',
           ])
           .optional()
           .describe('Single permission tier (use scopeTiers for multiple)'),
         scopeTiers: z
-          .array(z.enum([
-            'mail_readonly', 'mail_compose', 'mail_full', 'mail_settings',
-            'drive_readonly', 'drive_full',
-            'calendar_readonly', 'calendar_full',
-            'all',
-            // Legacy aliases
-            'readonly', 'compose', 'full', 'settings',
-          ]))
+          .array(
+            z.enum([
+              'mail_readonly',
+              'mail_compose',
+              'mail_full',
+              'mail_settings',
+              'drive_readonly',
+              'drive_full',
+              'calendar_readonly',
+              'calendar_full',
+              'all',
+              // Legacy aliases
+              'readonly',
+              'compose',
+              'full',
+              'settings',
+            ]),
+          )
           .optional()
           .describe('Combine multiple tiers (e.g., ["mail_full", "drive_readonly"])'),
       },
@@ -182,26 +197,30 @@ export function createServer(options: ServerOptions): McpServer {
 
       // scopeTiers takes precedence if provided; migrate any legacy tier names
       const scopeTierOrTiers: ScopeTier | ScopeTier[] = args.scopeTiers
-        ? (args.scopeTiers as string[]).map(migrateTierName) as ScopeTier[]
+        ? ((args.scopeTiers as string[]).map(migrateTierName) as ScopeTier[])
         : migrateTierName(args.scopeTier as string);
 
       try {
         // Start async auth flow - returns immediately with auth URL
         const session = accountStore.startAddAccount(scopeTierOrTiers);
 
-        return successResponse({
-          status: 'authorization_required',
-          message:
-            'Please open the authorization URL below in your browser to connect your Google account.',
-          sessionId: session.sessionId,
-          authUrl: session.authUrl,
-          instructions: [
-            '1. Open the authorization URL in your browser',
-            '2. Sign in to your Google account and grant permissions',
-            '3. After authorization, call google_check_pending_auth with the sessionId to complete setup',
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: [
+                'Authorization required. Open this URL in your browser:',
+                '',
+                session.authUrl,
+                '',
+                `Session ID: ${session.sessionId}`,
+                '',
+                'After authorizing, call google_check_pending_auth with the sessionId above.',
+                'This session expires in 5 minutes.',
+              ].join('\n'),
+            },
           ],
-          expiresIn: '5 minutes',
-        });
+        };
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -224,14 +243,16 @@ export function createServer(options: ServerOptions): McpServer {
       if (result.status === 'not_found') {
         return errorResponse({
           code: 'SESSION_NOT_FOUND',
-          message: 'Authorization session not found or expired. Please start a new authorization with google_add_account.',
+          message:
+            'Authorization session not found or expired. Please start a new authorization with google_add_account.',
         });
       }
 
       if (result.status === 'pending') {
         return successResponse({
           status: 'pending',
-          message: 'Authorization still pending. The user needs to complete the OAuth flow in their browser.',
+          message:
+            'Authorization still pending. The user needs to complete the OAuth flow in their browser.',
           instructions: 'If the user has already authorized, wait a moment and check again.',
         });
       }
@@ -535,10 +556,7 @@ Show me the preview and ask for confirmation before any sending.`,
           .string()
           .optional()
           .describe('Optional search query to filter messages (default: recent unread)'),
-        maxMessages: z
-          .number()
-          .optional()
-          .describe('Maximum messages to analyze (default: 20)'),
+        maxMessages: z.number().optional().describe('Maximum messages to analyze (default: 20)'),
       },
     },
     async (args) => {
@@ -593,10 +611,7 @@ Group items by priority (High > Medium > Low) where:
         'Analyze uncategorized emails and suggest appropriate labels based on content and sender patterns.',
       argsSchema: {
         accountId: z.string().describe('The Google account ID'),
-        maxMessages: z
-          .number()
-          .optional()
-          .describe('Maximum messages to analyze (default: 25)'),
+        maxMessages: z.number().optional().describe('Maximum messages to analyze (default: 25)'),
         applyAutomatically: z
           .boolean()
           .optional()
