@@ -221,3 +221,27 @@ Lower priority features for power users.
 - [DONE] Implement google_list_accounts tool (returns empty array)
 - [DONE] Add CLI entrypoint (bin: mcp-google)
 - [DONE] Verify MCP server connects via stdio
+
+---
+
+## Future Enhancements (from Competitive Analysis)
+
+Identified from comparing against mcp-gsuite, mcp-google-workspace, and gmail-mcp-multi.
+
+### Account Aliases
+- Allow users to assign friendly aliases ("work", "personal") to accounts, usable in tool calls instead of account IDs
+- **Reference:** gmail-mcp-multi (github.com/dmorrill/gmail-mcp-multi) uses aliases as primary account identifiers via AccountManager
+- **Why:** More ergonomic for AI tool calls — `accountAlias: "work"` is more natural than a UUID
+- **Scope:** Add alias field to Account type, update tool parameter schemas to accept alias OR accountId, add alias resolution in AccountStore
+
+### Bulk Attachment Download
+- Add `gmail_bulk_save_attachments` tool to download multiple email attachments to local disk in one call
+- **Reference:** mcp-gsuite (github.com/MarkusPfundstein/mcp-gsuite) has `bulk_save_gmail_attachments` that writes attachments directly to filesystem
+- **Why:** Useful for batch processing email attachments in AI workflows
+- **Scope:** Add filesystem write capability, new tool registration, path sanitization for security
+
+### Account Descriptions in Tool Schemas
+- Inject human-readable account descriptions into tool parameter schemas so the AI sees context like "Work - engineering team" when choosing accounts
+- **Reference:** mcp-gsuite ToolHandler base class embeds `.accounts.json` descriptions directly into each tool's parameter enum descriptions
+- **Why:** Helps LLM pick the right account without explicit user instruction
+- **Scope:** Extend google_set_account_labels or add new google_set_account_description tool, inject descriptions into tool schema generation
