@@ -1,5 +1,8 @@
 {
-  "name": "@anthropic/mcp-google",
+  "name": "@procedure/mcp-google",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.1.0",
   "description": "MCP server for multi-Google-account access (Gmail, Calendar, Drive)",
   "type": "module",
