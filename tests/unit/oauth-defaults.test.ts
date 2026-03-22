@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_OAUTH_CLIENT_ID, DEFAULT_OAUTH_CLIENT_SECRET } from '../../src/auth/oauth-defaults.js';
+import {
+  DEFAULT_OAUTH_CLIENT_ID,
+  DEFAULT_OAUTH_CLIENT_SECRET,
+} from '../../src/auth/oauth-defaults.js';
 
 describe('OAuth Defaults', () => {
   it('should export a non-empty default client ID', () => {

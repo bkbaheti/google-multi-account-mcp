@@ -109,7 +109,9 @@ export class LRUCache<T = unknown> {
   }
 
   // Get value with cache hit metadata
-  getWithMeta(key: string): { value: T; cacheHit: true; ttlRemainingMs: number } | { cacheHit: false } {
+  getWithMeta(
+    key: string,
+  ): { value: T; cacheHit: true; ttlRemainingMs: number } | { cacheHit: false } {
     const entry = this.get(key);
 
     if (!entry) {

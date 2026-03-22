@@ -113,7 +113,12 @@ export function getScopeTier(scopes: string[]): ScopeTier {
   const hasCalendarEvents = scopes.includes('https://www.googleapis.com/auth/calendar.events');
 
   // 'all' tier has mail full + settings + drive + calendar
-  if ((hasModify || hasLabels) && hasSettings && (hasDriveReadonly || hasDriveFile) && (hasCalendarReadonly || hasCalendarEvents)) {
+  if (
+    (hasModify || hasLabels) &&
+    hasSettings &&
+    (hasDriveReadonly || hasDriveFile) &&
+    (hasCalendarReadonly || hasCalendarEvents)
+  ) {
     return 'all';
   }
 
@@ -165,9 +170,7 @@ const SCOPE_IMPLIES: Record<string, string[]> = {
   'https://www.googleapis.com/auth/gmail.modify': [
     'https://www.googleapis.com/auth/gmail.readonly',
   ],
-  'https://www.googleapis.com/auth/drive.file': [
-    'https://www.googleapis.com/auth/drive.readonly',
-  ],
+  'https://www.googleapis.com/auth/drive.file': ['https://www.googleapis.com/auth/drive.readonly'],
   'https://www.googleapis.com/auth/calendar.events': [
     'https://www.googleapis.com/auth/calendar.readonly',
   ],
@@ -195,7 +198,7 @@ function expandScopes(scopes: string[]): Set<string> {
 export function hasSufficientScope(accountScopes: string[], requiredTier: ScopeTier): boolean {
   const requiredScopes = SCOPE_TIERS[requiredTier];
   const effectiveScopes = expandScopes(accountScopes);
-  return requiredScopes.every(scope => effectiveScopes.has(scope));
+  return requiredScopes.every((scope) => effectiveScopes.has(scope));
 }
 
 // Get the scope tier required for each operation category

@@ -65,7 +65,7 @@ function isRetryable(error: unknown, retryableStatusCodes: number[]): boolean {
 
 // Calculate delay with jitter to prevent thundering herd
 function calculateDelay(attempt: number, options: RetryOptions): number {
-  const exponentialDelay = options.initialDelayMs * Math.pow(options.backoffMultiplier, attempt);
+  const exponentialDelay = options.initialDelayMs * options.backoffMultiplier ** attempt;
   const delay = Math.min(exponentialDelay, options.maxDelayMs);
 
   // Add jitter (±25%) to prevent synchronized retries
@@ -109,7 +109,9 @@ export async function withRetry<T>(
       const delayMs = calculateDelay(attempt, opts);
       const statusCode = getStatusCode(error);
 
-      log.warn(`Retryable error (status ${statusCode}), attempt ${attempt + 1}/${opts.maxRetries + 1}, waiting ${delayMs}ms`);
+      log.warn(
+        `Retryable error (status ${statusCode}), attempt ${attempt + 1}/${opts.maxRetries + 1}, waiting ${delayMs}ms`,
+      );
 
       // Call optional retry callback
       if (opts.onRetry) {
@@ -125,11 +127,11 @@ export async function withRetry<T>(
 
 // Decorator-style wrapper for class methods
 export function retryable(options: Partial<RetryOptions> = {}) {
-  return function <T>(
+  return <T>(
     _target: unknown,
     _propertyKey: string,
     descriptor: TypedPropertyDescriptor<(...args: unknown[]) => Promise<T>>,
-  ): TypedPropertyDescriptor<(...args: unknown[]) => Promise<T>> {
+  ): TypedPropertyDescriptor<(...args: unknown[]) => Promise<T>> => {
     const originalMethod = descriptor.value;
 
     if (!originalMethod) {
@@ -173,7 +175,7 @@ export function recordRateLimitError(accountId: string): void {
 
   // Set backoff based on consecutive errors
   const backoffMs = Math.min(
-    DEFAULT_RETRY_OPTIONS.initialDelayMs * Math.pow(2, state.consecutiveErrors),
+    DEFAULT_RETRY_OPTIONS.initialDelayMs * 2 ** state.consecutiveErrors,
     DEFAULT_RETRY_OPTIONS.maxDelayMs,
   );
   state.backoffUntil = new Date(Date.now() + backoffMs);

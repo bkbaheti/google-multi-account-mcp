@@ -51,9 +51,7 @@ describe('Config', () => {
 
       const { getConfigPath } = await import('../../src/config/index.js');
 
-      expect(getConfigPath()).toBe(
-        path.join(os.homedir(), '.config', 'mcp-google', 'config.json')
-      );
+      expect(getConfigPath()).toBe(path.join(os.homedir(), '.config', 'mcp-google', 'config.json'));
     });
 
     it('should save and load config from env path', async () => {
@@ -128,7 +126,9 @@ describe('Config', () => {
 
       vi.resetModules();
       const { resolveOAuthConfig } = await import('../../src/config/index.js');
-      const { DEFAULT_OAUTH_CLIENT_ID, DEFAULT_OAUTH_CLIENT_SECRET } = await import('../../src/auth/oauth-defaults.js');
+      const { DEFAULT_OAUTH_CLIENT_ID, DEFAULT_OAUTH_CLIENT_SECRET } = await import(
+        '../../src/auth/oauth-defaults.js'
+      );
 
       const result = resolveOAuthConfig();
       expect(result.clientId).toBe(DEFAULT_OAUTH_CLIENT_ID);

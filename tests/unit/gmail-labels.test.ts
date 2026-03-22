@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockLabelsList = vi.fn();
 const mockMessagesModify = vi.fn();
@@ -35,8 +35,8 @@ vi.mock('googleapis', () => ({
   },
 }));
 
-import { GmailClient } from '../../src/gmail/client.js';
 import type { AccountStore } from '../../src/auth/index.js';
+import { GmailClient } from '../../src/gmail/client.js';
 
 describe('GmailClient labels and inbox management', () => {
   let mockAccountStore: AccountStore;

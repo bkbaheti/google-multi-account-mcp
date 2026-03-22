@@ -39,10 +39,7 @@ describe('Retry utilities', () => {
 
     it('retries on 429 rate limit error', async () => {
       const error = Object.assign(new Error('Rate limited'), { status: 429 });
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce(error)
-        .mockResolvedValueOnce('success');
+      const operation = vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce('success');
 
       const resultPromise = withRetry(operation, { initialDelayMs: 100 });
 
@@ -56,10 +53,7 @@ describe('Retry utilities', () => {
 
     it('retries on 500 server error', async () => {
       const error = Object.assign(new Error('Server error'), { status: 500 });
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce(error)
-        .mockResolvedValueOnce('recovered');
+      const operation = vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce('recovered');
 
       const resultPromise = withRetry(operation, { initialDelayMs: 100 });
       await vi.advanceTimersByTimeAsync(200);
@@ -136,10 +130,7 @@ describe('Retry utilities', () => {
 
     it('handles Google API error format with code property', async () => {
       const error = Object.assign(new Error('Quota exceeded'), { code: 429 });
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce(error)
-        .mockResolvedValueOnce('success');
+      const operation = vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce('success');
 
       const resultPromise = withRetry(operation, { initialDelayMs: 100 });
       await vi.advanceTimersByTimeAsync(200);
@@ -152,10 +143,7 @@ describe('Retry utilities', () => {
       const error = Object.assign(new Error('Service unavailable'), {
         response: { status: 503 },
       });
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce(error)
-        .mockResolvedValueOnce('recovered');
+      const operation = vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce('recovered');
 
       const resultPromise = withRetry(operation, { initialDelayMs: 100 });
       await vi.advanceTimersByTimeAsync(200);
@@ -167,10 +155,7 @@ describe('Retry utilities', () => {
     it('calls onRetry callback with correct arguments', async () => {
       const error = Object.assign(new Error('Rate limited'), { status: 429 });
       const onRetry = vi.fn();
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce(error)
-        .mockResolvedValueOnce('success');
+      const operation = vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce('success');
 
       const resultPromise = withRetry(operation, {
         initialDelayMs: 100,

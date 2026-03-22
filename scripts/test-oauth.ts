@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+
 /**
  * Quick test script for OAuth flow.
  *
@@ -12,10 +13,10 @@
  *   npx tsx scripts/test-oauth.ts remove <accountId>
  */
 
-import { AccountStore, createTokenStorage } from '../src/index.js';
-import { resolveOAuthConfig } from '../src/config/index.js';
-import * as path from 'node:path';
 import * as os from 'node:os';
+import * as path from 'node:path';
+import { resolveOAuthConfig } from '../src/config/index.js';
+import { AccountStore, createTokenStorage } from '../src/index.js';
 
 const TOKENS_DIR = path.join(os.homedir(), '.config', 'mcp-google', 'tokens');
 
@@ -52,7 +53,9 @@ async function main() {
         console.log('Configured accounts:');
         for (const account of accounts) {
           console.log(`  - ${account.email} (${account.id})`);
-          console.log(`    Labels: ${account.labels.length > 0 ? account.labels.join(', ') : '(none)'}`);
+          console.log(
+            `    Labels: ${account.labels.length > 0 ? account.labels.join(', ') : '(none)'}`,
+          );
           console.log(`    Scopes: ${account.scopes.join(', ')}`);
           console.log(`    Added: ${account.addedAt}`);
         }

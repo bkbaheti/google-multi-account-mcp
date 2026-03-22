@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Tests for the confirmation flow safety gate.
@@ -41,8 +41,8 @@ vi.mock('googleapis', () => ({
   },
 }));
 
-import { GmailClient } from '../../src/gmail/client.js';
 import type { AccountStore } from '../../src/auth/index.js';
+import { GmailClient } from '../../src/gmail/client.js';
 
 describe('Confirmation Flow - GmailClient Level', () => {
   let mockAccountStore: AccountStore;

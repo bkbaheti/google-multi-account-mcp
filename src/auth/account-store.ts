@@ -1,9 +1,9 @@
-import { loadConfig, saveConfig, resolveOAuthConfig } from '../config/index.js';
+import { loadConfig, resolveOAuthConfig, saveConfig } from '../config/index.js';
 import type { Account, ScopeTier } from '../types/index.js';
 import { mergeScopeTiers, SCOPE_TIERS } from '../types/index.js';
 import {
-  GoogleOAuth,
   type AuthFlowOptions,
+  GoogleOAuth,
   type OAuth2Client,
   type OAuthConfig,
   type PendingAuthSession,

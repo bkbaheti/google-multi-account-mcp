@@ -1,0 +1,65 @@
+{
+  "mcpServers": {
+    "gcloud": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@google-cloud/gcloud-mcp"
+      ],
+      "env": {}
+    },
+    "observability": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@google-cloud/observability-mcp"
+      ],
+      "env": {}
+    },
+    "storage": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@google-cloud/storage-mcp"
+      ],
+      "env": {}
+    },
+    "backupdr": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@google-cloud/backupdr-mcp"
+      ],
+      "env": {}
+    },
+    "Railway": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@railway/mcp-server"
+      ],
+      "env": {}
+    },
+    "cloudflare-api": {
+      "type": "http",
+      "url": "https://mcp.cloudflare.com/mcp"
+    },
+    "cloudflare-docs": {
+      "type": "http",
+      "url": "https://docs.mcp.cloudflare.com/mcp"
+    },
+    "google": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/baheti/projects/google-multi-account-mcp/dist/cli.js"
+      ],
+      "env": {}
+    }
+  }
+}

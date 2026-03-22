@@ -150,7 +150,9 @@ export function validationError(message: string, field?: string): McpToolError {
 }
 
 export function filterNotFound(filterId: string): McpToolError {
-  return new McpToolError(ErrorCode.FILTER_NOT_FOUND, `Filter not found: ${filterId}`, { filterId });
+  return new McpToolError(ErrorCode.FILTER_NOT_FOUND, `Filter not found: ${filterId}`, {
+    filterId,
+  });
 }
 
 export function filterLimitExceeded(): McpToolError {
@@ -166,7 +168,9 @@ export function fileNotFound(fileId: string): McpToolError {
 }
 
 export function folderNotFound(folderId: string): McpToolError {
-  return new McpToolError(ErrorCode.FOLDER_NOT_FOUND, `Folder not found: ${folderId}`, { folderId });
+  return new McpToolError(ErrorCode.FOLDER_NOT_FOUND, `Folder not found: ${folderId}`, {
+    folderId,
+  });
 }
 
 export function driveApiError(originalMessage: string, statusCode?: number): McpToolError {
@@ -177,10 +181,7 @@ export function driveApiError(originalMessage: string, statusCode?: number): Mcp
 }
 
 export function driveQuotaExceeded(): McpToolError {
-  return new McpToolError(
-    ErrorCode.DRIVE_QUOTA_EXCEEDED,
-    'Drive storage quota exceeded.',
-  );
+  return new McpToolError(ErrorCode.DRIVE_QUOTA_EXCEEDED, 'Drive storage quota exceeded.');
 }
 
 export function eventNotFound(eventId: string): McpToolError {
@@ -188,7 +189,9 @@ export function eventNotFound(eventId: string): McpToolError {
 }
 
 export function calendarNotFound(calendarId: string): McpToolError {
-  return new McpToolError(ErrorCode.CALENDAR_NOT_FOUND, `Calendar not found: ${calendarId}`, { calendarId });
+  return new McpToolError(ErrorCode.CALENDAR_NOT_FOUND, `Calendar not found: ${calendarId}`, {
+    calendarId,
+  });
 }
 
 export function calendarApiError(originalMessage: string, statusCode?: number): McpToolError {

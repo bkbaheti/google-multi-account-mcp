@@ -513,8 +513,15 @@ export class CalendarClient {
     if (a.displayName) {
       result.displayName = a.displayName;
     }
-    if (a.responseStatus && ['needsAction', 'declined', 'tentative', 'accepted'].includes(a.responseStatus)) {
-      result.responseStatus = a.responseStatus as 'needsAction' | 'declined' | 'tentative' | 'accepted';
+    if (
+      a.responseStatus &&
+      ['needsAction', 'declined', 'tentative', 'accepted'].includes(a.responseStatus)
+    ) {
+      result.responseStatus = a.responseStatus as
+        | 'needsAction'
+        | 'declined'
+        | 'tentative'
+        | 'accepted';
     }
     if (a.organizer !== undefined && a.organizer !== null) {
       result.organizer = a.organizer;

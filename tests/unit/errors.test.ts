@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ErrorCode,
-  McpToolError,
   accountNotFound,
   authNotConfigured,
   confirmationRequired,
   draftNotFound,
+  ErrorCode,
   errorResponse,
   gmailApiError,
   internalError,
+  McpToolError,
   messageNotFound,
   rateLimited,
   scopeInsufficient,

@@ -369,7 +369,9 @@ export class GmailClient {
     return this.createDraft(draftInput);
   }
 
-  private buildDraftRequestBody(input: DraftInput): { message: { raw: string; threadId?: string } } {
+  private buildDraftRequestBody(input: DraftInput): {
+    message: { raw: string; threadId?: string };
+  } {
     const lines: string[] = [];
     lines.push(`To: ${input.to}`);
     if (input.cc) {
@@ -405,7 +407,10 @@ export class GmailClient {
     return requestBody;
   }
 
-  private convertDraftResponse(data: { id?: string | null; message?: { id?: string | null; threadId?: string | null } | null }): Draft {
+  private convertDraftResponse(data: {
+    id?: string | null;
+    message?: { id?: string | null; threadId?: string | null } | null;
+  }): Draft {
     const result: Draft = {
       id: data.id ?? '',
     };

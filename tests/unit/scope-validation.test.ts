@@ -221,7 +221,9 @@ describe('Scope Validation', () => {
 
   describe('Drive scope tiers', () => {
     it('drive_readonly tier has drive.readonly scope', () => {
-      expect(SCOPE_TIERS.drive_readonly).toContain('https://www.googleapis.com/auth/drive.readonly');
+      expect(SCOPE_TIERS.drive_readonly).toContain(
+        'https://www.googleapis.com/auth/drive.readonly',
+      );
     });
     it('drive_full tier has drive.file scope', () => {
       expect(SCOPE_TIERS.drive_full).toContain('https://www.googleapis.com/auth/drive.file');
@@ -239,13 +241,19 @@ describe('Scope Validation', () => {
 
   describe('Calendar scope tiers', () => {
     it('calendar_readonly tier has calendar.readonly scope', () => {
-      expect(SCOPE_TIERS.calendar_readonly).toContain('https://www.googleapis.com/auth/calendar.readonly');
+      expect(SCOPE_TIERS.calendar_readonly).toContain(
+        'https://www.googleapis.com/auth/calendar.readonly',
+      );
     });
     it('calendar_full tier has calendar.events scope', () => {
-      expect(SCOPE_TIERS.calendar_full).toContain('https://www.googleapis.com/auth/calendar.events');
+      expect(SCOPE_TIERS.calendar_full).toContain(
+        'https://www.googleapis.com/auth/calendar.events',
+      );
     });
     it('calendar_readonly satisfies calendar_readonly', () => {
-      expect(hasSufficientScope([...SCOPE_TIERS.calendar_readonly], 'calendar_readonly')).toBe(true);
+      expect(hasSufficientScope([...SCOPE_TIERS.calendar_readonly], 'calendar_readonly')).toBe(
+        true,
+      );
     });
     it('calendar_readonly does not satisfy calendar_full', () => {
       expect(hasSufficientScope([...SCOPE_TIERS.calendar_readonly], 'calendar_full')).toBe(false);
@@ -337,27 +345,17 @@ describe('Scope Validation', () => {
 
   describe('SCOPE_TIERS', () => {
     it('mail_readonly tier has gmail.readonly', () => {
-      expect(SCOPE_TIERS.mail_readonly).toContain(
-        'https://www.googleapis.com/auth/gmail.readonly',
-      );
+      expect(SCOPE_TIERS.mail_readonly).toContain('https://www.googleapis.com/auth/gmail.readonly');
     });
 
     it('mail_compose tier has gmail.compose and gmail.readonly', () => {
-      expect(SCOPE_TIERS.mail_compose).toContain(
-        'https://www.googleapis.com/auth/gmail.compose',
-      );
-      expect(SCOPE_TIERS.mail_compose).toContain(
-        'https://www.googleapis.com/auth/gmail.readonly',
-      );
+      expect(SCOPE_TIERS.mail_compose).toContain('https://www.googleapis.com/auth/gmail.compose');
+      expect(SCOPE_TIERS.mail_compose).toContain('https://www.googleapis.com/auth/gmail.readonly');
     });
 
     it('mail_full tier has gmail.modify and gmail.labels', () => {
-      expect(SCOPE_TIERS.mail_full).toContain(
-        'https://www.googleapis.com/auth/gmail.modify',
-      );
-      expect(SCOPE_TIERS.mail_full).toContain(
-        'https://www.googleapis.com/auth/gmail.labels',
-      );
+      expect(SCOPE_TIERS.mail_full).toContain('https://www.googleapis.com/auth/gmail.modify');
+      expect(SCOPE_TIERS.mail_full).toContain('https://www.googleapis.com/auth/gmail.labels');
     });
 
     it('all mail tiers include userinfo.email', () => {
@@ -378,39 +376,21 @@ describe('Scope Validation', () => {
     });
 
     it('all tier has mail modify, labels, settings, compose, drive, and calendar scopes', () => {
-      expect(SCOPE_TIERS.all).toContain(
-        'https://www.googleapis.com/auth/gmail.modify',
-      );
-      expect(SCOPE_TIERS.all).toContain(
-        'https://www.googleapis.com/auth/gmail.labels',
-      );
-      expect(SCOPE_TIERS.all).toContain(
-        'https://www.googleapis.com/auth/gmail.settings.basic',
-      );
-      expect(SCOPE_TIERS.all).toContain(
-        'https://www.googleapis.com/auth/gmail.compose',
-      );
-      expect(SCOPE_TIERS.all).toContain(
-        'https://www.googleapis.com/auth/drive.readonly',
-      );
-      expect(SCOPE_TIERS.all).toContain(
-        'https://www.googleapis.com/auth/drive.file',
-      );
-      expect(SCOPE_TIERS.all).toContain(
-        'https://www.googleapis.com/auth/calendar.readonly',
-      );
-      expect(SCOPE_TIERS.all).toContain(
-        'https://www.googleapis.com/auth/calendar.events',
-      );
+      expect(SCOPE_TIERS.all).toContain('https://www.googleapis.com/auth/gmail.modify');
+      expect(SCOPE_TIERS.all).toContain('https://www.googleapis.com/auth/gmail.labels');
+      expect(SCOPE_TIERS.all).toContain('https://www.googleapis.com/auth/gmail.settings.basic');
+      expect(SCOPE_TIERS.all).toContain('https://www.googleapis.com/auth/gmail.compose');
+      expect(SCOPE_TIERS.all).toContain('https://www.googleapis.com/auth/drive.readonly');
+      expect(SCOPE_TIERS.all).toContain('https://www.googleapis.com/auth/drive.file');
+      expect(SCOPE_TIERS.all).toContain('https://www.googleapis.com/auth/calendar.readonly');
+      expect(SCOPE_TIERS.all).toContain('https://www.googleapis.com/auth/calendar.events');
     });
 
     it('mail_settings tier has gmail.settings.basic and gmail.readonly', () => {
       expect(SCOPE_TIERS.mail_settings).toContain(
         'https://www.googleapis.com/auth/gmail.settings.basic',
       );
-      expect(SCOPE_TIERS.mail_settings).toContain(
-        'https://www.googleapis.com/auth/gmail.readonly',
-      );
+      expect(SCOPE_TIERS.mail_settings).toContain('https://www.googleapis.com/auth/gmail.readonly');
     });
   });
 
@@ -475,9 +455,13 @@ describe('Scope Validation', () => {
 
     it('merging all mail + drive + calendar tiers includes all tier capabilities', () => {
       const merged = mergeScopeTiers([
-        'mail_compose', 'mail_full', 'mail_settings',
-        'drive_readonly', 'drive_full',
-        'calendar_readonly', 'calendar_full',
+        'mail_compose',
+        'mail_full',
+        'mail_settings',
+        'drive_readonly',
+        'drive_full',
+        'calendar_readonly',
+        'calendar_full',
       ]);
       // Should include all scopes from 'all' tier
       for (const scope of SCOPE_TIERS.all) {
