@@ -3,3 +3,10 @@ dist/
 *.log
 .DS_Store
 coverage/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
