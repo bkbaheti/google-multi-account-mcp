@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import open from 'open';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { TokenStorage } from '../auth/index.js';
@@ -204,12 +205,16 @@ export function createServer(options: ServerOptions): McpServer {
         // Start async auth flow - returns immediately with auth URL
         const session = accountStore.startAddAccount(scopeTierOrTiers);
 
+        // Auto-open browser, best-effort (ignore errors for headless/SSH environments)
+        open(session.authUrl).catch(() => {});
+
         return {
           content: [
             {
               type: 'text' as const,
               text: [
-                'Authorization required. Open this URL in your browser:',
+                'Authorization required. Opening your browser...',
+                'If it didn\'t open, use this URL:',
                 '',
                 session.authUrl,
                 '',
