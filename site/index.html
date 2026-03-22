@@ -3,71 +3,171 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MCP Google Multi-Account</title>
+  <title>MCP Google Multi-Account | Connect AI to Your Google Workspace</title>
+  <meta name="description" content="Local MCP server for multi-Google-account access. Gmail, Drive, Calendar — zero config, local tokens, open source.">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <nav>
-    <a href="/">Home</a>
-    <a href="/privacy">Privacy Policy</a>
-    <a href="/terms">Terms of Service</a>
-  </nav>
+  <div class="bg-glow"></div>
+  <div class="bg-glow-2"></div>
 
-  <h1>MCP Google Multi-Account</h1>
+  <div class="wrapper">
+    <nav>
+      <a href="/" class="nav-brand">
+        <span class="brand-dot"></span>
+        MCP Google
+      </a>
+      <div class="nav-links">
+        <a href="/" class="active">Home</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="https://github.com/bkbaheti/google-multi-account-mcp">GitHub</a>
+      </div>
+    </nav>
 
-  <p>
-    A local MCP (Model Context Protocol) server that gives AI assistants like Claude
-    secure access to your Google accounts. Connect multiple Google accounts and work
-    with Gmail, Google Drive, and Google Calendar — all from a single server running
-    on your machine.
-  </p>
+    <section class="hero">
+      <div class="animate-in">
+        <div class="hero-badge">
+          <span class="dot"></span>
+          Open Source &middot; Local-first &middot; Zero Config
+        </div>
+      </div>
 
-  <h2>Quick Start</h2>
+      <h1 class="animate-in delay-1">
+        Connect AI to Your<br>
+        <span class="gradient-text">Google Workspace</span>
+      </h1>
 
-  <h3>Claude Code CLI</h3>
-  <p>Add the server in one command:</p>
-  <pre><code>claude mcp add google-multi-account -- npx -y @anthropic/mcp-google</code></pre>
+      <p class="subtitle animate-in delay-2">
+        A local MCP server that gives AI assistants like Claude secure access to your
+        Google accounts. Gmail, Drive, and Calendar — multiple accounts, one server,
+        all running on your machine.
+      </p>
 
-  <h3>Claude Desktop</h3>
-  <p>Add the following to your Claude Desktop configuration file (<code>claude_desktop_config.json</code>):</p>
-  <pre><code>{
-  "mcpServers": {
-    "google": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-google"]
+      <div class="hero-actions animate-in delay-3">
+        <a href="https://github.com/bkbaheti/google-multi-account-mcp" class="btn-primary">
+          Get Started
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a href="https://github.com/bkbaheti/google-multi-account-mcp" class="btn-secondary">
+          View on GitHub
+        </a>
+      </div>
+    </section>
+
+    <section class="section animate-in delay-4">
+      <div class="section-label">Quick Start</div>
+      <h2>Up and running in seconds</h2>
+      <p>No Google Cloud project needed. Install, connect your account, done.</p>
+
+      <div class="setup-tabs">
+        <button class="setup-tab active" onclick="switchTab('cli')">Claude Code CLI</button>
+        <button class="setup-tab" onclick="switchTab('desktop')">Claude Desktop</button>
+      </div>
+
+      <div id="tab-cli" class="setup-content active">
+        <div class="code-block">
+          <span class="code-label">Terminal</span>
+          <code>claude mcp add google -- npx -y @anthropic/mcp-google</code>
+        </div>
+      </div>
+
+      <div id="tab-desktop" class="setup-content">
+        <div class="code-block">
+          <span class="code-label">claude_desktop_config.json</span>
+          <code><pre>{
+  <span class="code-string">"mcpServers"</span>: {
+    <span class="code-string">"google"</span>: {
+      <span class="code-string">"command"</span>: <span class="code-string">"npx"</span>,
+      <span class="code-string">"args"</span>: [<span class="code-string">"-y"</span>, <span class="code-string">"@anthropic/mcp-google"</span>]
     }
   }
-}</code></pre>
+}</pre></code>
+        </div>
+      </div>
 
-  <p>
-    On first use, the server will prompt you to provide your own Google OAuth
-    client credentials and guide you through connecting your Google account.
-  </p>
+      <p style="color: var(--text-tertiary); font-size: 0.875rem; margin-top: 0.5rem;">
+        Then use the <code>google_add_account</code> tool to connect your Google account.
+      </p>
+    </section>
 
-  <h2>Features</h2>
-  <ul>
-    <li><strong>Multi-account support</strong> — Connect and switch between multiple Google accounts seamlessly</li>
-    <li><strong>Gmail</strong> — Search, read, draft, send, reply, manage labels, archive, and trash messages</li>
-    <li><strong>Google Drive</strong> — Search, list, read, upload, copy, move, rename, share, and manage files</li>
-    <li><strong>Google Calendar</strong> — List, search, create, update, delete events, check availability, and RSVP</li>
-    <li><strong>Zero-config</strong> — Install and run with a single <code>npx</code> command, no build step required</li>
-    <li><strong>Local tokens</strong> — OAuth tokens are stored only on your machine at <code>~/.config/mcp-google/</code></li>
-    <li><strong>Safety gates</strong> — Destructive actions like sending email or sharing files require explicit confirmation</li>
-    <li><strong>Tiered scopes</strong> — Request only the Google API permissions you need</li>
-  </ul>
+    <div class="divider"></div>
 
-  <h2>Source Code</h2>
-  <p>
-    This project is open source under the MIT License. View the code, report issues, and contribute on GitHub:
-  </p>
-  <p>
-    <a href="https://github.com/bkbaheti/google-multi-account-mcp">github.com/bkbaheti/google-multi-account-mcp</a>
-  </p>
+    <section class="section">
+      <div class="section-label">Capabilities</div>
+      <h2>Everything you need</h2>
+      <p>Full access to Gmail, Drive, and Calendar with safety gates built in.</p>
 
-  <footer>
-    <a href="/privacy">Privacy Policy</a> &middot;
-    <a href="/terms">Terms of Service</a> &middot;
-    <a href="https://github.com/bkbaheti/google-multi-account-mcp">GitHub</a>
-  </footer>
+      <div class="features-grid">
+        <div class="feature-card animate-in">
+          <span class="card-icon">&#9993;</span>
+          <h3>Gmail</h3>
+          <p>Search, read, draft, send, reply, manage labels, archive, and trash. Draft-first workflow with confirmation gates on sends.</p>
+        </div>
+
+        <div class="feature-card animate-in delay-1">
+          <span class="card-icon">&#128193;</span>
+          <h3>Google Drive</h3>
+          <p>Search, list, read, upload, copy, move, rename, share, and manage permissions. Export Google Docs to markdown.</p>
+        </div>
+
+        <div class="feature-card animate-in delay-2">
+          <span class="card-icon">&#128197;</span>
+          <h3>Google Calendar</h3>
+          <p>List, search, create, update, delete events. Check free/busy status and RSVP to invitations across calendars.</p>
+        </div>
+
+        <div class="feature-card animate-in delay-3">
+          <span class="card-icon">&#128101;</span>
+          <h3>Multi-Account</h3>
+          <p>Connect multiple Google accounts with labels. Switch between personal, work, and shared accounts seamlessly.</p>
+        </div>
+
+        <div class="feature-card animate-in delay-4">
+          <span class="card-icon">&#128274;</span>
+          <h3>Local &amp; Secure</h3>
+          <p>Runs entirely on your machine. OAuth tokens stored locally. No data ever passes through external servers.</p>
+        </div>
+
+        <div class="feature-card animate-in delay-5">
+          <span class="card-icon">&#9881;</span>
+          <h3>Tiered Scopes</h3>
+          <p>Request only the permissions you need. Start read-only, upgrade to compose or full access when required.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="section">
+      <div class="oss-banner">
+        <span class="oss-icon">&#128736;</span>
+        <p>
+          <strong style="color: var(--text-primary);">Open source under MIT License.</strong>
+          View the code, report issues, and contribute on
+          <a href="https://github.com/bkbaheti/google-multi-account-mcp">GitHub</a>.
+          Built by <a href="https://procedure.tech">Procedure</a>.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <div class="footer-links">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="https://github.com/bkbaheti/google-multi-account-mcp">GitHub</a>
+      </div>
+      <span class="footer-copy">&copy; 2026 Procedure Technologies</span>
+    </footer>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      document.querySelectorAll('.setup-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.setup-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+    }
+  </script>
 </body>
 </html>
