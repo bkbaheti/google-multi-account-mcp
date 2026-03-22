@@ -11,6 +11,36 @@ import {
 import type { ScopeTier } from '../types/index.js';
 import { coerceArgs } from '../utils/index.js';
 
+/**
+ * Convert common shorthand query formats to Google Drive API query syntax.
+ * For example, "type:document" becomes "mimeType='application/vnd.google-apps.document'".
+ */
+function normalizeDriveQuery(query: string): string {
+  const typeMap: Record<string, string> = {
+    document: 'application/vnd.google-apps.document',
+    spreadsheet: 'application/vnd.google-apps.spreadsheet',
+    presentation: 'application/vnd.google-apps.presentation',
+    folder: 'application/vnd.google-apps.folder',
+    form: 'application/vnd.google-apps.form',
+    pdf: 'application/pdf',
+    image: 'image/',
+    video: 'video/',
+    audio: 'audio/',
+  };
+
+  return query.replace(/type:(\w+)/gi, (_match, type) => {
+    const mime = typeMap[type.toLowerCase()];
+    if (mime) {
+      // Use "contains" for partial mime types (image/, video/, audio/)
+      if (mime.endsWith('/')) {
+        return `mimeType contains '${mime}'`;
+      }
+      return `mimeType='${mime}'`;
+    }
+    return _match; // Leave unknown types as-is
+  });
+}
+
 export function registerDriveTools(
   server: McpServer,
   accountStore: AccountStore,
@@ -26,7 +56,7 @@ export function registerDriveTools(
     'drive_search_files',
     {
       description:
-        'Search for files in Google Drive using Drive search syntax (e.g., "name contains \'report\'", "mimeType = \'application/pdf\'")',
+        'Search for files in Google Drive. Supports shorthand syntax like type:document, type:spreadsheet, type:pdf, type:folder, type:image, type:video, type:audio (automatically converted to mimeType queries). Also accepts raw Drive API query syntax (e.g., "name contains \'report\'", "mimeType=\'application/pdf\'").',
       inputSchema: {
         accountId: z.string().describe('The Google account ID to search'),
         query: z.string().describe('Drive search query (e.g., "name contains \'report\'")'),
@@ -48,7 +78,8 @@ export function registerDriveTools(
         if (args.pageToken !== undefined) {
           options.pageToken = args.pageToken;
         }
-        const result = await client.searchFiles(args.query, options);
+        const normalizedQuery = normalizeDriveQuery(args.query);
+        const result = await client.searchFiles(normalizedQuery, options);
 
         return successResponse(result);
       } catch (error) {
