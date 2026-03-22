@@ -74,12 +74,18 @@ export class GoogleOAuth {
     const state = crypto.randomBytes(16).toString('hex');
     const sessionId = crypto.randomUUID();
 
-    const authUrl = oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: scopes,
-      state,
-      prompt: 'consent',
-    });
+    // Build URL manually with critical params (response_type, client_id,
+    // redirect_uri) placed BEFORE scopes. googleapis puts them last, but
+    // if the URL gets truncated by text rendering, those params are lost.
+    const params = new URLSearchParams();
+    params.set('response_type', 'code');
+    params.set('client_id', this.config.clientId);
+    params.set('redirect_uri', REDIRECT_URI);
+    params.set('state', state);
+    params.set('access_type', 'offline');
+    params.set('prompt', 'consent');
+    params.set('scope', scopes.join(' '));
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
     const session: PendingAuthSession = {
       sessionId,
@@ -251,12 +257,16 @@ export class GoogleOAuth {
     const oauth2Client = this.createOAuth2Client();
     const state = crypto.randomBytes(16).toString('hex');
 
-    const authUrl = oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: scopes,
-      state,
-      prompt: 'consent', // Force consent to get refresh token
-    });
+    // Build URL manually — same param ordering fix as startAuthFlowAsync
+    const params = new URLSearchParams();
+    params.set('response_type', 'code');
+    params.set('client_id', this.config.clientId);
+    params.set('redirect_uri', REDIRECT_URI);
+    params.set('state', state);
+    params.set('access_type', 'offline');
+    params.set('prompt', 'consent');
+    params.set('scope', scopes.join(' '));
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
     // Notify caller of the auth URL if callback provided
     if (options?.onAuthUrl) {
