@@ -1,20 +1,23 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AccountStore } from '../auth/index.js';
+import { CalendarClient } from '../calendar/index.js';
 import {
   confirmationRequired,
   errorResponse,
   successResponse,
   toMcpError,
 } from '../errors/index.js';
-import { CalendarClient } from '../calendar/index.js';
 import type { ScopeTier } from '../types/index.js';
+import { coerceArgs } from '../utils/index.js';
 
 export function registerCalendarTools(
   server: McpServer,
   accountStore: AccountStore,
-  validateAccountScope: (accountId: string, requiredTier: ScopeTier) =>
-    { error: ReturnType<typeof errorResponse> } | { account: any },
+  validateAccountScope: (
+    accountId: string,
+    requiredTier: ScopeTier,
+  ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // === Read tools (require calendar_readonly) ===
 
@@ -51,13 +54,23 @@ export function registerCalendarTools(
       inputSchema: {
         accountId: z.string().describe('The Google account ID'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
-        timeMin: z.string().optional().describe('Start of time range (RFC3339, e.g., "2024-01-01T00:00:00Z")'),
-        timeMax: z.string().optional().describe('End of time range (RFC3339, e.g., "2024-12-31T23:59:59Z")'),
-        maxResults: z.number().optional().describe('Maximum number of events to return (default: 20)'),
+        timeMin: z
+          .string()
+          .optional()
+          .describe('Start of time range (RFC3339, e.g., "2024-01-01T00:00:00Z")'),
+        timeMax: z
+          .string()
+          .optional()
+          .describe('End of time range (RFC3339, e.g., "2024-12-31T23:59:59Z")'),
+        maxResults: z
+          .number()
+          .optional()
+          .describe('Maximum number of events to return (default: 20)'),
         pageToken: z.string().optional().describe('Token for pagination'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { maxResults: 'number' });
       const validation = validateAccountScope(args.accountId, 'calendar_readonly');
       if ('error' in validation) return validation.error;
 
@@ -132,10 +145,14 @@ export function registerCalendarTools(
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
         timeMin: z.string().optional().describe('Start of time range (RFC3339)'),
         timeMax: z.string().optional().describe('End of time range (RFC3339)'),
-        maxResults: z.number().optional().describe('Maximum number of events to return (default: 20)'),
+        maxResults: z
+          .number()
+          .optional()
+          .describe('Maximum number of events to return (default: 20)'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { maxResults: 'number' });
       const validation = validateAccountScope(args.accountId, 'calendar_readonly');
       if ('error' in validation) return validation.error;
 
@@ -172,13 +189,15 @@ export function registerCalendarTools(
   server.registerTool(
     'calendar_freebusy',
     {
-      description:
-        'Check free/busy status for one or more Google Calendars within a time range.',
+      description: 'Check free/busy status for one or more Google Calendars within a time range.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID'),
         timeMin: z.string().describe('Start of time range (RFC3339)'),
         timeMax: z.string().describe('End of time range (RFC3339)'),
-        calendarIds: z.array(z.string()).optional().describe('Calendar IDs to check (default: ["primary"])'),
+        calendarIds: z
+          .array(z.string())
+          .optional()
+          .describe('Calendar IDs to check (default: ["primary"])'),
       },
     },
     async (args) => {
@@ -218,18 +237,36 @@ export function registerCalendarTools(
       inputSchema: {
         accountId: z.string().describe('The Google account ID'),
         summary: z.string().describe('Event title/summary'),
-        start: z.string().describe('Start time (RFC3339 for timed event, e.g., "2024-01-15T09:00:00-05:00") or date (YYYY-MM-DD for all-day event)'),
-        end: z.string().describe('End time (RFC3339 for timed event) or date (YYYY-MM-DD for all-day event)'),
+        start: z
+          .string()
+          .describe(
+            'Start time (RFC3339 for timed event, e.g., "2024-01-15T09:00:00-05:00") or date (YYYY-MM-DD for all-day event)',
+          ),
+        end: z
+          .string()
+          .describe('End time (RFC3339 for timed event) or date (YYYY-MM-DD for all-day event)'),
         description: z.string().optional().describe('Event description'),
         location: z.string().optional().describe('Event location'),
         attendees: z.array(z.string()).optional().describe('Email addresses of attendees'),
-        timeZone: z.string().optional().describe('Time zone (e.g., "America/New_York"). Required for timed events without offset.'),
+        timeZone: z
+          .string()
+          .optional()
+          .describe(
+            'Time zone (e.g., "America/New_York"). Required for timed events without offset.',
+          ),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
-        recurrence: z.array(z.string()).optional().describe('Recurrence rules (e.g., ["RRULE:FREQ=WEEKLY;COUNT=10"])'),
-        confirm: z.boolean().optional().describe('Set to true to confirm creating event with attendees (sends invitations)'),
+        recurrence: z
+          .array(z.string())
+          .optional()
+          .describe('Recurrence rules (e.g., ["RRULE:FREQ=WEEKLY;COUNT=10"])'),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe('Set to true to confirm creating event with attendees (sends invitations)'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'calendar_full');
       if ('error' in validation) return validation.error;
 
@@ -308,17 +345,30 @@ export function registerCalendarTools(
         accountId: z.string().describe('The Google account ID'),
         eventId: z.string().describe('The event ID to update'),
         summary: z.string().optional().describe('New event title/summary'),
-        start: z.string().optional().describe('New start time (RFC3339) or date (YYYY-MM-DD for all-day)'),
-        end: z.string().optional().describe('New end time (RFC3339) or date (YYYY-MM-DD for all-day)'),
+        start: z
+          .string()
+          .optional()
+          .describe('New start time (RFC3339) or date (YYYY-MM-DD for all-day)'),
+        end: z
+          .string()
+          .optional()
+          .describe('New end time (RFC3339) or date (YYYY-MM-DD for all-day)'),
         description: z.string().optional().describe('New event description'),
         location: z.string().optional().describe('New event location'),
-        attendees: z.array(z.string()).optional().describe('New attendee email addresses (replaces existing attendees)'),
+        attendees: z
+          .array(z.string())
+          .optional()
+          .describe('New attendee email addresses (replaces existing attendees)'),
         timeZone: z.string().optional().describe('Time zone (e.g., "America/New_York")'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
-        confirm: z.boolean().optional().describe('Set to true to confirm updating event with attendees (sends notifications)'),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe('Set to true to confirm updating event with attendees (sends notifications)'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'calendar_full');
       if ('error' in validation) return validation.error;
 
@@ -413,10 +463,14 @@ export function registerCalendarTools(
         accountId: z.string().describe('The Google account ID'),
         eventId: z.string().describe('The event ID to delete'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
-        confirm: z.boolean().optional().describe('Set to true to confirm deleting event with attendees'),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe('Set to true to confirm deleting event with attendees'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'calendar_full');
       if ('error' in validation) return validation.error;
 

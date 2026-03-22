@@ -1,28 +1,29 @@
+export { coerceArgs, coerceBoolean, coerceNumber, type CoercionSpec } from './coerce.js';
 export {
+  type CacheConfig,
+  type CacheEntry,
+  type CacheTTLs,
   cache,
   DEFAULT_TTLS,
   LRUCache,
   withCache,
-  type CacheConfig,
-  type CacheEntry,
-  type CacheTTLs,
 } from './cache.js';
-export { ChildLogger, Logger, logger, type LogLevel } from './logger.js';
+export { ChildLogger, Logger, type LogLevel, logger } from './logger.js';
 export {
   clearRateLimitState,
   getAccountRateLimitState,
   getBackoffRemainingMs,
+  type HttpError,
   isAccountInBackoff,
+  type RetryOptions,
   recordRateLimitError,
   recordSuccessfulRequest,
   retryable,
   withRetry,
-  type HttpError,
-  type RetryOptions,
 } from './retry.js';
 export {
-  throttle,
-  TokenBucket,
-  withThrottle,
   type ThrottleConfig,
+  TokenBucket,
+  throttle,
+  withThrottle,
 } from './throttle.js';

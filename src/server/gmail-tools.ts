@@ -9,12 +9,15 @@ import {
 } from '../errors/index.js';
 import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
 import type { ScopeTier } from '../types/index.js';
+import { coerceArgs } from '../utils/index.js';
 
 export function registerGmailTools(
   server: McpServer,
   accountStore: AccountStore,
-  validateAccountScope: (accountId: string, requiredTier: ScopeTier) =>
-    { error: ReturnType<typeof errorResponse> } | { account: any },
+  validateAccountScope: (
+    accountId: string,
+    requiredTier: ScopeTier,
+  ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // gmail_search_messages - Search messages in Gmail
   server.registerTool(
@@ -29,7 +32,8 @@ export function registerGmailTools(
         pageToken: z.string().optional().describe('Token for pagination'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { maxResults: 'number' });
       const validation = validateAccountScope(args.accountId, 'mail_readonly');
       if ('error' in validation) return validation.error;
 
@@ -217,10 +221,7 @@ export function registerGmailTools(
           .string()
           .optional()
           .describe('Thread ID to reply in (for continuing a conversation)'),
-        inReplyTo: z
-          .string()
-          .optional()
-          .describe('Message-ID of the message being replied to'),
+        inReplyTo: z.string().optional().describe('Message-ID of the message being replied to'),
         references: z.string().optional().describe('References header for threading'),
       },
     },
@@ -272,14 +273,8 @@ export function registerGmailTools(
         body: z.string().describe('Email body (plain text)'),
         cc: z.string().optional().describe('CC email address(es), comma-separated for multiple'),
         bcc: z.string().optional().describe('BCC email address(es), comma-separated for multiple'),
-        threadId: z
-          .string()
-          .optional()
-          .describe('Thread ID (for continuing a conversation)'),
-        inReplyTo: z
-          .string()
-          .optional()
-          .describe('Message-ID of the message being replied to'),
+        threadId: z.string().optional().describe('Thread ID (for continuing a conversation)'),
+        inReplyTo: z.string().optional().describe('Message-ID of the message being replied to'),
         references: z.string().optional().describe('References header for threading'),
       },
     },
@@ -385,7 +380,8 @@ export function registerGmailTools(
           ),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
@@ -472,7 +468,8 @@ export function registerGmailTools(
           .describe('Required if sendImmediately is true. Safety gate for sending.'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { sendImmediately: 'boolean', confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
 
@@ -628,13 +625,8 @@ export function registerGmailTools(
         'Apply label changes to multiple messages in one operation. More efficient than individual modifications. Limited to 1000 messages. Requires full scope.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID'),
-        messageIds: z
-          .array(z.string())
-          .describe('Array of message IDs to modify (max 1000)'),
-        addLabelIds: z
-          .array(z.string())
-          .optional()
-          .describe('Label IDs to add to all messages'),
+        messageIds: z.array(z.string()).describe('Array of message IDs to modify (max 1000)'),
+        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add to all messages'),
         removeLabelIds: z
           .array(z.string())
           .optional()
@@ -645,7 +637,8 @@ export function registerGmailTools(
           .describe('Set to true to confirm bulk operation (required for >100 messages)'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
@@ -696,10 +689,7 @@ export function registerGmailTools(
           .enum(['labelShow', 'labelShowIfUnread', 'labelHide'])
           .optional()
           .describe('Whether to show label in label list'),
-        backgroundColor: z
-          .string()
-          .optional()
-          .describe('Background color hex (e.g., "#16a765")'),
+        backgroundColor: z.string().optional().describe('Background color hex (e.g., "#16a765")'),
         textColor: z.string().optional().describe('Text color hex (e.g., "#ffffff")'),
       },
     },
@@ -791,13 +781,11 @@ export function registerGmailTools(
       inputSchema: {
         accountId: z.string().describe('The Google account ID'),
         labelId: z.string().describe('The label ID to delete'),
-        confirm: z
-          .boolean()
-          .optional()
-          .describe('Set to true to confirm deletion'),
+        confirm: z.boolean().optional().describe('Set to true to confirm deletion'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
@@ -837,7 +825,8 @@ export function registerGmailTools(
         markAsRead: z.boolean().describe('true to mark as read, false to mark as unread'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { markAsRead: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'mail_full');
       if ('error' in validation) return validation.error;
 
@@ -1132,7 +1121,10 @@ export function registerGmailTools(
             from: z.string().optional().describe('Match messages from this sender'),
             to: z.string().optional().describe('Match messages to this recipient'),
             subject: z.string().optional().describe('Match messages with this subject'),
-            query: z.string().optional().describe('Match messages matching this Gmail search query'),
+            query: z
+              .string()
+              .optional()
+              .describe('Match messages matching this Gmail search query'),
             negatedQuery: z.string().optional().describe('Exclude messages matching this query'),
             hasAttachment: z.boolean().optional().describe('Match only messages with attachments'),
             excludeChats: z.boolean().optional().describe('Exclude chat messages'),
@@ -1145,7 +1137,10 @@ export function registerGmailTools(
           .describe('Criteria for matching messages'),
         action: z
           .object({
-            addLabelIds: z.array(z.string()).optional().describe('Label IDs to add to matched messages'),
+            addLabelIds: z
+              .array(z.string())
+              .optional()
+              .describe('Label IDs to add to matched messages'),
             removeLabelIds: z
               .array(z.string())
               .optional()
@@ -1153,12 +1148,19 @@ export function registerGmailTools(
             forward: z.string().optional().describe('Email address to forward matched messages to'),
           })
           .describe('Actions to perform on matched messages'),
-        confirm: z
-          .boolean()
-          .describe('Must be true to create the filter. This is a safety gate.'),
+        confirm: z.boolean().describe('Must be true to create the filter. This is a safety gate.'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
+      // Coerce nested criteria fields
+      if (args.criteria) {
+        coerceArgs(args.criteria as Record<string, unknown>, {
+          hasAttachment: 'boolean',
+          excludeChats: 'boolean',
+          size: 'number',
+        });
+      }
       const validation = validateAccountScope(args.accountId, 'mail_settings');
       if ('error' in validation) return validation.error;
 
@@ -1180,16 +1182,21 @@ export function registerGmailTools(
         if (args.criteria.to !== undefined) criteria.to = args.criteria.to;
         if (args.criteria.subject !== undefined) criteria.subject = args.criteria.subject;
         if (args.criteria.query !== undefined) criteria.query = args.criteria.query;
-        if (args.criteria.negatedQuery !== undefined) criteria.negatedQuery = args.criteria.negatedQuery;
-        if (args.criteria.hasAttachment !== undefined) criteria.hasAttachment = args.criteria.hasAttachment;
-        if (args.criteria.excludeChats !== undefined) criteria.excludeChats = args.criteria.excludeChats;
+        if (args.criteria.negatedQuery !== undefined)
+          criteria.negatedQuery = args.criteria.negatedQuery;
+        if (args.criteria.hasAttachment !== undefined)
+          criteria.hasAttachment = args.criteria.hasAttachment;
+        if (args.criteria.excludeChats !== undefined)
+          criteria.excludeChats = args.criteria.excludeChats;
         if (args.criteria.size !== undefined) criteria.size = args.criteria.size;
-        if (args.criteria.sizeComparison !== undefined) criteria.sizeComparison = args.criteria.sizeComparison;
+        if (args.criteria.sizeComparison !== undefined)
+          criteria.sizeComparison = args.criteria.sizeComparison;
 
         // Build action object without undefined values
         const action: Parameters<typeof client.createFilter>[1] = {};
         if (args.action.addLabelIds !== undefined) action.addLabelIds = args.action.addLabelIds;
-        if (args.action.removeLabelIds !== undefined) action.removeLabelIds = args.action.removeLabelIds;
+        if (args.action.removeLabelIds !== undefined)
+          action.removeLabelIds = args.action.removeLabelIds;
         if (args.action.forward !== undefined) action.forward = args.action.forward;
 
         const filter = await client.createFilter(criteria, action);
@@ -1214,12 +1221,11 @@ export function registerGmailTools(
       inputSchema: {
         accountId: z.string().describe('The Google account ID'),
         filterId: z.string().describe('The filter ID to delete'),
-        confirm: z
-          .boolean()
-          .describe('Must be true to delete the filter. This is a safety gate.'),
+        confirm: z.boolean().describe('Must be true to delete the filter. This is a safety gate.'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'mail_settings');
       if ('error' in validation) return validation.error;
 
@@ -1308,7 +1314,15 @@ export function registerGmailTools(
           .describe('Required when enabling vacation responder. Safety gate.'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, {
+        enableAutoReply: 'boolean',
+        restrictToContacts: 'boolean',
+        restrictToDomain: 'boolean',
+        startTime: 'number',
+        endTime: 'number',
+        confirm: 'boolean',
+      });
       const validation = validateAccountScope(args.accountId, 'mail_settings');
       if ('error' in validation) return validation.error;
 
@@ -1330,9 +1344,11 @@ export function registerGmailTools(
           enableAutoReply: args.enableAutoReply,
         };
         if (args.responseSubject !== undefined) settings.responseSubject = args.responseSubject;
-        if (args.responseBodyPlainText !== undefined) settings.responseBodyPlainText = args.responseBodyPlainText;
+        if (args.responseBodyPlainText !== undefined)
+          settings.responseBodyPlainText = args.responseBodyPlainText;
         if (args.responseBodyHtml !== undefined) settings.responseBodyHtml = args.responseBodyHtml;
-        if (args.restrictToContacts !== undefined) settings.restrictToContacts = args.restrictToContacts;
+        if (args.restrictToContacts !== undefined)
+          settings.restrictToContacts = args.restrictToContacts;
         if (args.restrictToDomain !== undefined) settings.restrictToDomain = args.restrictToDomain;
         if (args.startTime !== undefined) settings.startTime = args.startTime;
         if (args.endTime !== undefined) settings.endTime = args.endTime;

@@ -13,7 +13,7 @@ import {
   toMcpError,
 } from '../errors/index.js';
 import { getScopeTier, hasSufficientScope, SCOPE_TIERS, type ScopeTier } from '../types/index.js';
-import { cache } from '../utils/index.js';
+import { cache, coerceArgs } from '../utils/index.js';
 import { registerCalendarTools } from './calendar-tools.js';
 import { registerDriveTools } from './drive-tools.js';
 import { registerGmailTools } from './gmail-tools.js';
@@ -559,7 +559,8 @@ Show me the preview and ask for confirmation before any sending.`,
         maxMessages: z.number().optional().describe('Maximum messages to analyze (default: 20)'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { maxMessages: 'number' });
       const query = args.query || 'is:unread newer_than:7d';
       const maxMessages = args.maxMessages || 20;
 
@@ -618,7 +619,8 @@ Group items by priority (High > Medium > Low) where:
           .describe('If true, apply labels after confirmation. If false, just show suggestions.'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { maxMessages: 'number', applyAutomatically: 'boolean' });
       const maxMessages = args.maxMessages || 25;
       const autoApply = args.applyAutomatically ?? false;
 

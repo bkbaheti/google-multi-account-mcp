@@ -1,20 +1,23 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AccountStore } from '../auth/index.js';
+import { DriveClient } from '../drive/index.js';
 import {
   confirmationRequired,
   errorResponse,
   successResponse,
   toMcpError,
 } from '../errors/index.js';
-import { DriveClient } from '../drive/index.js';
 import type { ScopeTier } from '../types/index.js';
+import { coerceArgs } from '../utils/index.js';
 
 export function registerDriveTools(
   server: McpServer,
   accountStore: AccountStore,
-  validateAccountScope: (accountId: string, requiredTier: ScopeTier) =>
-    { error: ReturnType<typeof errorResponse> } | { account: any },
+  validateAccountScope: (
+    accountId: string,
+    requiredTier: ScopeTier,
+  ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // === Read tools (require drive_readonly) ===
 
@@ -31,7 +34,8 @@ export function registerDriveTools(
         pageToken: z.string().optional().describe('Token for pagination'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { maxResults: 'number' });
       const validation = validateAccountScope(args.accountId, 'drive_readonly');
       if ('error' in validation) return validation.error;
 
@@ -66,7 +70,8 @@ export function registerDriveTools(
         pageToken: z.string().optional().describe('Token for pagination'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { maxResults: 'number' });
       const validation = validateAccountScope(args.accountId, 'drive_readonly');
       if ('error' in validation) return validation.error;
 
@@ -92,7 +97,8 @@ export function registerDriveTools(
   server.registerTool(
     'drive_get_file',
     {
-      description: 'Get metadata for a Google Drive file (name, size, type, owners, sharing status, etc.)',
+      description:
+        'Get metadata for a Google Drive file (name, size, type, owners, sharing status, etc.)',
       inputSchema: {
         accountId: z.string().describe('The Google account ID'),
         fileId: z.string().describe('The file ID'),
@@ -151,12 +157,15 @@ export function registerDriveTools(
         accountId: z.string().describe('The Google account ID'),
         name: z.string().describe('File name including extension'),
         content: z.string().describe('File content (UTF-8 text or base64-encoded binary)'),
-        mimeType: z.string().describe('MIME type of the file (e.g., "text/plain", "application/pdf")'),
+        mimeType: z
+          .string()
+          .describe('MIME type of the file (e.g., "text/plain", "application/pdf")'),
         parentFolderId: z.string().optional().describe('Parent folder ID (default: root)'),
         isBase64: z.boolean().optional().describe('Set to true if content is base64-encoded'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { isBase64: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'drive_full');
       if ('error' in validation) return validation.error;
 
@@ -244,11 +253,15 @@ export function registerDriveTools(
   server.registerTool(
     'drive_copy_file',
     {
-      description: 'Create a copy of a file in Google Drive. Optionally specify a new name for the copy.',
+      description:
+        'Create a copy of a file in Google Drive. Optionally specify a new name for the copy.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID'),
         fileId: z.string().describe('The file ID to copy'),
-        name: z.string().optional().describe('Name for the copy (default: "Copy of [original name]")'),
+        name: z
+          .string()
+          .optional()
+          .describe('Name for the copy (default: "Copy of [original name]")'),
       },
     },
     async (args) => {
@@ -332,13 +345,20 @@ export function registerDriveTools(
         role: z
           .enum(['owner', 'organizer', 'fileOrganizer', 'writer', 'commenter', 'reader'])
           .describe('Permission role'),
-        emailAddress: z.string().optional().describe('Email address (required for user/group type)'),
+        emailAddress: z
+          .string()
+          .optional()
+          .describe('Email address (required for user/group type)'),
         domain: z.string().optional().describe('Domain (required for domain type)'),
-        sendNotification: z.boolean().optional().describe('Send notification email (default: false)'),
+        sendNotification: z
+          .boolean()
+          .optional()
+          .describe('Send notification email (default: false)'),
         confirm: z.boolean().optional().describe('Set to true to confirm sharing'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { sendNotification: 'boolean', confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'drive_full');
       if ('error' in validation) return validation.error;
 
@@ -398,7 +418,8 @@ export function registerDriveTools(
         confirm: z.boolean().optional().describe('Set to true to confirm permission update'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'drive_full');
       if ('error' in validation) return validation.error;
 
@@ -414,7 +435,11 @@ export function registerDriveTools(
 
       try {
         const client = new DriveClient(accountStore, args.accountId);
-        const permission = await client.updatePermissions(args.fileId, args.permissionId, args.role);
+        const permission = await client.updatePermissions(
+          args.fileId,
+          args.permissionId,
+          args.role,
+        );
 
         return successResponse(permission);
       } catch (error) {
