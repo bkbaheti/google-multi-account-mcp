@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 export interface TokenData {
@@ -74,7 +75,12 @@ export class KeychainStorage implements TokenStorage {
   private async getKeytar(): Promise<typeof import('keytar')> {
     if (!this.keytar) {
       try {
-        this.keytar = await import('keytar');
+        const mod = await import('keytar');
+        // Verify the module actually works (native bindings may fail in WSL/containers)
+        if (typeof mod.setPassword !== 'function') {
+          throw new Error('keytar methods not available');
+        }
+        this.keytar = mod;
       } catch {
         throw new Error('Keychain storage not available: keytar module failed to load');
       }
@@ -170,11 +176,10 @@ export async function createTokenStorage(
     await storage.load('__test__');
     return storage;
   } catch {
-    // Fall back to encrypted file
+    // Fall back to encrypted file with default passphrase if none provided
     if (!passphrase) {
-      throw new Error(
-        'Keychain not available and no passphrase provided for encrypted file storage',
-      );
+      // Use a machine-specific default so tokens are still encrypted at rest
+      passphrase = `mcp-google-${os.hostname()}-${os.userInfo().username}`;
     }
     return new EncryptedFileStorage(storageDir, passphrase);
   }

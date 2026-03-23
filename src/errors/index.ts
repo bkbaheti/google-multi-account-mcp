@@ -8,6 +8,7 @@ export const ErrorCode = {
   // Account errors
   ACCOUNT_NOT_FOUND: 'ACCOUNT_NOT_FOUND',
   ACCOUNT_ALREADY_EXISTS: 'ACCOUNT_ALREADY_EXISTS',
+  ALIAS_DUPLICATE: 'ALIAS_DUPLICATE',
 
   // Scope/permission errors
   SCOPE_INSUFFICIENT: 'SCOPE_INSUFFICIENT',
@@ -82,6 +83,14 @@ export function accountNotFound(accountId: string): McpToolError {
   return new McpToolError(ErrorCode.ACCOUNT_NOT_FOUND, `Account not found: ${accountId}`, {
     accountId,
   });
+}
+
+export function aliasDuplicate(alias: string, existingAccountId: string): McpToolError {
+  return new McpToolError(
+    ErrorCode.ALIAS_DUPLICATE,
+    `Alias "${alias}" is already assigned to account ${existingAccountId}. Each alias must be unique.`,
+    { alias, existingAccountId },
+  );
 }
 
 export function authNotConfigured(accountId: string): McpToolError {

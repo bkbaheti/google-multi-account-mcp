@@ -55,9 +55,10 @@
     },
     "google": {
       "type": "stdio",
-      "command": "node",
+      "command": "npx",
       "args": [
-        "/home/baheti/projects/google-multi-account-mcp/dist/cli.js"
+        "-y",
+        "@procedure-tech/mcp-google"
       ],
       "env": {}
     }

@@ -58,7 +58,7 @@ export function registerDriveTools(
       description:
         'Search for files in Google Drive. Supports shorthand syntax like type:document, type:spreadsheet, type:pdf, type:folder, type:image, type:video, type:audio (automatically converted to mimeType queries). Also accepts raw Drive API query syntax (e.g., "name contains \'report\'", "mimeType=\'application/pdf\'").',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID to search'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         query: z.string().describe('Drive search query (e.g., "name contains \'report\'")'),
         maxResults: z.number().optional().describe('Maximum number of results (default: 20)'),
         pageToken: z.string().optional().describe('Token for pagination'),
@@ -95,7 +95,7 @@ export function registerDriveTools(
       description:
         'List files in a Google Drive folder. If no folderId is provided, lists files in the root folder.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         folderId: z.string().optional().describe('Folder ID to list (default: root)'),
         maxResults: z.number().optional().describe('Maximum number of results (default: 20)'),
         pageToken: z.string().optional().describe('Token for pagination'),
@@ -131,7 +131,7 @@ export function registerDriveTools(
       description:
         'Get metadata for a Google Drive file (name, size, type, owners, sharing status, etc.)',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID'),
       },
     },
@@ -157,7 +157,7 @@ export function registerDriveTools(
       description:
         'Download or export file content from Google Drive. Google Workspace files (Docs, Sheets, Slides) are exported to plain text/CSV. Binary files are returned as base64.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID'),
       },
     },
@@ -185,7 +185,7 @@ export function registerDriveTools(
       description:
         'Upload a file to Google Drive. Provide content as UTF-8 text or base64-encoded binary (set isBase64: true).',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         name: z.string().describe('File name including extension'),
         content: z.string().describe('File content (UTF-8 text or base64-encoded binary)'),
         mimeType: z
@@ -234,7 +234,7 @@ export function registerDriveTools(
     {
       description: 'Create a new folder in Google Drive.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         name: z.string().describe('Folder name'),
         parentFolderId: z.string().optional().describe('Parent folder ID (default: root)'),
       },
@@ -260,7 +260,7 @@ export function registerDriveTools(
     {
       description: 'Move a file to a different folder in Google Drive.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID to move'),
         newParentId: z.string().describe('The destination folder ID'),
       },
@@ -287,7 +287,7 @@ export function registerDriveTools(
       description:
         'Create a copy of a file in Google Drive. Optionally specify a new name for the copy.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID to copy'),
         name: z
           .string()
@@ -316,7 +316,7 @@ export function registerDriveTools(
     {
       description: 'Rename a file in Google Drive.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID to rename'),
         name: z.string().describe('New file name'),
       },
@@ -342,7 +342,7 @@ export function registerDriveTools(
     {
       description: 'Move a file to trash in Google Drive.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID to trash'),
       },
     },
@@ -370,7 +370,7 @@ export function registerDriveTools(
       description:
         'Share a Google Drive file by creating a permission. Requires confirm: true as a safety gate since sharing exposes the file to others.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID to share'),
         type: z.enum(['user', 'group', 'domain', 'anyone']).describe('Permission type'),
         role: z
@@ -440,7 +440,7 @@ export function registerDriveTools(
       description:
         'Update an existing permission on a Google Drive file. Requires confirm: true as a safety gate since permission changes affect access control.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID'),
         permissionId: z.string().describe('The permission ID to update'),
         role: z

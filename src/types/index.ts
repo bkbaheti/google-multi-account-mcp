@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const AccountSchema = z.object({
   id: z.string(),
   email: z.email(),
+  alias: z.string().optional(),
+  description: z.string().optional(),
   labels: z.array(z.string()).default([]),
   scopes: z.array(z.string()),
   addedAt: z.iso.datetime(),

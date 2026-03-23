@@ -27,7 +27,7 @@ export function registerCalendarTools(
     {
       description: 'List all calendars for a Google account (primary, shared, subscribed).',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
       },
     },
     async (args) => {
@@ -52,7 +52,7 @@ export function registerCalendarTools(
       description:
         'List events from a Google Calendar within a time range. Defaults to primary calendar.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
         timeMin: z
           .string()
@@ -113,7 +113,7 @@ export function registerCalendarTools(
     {
       description: 'Get full details for a specific Google Calendar event.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         eventId: z.string().describe('The event ID'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
       },
@@ -140,7 +140,7 @@ export function registerCalendarTools(
       description:
         'Search for Google Calendar events by text query. Searches summary, description, location, and attendees.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         query: z.string().describe('Search text to find in events'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
         timeMin: z.string().optional().describe('Start of time range (RFC3339)'),
@@ -191,7 +191,7 @@ export function registerCalendarTools(
     {
       description: 'Check free/busy status for one or more Google Calendars within a time range.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         timeMin: z.string().describe('Start of time range (RFC3339)'),
         timeMax: z.string().describe('End of time range (RFC3339)'),
         calendarIds: z
@@ -235,7 +235,7 @@ export function registerCalendarTools(
       description:
         'Create a new Google Calendar event. If attendees are included, requires confirm: true as a safety gate since it will send calendar invitations.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         summary: z.string().describe('Event title/summary'),
         start: z
           .string()
@@ -342,7 +342,7 @@ export function registerCalendarTools(
       description:
         'Update an existing Google Calendar event. Requires confirm: true if the event has attendees or attendees are being added, since it will send update notifications.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         eventId: z.string().describe('The event ID to update'),
         summary: z.string().optional().describe('New event title/summary'),
         start: z
@@ -460,7 +460,7 @@ export function registerCalendarTools(
       description:
         'Delete a Google Calendar event. Requires confirm: true if the event has attendees, since they will be notified of the cancellation.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         eventId: z.string().describe('The event ID to delete'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
         confirm: z
@@ -506,7 +506,7 @@ export function registerCalendarTools(
       description:
         'Respond to a Google Calendar invitation (accept, decline, or tentatively accept).',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         eventId: z.string().describe('The event ID to respond to'),
         response: z.enum(['accepted', 'declined', 'tentative']).describe('RSVP response'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
@@ -533,7 +533,7 @@ export function registerCalendarTools(
     {
       description: 'Move a Google Calendar event to a different calendar.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         eventId: z.string().describe('The event ID to move'),
         destinationCalendarId: z.string().describe('The destination calendar ID'),
         sourceCalendarId: z.string().optional().describe('Source calendar ID (default: "primary")'),

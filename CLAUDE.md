@@ -20,6 +20,8 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `google_check_pending_auth` - check/complete pending auth session
 - `google_remove_account` - delete account + tokens
 - `google_set_account_labels` - tag accounts
+- `google_set_account_alias` - set friendly alias (e.g., "work") for use in all tool calls
+- `google_set_account_description` - set human-readable description (e.g., "Work - engineering team")
 
 **Gmail Read:**
 - `gmail_search_messages` - search with query
@@ -41,6 +43,8 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `gmail_archive` - remove from INBOX
 - `gmail_trash` - move to trash
 - `gmail_untrash` - restore from trash
+
+- `gmail_bulk_save_attachments` - download attachments from multiple messages to local disk
 
 **Drive:**
 - `drive_search_files` - search files in Drive

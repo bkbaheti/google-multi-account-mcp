@@ -8,6 +8,7 @@ import type { TokenStorage } from '../auth/index.js';
 import { AccountStore } from '../auth/index.js';
 import {
   accountNotFound,
+  aliasDuplicate,
   errorResponse,
   scopeInsufficient,
   successResponse,
@@ -56,22 +57,23 @@ export function createServer(options: ServerOptions): McpServer {
 
   const accountStore = new AccountStore(options.tokenStorage);
 
-  // Helper to validate account exists and has sufficient scope
+  // Helper to validate account exists and has sufficient scope.
+  // Accepts account ID, alias, or email address.
   function validateAccountScope(
-    accountId: string,
+    accountIdOrAlias: string,
     requiredTier: ScopeTier,
   ):
     | { error: ReturnType<typeof errorResponse> }
     | { account: NonNullable<ReturnType<typeof accountStore.getAccount>> } {
-    const account = accountStore.getAccount(accountId);
+    const account = accountStore.resolveAccount(accountIdOrAlias);
     if (!account) {
-      return { error: errorResponse(accountNotFound(accountId).toResponse()) };
+      return { error: errorResponse(accountNotFound(accountIdOrAlias).toResponse()) };
     }
 
     if (!hasSufficientScope(account.scopes, requiredTier)) {
       const currentTier = getScopeTier(account.scopes);
       return {
-        error: errorResponse(scopeInsufficient(requiredTier, currentTier, accountId).toResponse()),
+        error: errorResponse(scopeInsufficient(requiredTier, currentTier, account.id).toResponse()),
       };
     }
 
@@ -106,6 +108,8 @@ export function createServer(options: ServerOptions): McpServer {
       const result = accounts.map((account) => ({
         id: account.id,
         email: account.email,
+        alias: account.alias,
+        description: account.description,
         labels: account.labels,
         scopes: account.scopes,
         addedAt: account.addedAt,
@@ -294,11 +298,16 @@ export function createServer(options: ServerOptions): McpServer {
     {
       description: 'Remove a Google account and revoke its tokens',
       inputSchema: {
-        accountId: z.string().describe('The account ID to remove'),
+        accountId: z.string().describe('The account ID, alias, or email to remove'),
       },
     },
     async (args) => {
-      const removed = await accountStore.removeAccount(args.accountId);
+      const account = accountStore.resolveAccount(args.accountId);
+      if (!account) {
+        return errorResponse(accountNotFound(args.accountId).toResponse());
+      }
+
+      const removed = await accountStore.removeAccount(account.id);
 
       if (removed) {
         return successResponse({ success: true, message: 'Account removed' });
@@ -314,15 +323,101 @@ export function createServer(options: ServerOptions): McpServer {
     {
       description: 'Set labels on a Google account (e.g., personal, work, school)',
       inputSchema: {
-        accountId: z.string().describe('The account ID to update'),
+        accountId: z.string().describe('The account ID, alias, or email to update'),
         labels: z.array(z.string()).describe('Labels to set on the account'),
       },
     },
     async (args) => {
-      const updated = accountStore.setAccountLabels(args.accountId, args.labels);
+      const account = accountStore.resolveAccount(args.accountId);
+      if (!account) {
+        return errorResponse(accountNotFound(args.accountId).toResponse());
+      }
+
+      const updated = accountStore.setAccountLabels(account.id, args.labels);
 
       if (updated) {
         return successResponse({ success: true, message: 'Labels updated', labels: args.labels });
+      }
+
+      return errorResponse(accountNotFound(args.accountId).toResponse());
+    },
+  );
+
+  // google_set_account_alias - Set a friendly alias on an account
+  server.registerTool(
+    'google_set_account_alias',
+    {
+      description:
+        'Set a friendly alias on a Google account (e.g., "work", "personal"). Once set, you can use the alias instead of the account ID in all tool calls. Set to empty string to remove.',
+      inputSchema: {
+        accountId: z.string().describe('The account ID, existing alias, or email to update'),
+        alias: z
+          .string()
+          .describe('The alias to assign (e.g., "work", "personal"). Empty string to remove.'),
+      },
+    },
+    async (args) => {
+      const account = accountStore.resolveAccount(args.accountId);
+      if (!account) {
+        return errorResponse(accountNotFound(args.accountId).toResponse());
+      }
+
+      const aliasValue = args.alias.trim() === '' ? null : args.alias.trim();
+      const result = accountStore.setAccountAlias(account.id, aliasValue);
+
+      if (!result.success) {
+        if (result.existingAccountId) {
+          return errorResponse(
+            aliasDuplicate(args.alias, result.existingAccountId).toResponse(),
+          );
+        }
+        return errorResponse(accountNotFound(args.accountId).toResponse());
+      }
+
+      return successResponse({
+        success: true,
+        message: aliasValue
+          ? `Alias "${aliasValue}" set for account ${account.email}`
+          : `Alias removed from account ${account.email}`,
+        accountId: account.id,
+        alias: aliasValue,
+      });
+    },
+  );
+
+  // google_set_account_description - Set a human-readable description on an account
+  server.registerTool(
+    'google_set_account_description',
+    {
+      description:
+        'Set a human-readable description on a Google account (e.g., "Work - engineering team", "Personal Gmail"). This description appears in google_list_accounts output to help identify accounts. Set to empty string to remove.',
+      inputSchema: {
+        accountId: z.string().describe('The account ID, alias, or email to update'),
+        description: z
+          .string()
+          .describe(
+            'Human-readable description (e.g., "Work - engineering team"). Empty string to remove.',
+          ),
+      },
+    },
+    async (args) => {
+      const account = accountStore.resolveAccount(args.accountId);
+      if (!account) {
+        return errorResponse(accountNotFound(args.accountId).toResponse());
+      }
+
+      const descValue = args.description.trim() === '' ? null : args.description.trim();
+      const updated = accountStore.setAccountDescription(account.id, descValue);
+
+      if (updated) {
+        return successResponse({
+          success: true,
+          message: descValue
+            ? `Description set for account ${account.email}`
+            : `Description removed from account ${account.email}`,
+          accountId: account.id,
+          description: descValue,
+        });
       }
 
       return errorResponse(accountNotFound(args.accountId).toResponse());
@@ -348,7 +443,7 @@ export function createServer(options: ServerOptions): McpServer {
       description:
         'Guided workflow for composing an email safely. Creates a draft, shows preview, and requires confirmation before sending.',
       argsSchema: {
-        accountId: z.string().describe('The Google account ID to send from'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         to: z.string().describe('Recipient email address'),
         subject: z.string().describe('Email subject'),
         body: z.string().describe('Email body content'),
@@ -684,6 +779,8 @@ Tips:
       const accountsData = accounts.map((account) => ({
         id: account.id,
         email: account.email,
+        alias: account.alias,
+        description: account.description,
         scopeTier: getScopeTier(account.scopes),
         labels: account.labels,
         addedAt: account.addedAt,

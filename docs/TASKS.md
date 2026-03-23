@@ -138,9 +138,6 @@ Lower priority features for power users.
 - [DONE] Add unit tests for settings operations - 11 tests
 - [DONE] Update scope validation tests for parallel tier logic - 13 new tests
 
-### Deferred (Significant Architectural Work)
-- [ ] **HTTP/SSE transport support** - Requires HTTP server, authentication, message format adaptation
-
 ### Notes
 - Batch modify requires confirm: true for operations affecting >100 messages
 - Label delete requires confirm: true for safety
@@ -229,19 +226,25 @@ Lower priority features for power users.
 Identified from comparing against mcp-gsuite, mcp-google-workspace, and gmail-mcp-multi.
 
 ### Account Aliases
-- Allow users to assign friendly aliases ("work", "personal") to accounts, usable in tool calls instead of account IDs
-- **Reference:** gmail-mcp-multi (github.com/dmorrill/gmail-mcp-multi) uses aliases as primary account identifiers via AccountManager
-- **Why:** More ergonomic for AI tool calls — `accountAlias: "work"` is more natural than a UUID
-- **Scope:** Add alias field to Account type, update tool parameter schemas to accept alias OR accountId, add alias resolution in AccountStore
+- [DONE] Allow users to assign friendly aliases ("work", "personal") to accounts, usable in tool calls instead of account IDs
+- Added `alias` optional field to Account schema
+- Added `resolveAccount()` to AccountStore — resolves by ID, alias (case-insensitive), or email
+- Added `google_set_account_alias` tool to set/remove aliases (with uniqueness enforcement)
+- All tools now accept account ID, alias, or email in `accountId` parameter
+- Added 12 unit tests for alias resolution and management
 
 ### Bulk Attachment Download
-- Add `gmail_bulk_save_attachments` tool to download multiple email attachments to local disk in one call
-- **Reference:** mcp-gsuite (github.com/MarkusPfundstein/mcp-gsuite) has `bulk_save_gmail_attachments` that writes attachments directly to filesystem
-- **Why:** Useful for batch processing email attachments in AI workflows
-- **Scope:** Add filesystem write capability, new tool registration, path sanitization for security
+- [DONE] Add `gmail_bulk_save_attachments` tool to download multiple email attachments to local disk in one call
+- Downloads all attachments from up to 50 messages to a specified local directory
+- Path sanitization: rejects `..` in output dir, strips path separators from filenames
+- Prefixes filenames with message ID (or custom prefix) to avoid collisions
+- Returns manifest of saved files with partial error handling (continues on per-file failures)
+- Added 3 unit tests for path sanitization and file writing
 
 ### Account Descriptions in Tool Schemas
-- Inject human-readable account descriptions into tool parameter schemas so the AI sees context like "Work - engineering team" when choosing accounts
-- **Reference:** mcp-gsuite ToolHandler base class embeds `.accounts.json` descriptions directly into each tool's parameter enum descriptions
-- **Why:** Helps LLM pick the right account without explicit user instruction
-- **Scope:** Extend google_set_account_labels or add new google_set_account_description tool, inject descriptions into tool schema generation
+- [DONE] Add human-readable account descriptions to help AI identify the right account
+- Added `description` optional field to Account schema
+- Added `google_set_account_description` tool to set/remove descriptions
+- Descriptions included in `google_list_accounts` output and `accounts://list` resource
+- AI sees context like "Work - engineering team" when listing accounts before tool calls
+- Added 4 unit tests for description management

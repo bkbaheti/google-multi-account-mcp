@@ -37,6 +37,55 @@ export class AccountStore {
   }
 
   /**
+   * Resolve an account by ID, alias, or email.
+   * Priority: exact ID match > alias match > email match.
+   */
+  resolveAccount(idOrAlias: string): Account | null {
+    const accounts = this.listAccounts();
+
+    // 1. Try exact ID match
+    const byId = accounts.find((a) => a.id === idOrAlias);
+    if (byId) return byId;
+
+    // 2. Try alias match (case-insensitive)
+    const lower = idOrAlias.toLowerCase();
+    const byAlias = accounts.find((a) => a.alias?.toLowerCase() === lower);
+    if (byAlias) return byAlias;
+
+    // 3. Try email match
+    const byEmail = accounts.find((a) => a.email === idOrAlias);
+    if (byEmail) return byEmail;
+
+    return null;
+  }
+
+  setAccountAlias(accountId: string, alias: string | null): { success: boolean; error?: string; existingAccountId?: string } {
+    const config = loadConfig();
+    const account = config.accounts.find((a) => a.id === accountId);
+
+    if (!account) {
+      return { success: false, error: 'Account not found' };
+    }
+
+    if (alias !== null) {
+      // Check uniqueness (case-insensitive)
+      const lower = alias.toLowerCase();
+      const existing = config.accounts.find(
+        (a) => a.id !== accountId && a.alias?.toLowerCase() === lower,
+      );
+      if (existing) {
+        return { success: false, error: 'Alias already in use', existingAccountId: existing.id };
+      }
+      account.alias = alias;
+    } else {
+      delete account.alias;
+    }
+
+    saveConfig(config);
+    return { success: true };
+  }
+
+  /**
    * Start adding an account asynchronously - returns auth URL immediately.
    * Use checkPendingAuth to poll for completion.
    */
@@ -156,6 +205,24 @@ export class AccountStore {
     return true;
   }
 
+  setAccountDescription(accountId: string, description: string | null): boolean {
+    const config = loadConfig();
+    const account = config.accounts.find((a) => a.id === accountId);
+
+    if (!account) {
+      return false;
+    }
+
+    if (description !== null) {
+      account.description = description;
+    } else {
+      delete account.description;
+    }
+
+    saveConfig(config);
+    return true;
+  }
+
   setAccountLabels(accountId: string, labels: string[]): boolean {
     const config = loadConfig();
     const account = config.accounts.find((a) => a.id === accountId);
@@ -180,15 +247,26 @@ export class AccountStore {
     }
   }
 
-  async getAccessToken(accountId: string): Promise<string> {
-    const oauth = this.getOAuth();
-    this.updateLastUsed(accountId);
-    return oauth.getAccessToken(accountId);
+  /**
+   * Resolve an ID-or-alias to the real account ID for token storage.
+   * Falls back to the input if no match found (preserves original error paths).
+   */
+  private resolveToId(accountIdOrAlias: string): string {
+    const account = this.resolveAccount(accountIdOrAlias);
+    return account ? account.id : accountIdOrAlias;
   }
 
-  async getAuthenticatedClient(accountId: string): Promise<OAuth2Client> {
+  async getAccessToken(accountIdOrAlias: string): Promise<string> {
+    const id = this.resolveToId(accountIdOrAlias);
     const oauth = this.getOAuth();
-    this.updateLastUsed(accountId);
-    return oauth.getAuthenticatedClient(accountId);
+    this.updateLastUsed(id);
+    return oauth.getAccessToken(id);
+  }
+
+  async getAuthenticatedClient(accountIdOrAlias: string): Promise<OAuth2Client> {
+    const id = this.resolveToId(accountIdOrAlias);
+    const oauth = this.getOAuth();
+    this.updateLastUsed(id);
+    return oauth.getAuthenticatedClient(id);
   }
 }

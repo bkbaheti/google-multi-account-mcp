@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AccountStore } from '../auth/index.js';
@@ -6,6 +8,7 @@ import {
   errorResponse,
   successResponse,
   toMcpError,
+  validationError,
 } from '../errors/index.js';
 import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
 import type { ScopeTier } from '../types/index.js';
@@ -26,7 +29,7 @@ export function registerGmailTools(
       description:
         'Search for messages in Gmail using Gmail search syntax (e.g., "from:user@example.com", "subject:hello", "is:unread")',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID to search'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         query: z.string().describe('Gmail search query'),
         maxResults: z.number().optional().describe('Maximum number of results (default: 20)'),
         pageToken: z.string().optional().describe('Token for pagination'),
@@ -61,7 +64,7 @@ export function registerGmailTools(
     {
       description: 'Get a single Gmail message by ID with headers and body content',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID'),
         format: z
           .enum(['minimal', 'metadata', 'full'])
@@ -104,7 +107,7 @@ export function registerGmailTools(
       description:
         'Fetch multiple Gmail messages in a single call. More efficient than fetching individually. Limited to 50 messages per call.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageIds: z.array(z.string()).describe('Array of message IDs to fetch (max 50)'),
         format: z
           .enum(['minimal', 'metadata', 'full'])
@@ -167,7 +170,7 @@ export function registerGmailTools(
     {
       description: 'Get a Gmail thread with all its messages',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         threadId: z.string().describe('The thread ID'),
         format: z
           .enum(['minimal', 'metadata', 'full'])
@@ -211,7 +214,7 @@ export function registerGmailTools(
       description:
         'Create a draft email. The draft can be reviewed, updated, and sent later. Requires compose or full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
         subject: z.string().describe('Email subject'),
         body: z.string().describe('Email body (plain text)'),
@@ -266,7 +269,7 @@ export function registerGmailTools(
       description:
         'Update an existing draft email. Replaces the entire draft content. Requires compose or full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         draftId: z.string().describe('The draft ID to update'),
         to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
         subject: z.string().describe('Email subject'),
@@ -318,7 +321,7 @@ export function registerGmailTools(
     {
       description: 'Get a draft email with full content for preview before sending',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         draftId: z.string().describe('The draft ID to retrieve'),
       },
     },
@@ -371,7 +374,7 @@ export function registerGmailTools(
       description:
         'Send a draft email. IMPORTANT: This will actually send the email. You MUST pass confirm: true to proceed. Requires compose or full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         draftId: z.string().describe('The draft ID to send'),
         confirm: z
           .boolean()
@@ -420,7 +423,7 @@ export function registerGmailTools(
     {
       description: 'Delete a draft email',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         draftId: z.string().describe('The draft ID to delete'),
       },
     },
@@ -449,7 +452,7 @@ export function registerGmailTools(
       description:
         'Reply to an existing email thread. Creates a draft reply and optionally sends it. Requires compose or full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         threadId: z.string().describe('The thread ID to reply in'),
         to: z.string().describe('Recipient email address(es)'),
         subject: z.string().describe('Email subject (typically Re: original subject)'),
@@ -550,7 +553,7 @@ export function registerGmailTools(
       description:
         'List all Gmail labels (system labels like INBOX, SENT, etc. and custom user labels). Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
       },
     },
     async (args) => {
@@ -578,7 +581,7 @@ export function registerGmailTools(
       description:
         'Add or remove labels from a Gmail message. Use label IDs (e.g., "INBOX", "STARRED", "IMPORTANT", or custom label IDs). Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID to modify'),
         addLabelIds: z
           .array(z.string())
@@ -624,7 +627,7 @@ export function registerGmailTools(
       description:
         'Apply label changes to multiple messages in one operation. More efficient than individual modifications. Limited to 1000 messages. Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageIds: z.array(z.string()).describe('Array of message IDs to modify (max 1000)'),
         addLabelIds: z.array(z.string()).optional().describe('Label IDs to add to all messages'),
         removeLabelIds: z
@@ -679,7 +682,7 @@ export function registerGmailTools(
       description:
         'Create a new Gmail label with optional color and visibility settings. Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         name: z.string().describe('Label name (use "/" for nesting, e.g., "Work/Projects")'),
         messageListVisibility: z
           .enum(['show', 'hide'])
@@ -728,7 +731,7 @@ export function registerGmailTools(
       description:
         'Update a Gmail label (rename, change color, visibility). System labels cannot be modified. Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         labelId: z.string().describe('The label ID to update'),
         name: z.string().optional().describe('New label name'),
         messageListVisibility: z
@@ -779,7 +782,7 @@ export function registerGmailTools(
       description:
         'Delete a Gmail label. Messages with this label will not be deleted, they will just lose the label. System labels cannot be deleted. Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         labelId: z.string().describe('The label ID to delete'),
         confirm: z.boolean().optional().describe('Set to true to confirm deletion'),
       },
@@ -820,7 +823,7 @@ export function registerGmailTools(
       description:
         'Mark a Gmail message as read or unread. This is a shortcut for modifying the UNREAD label. Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID to modify'),
         markAsRead: z.boolean().describe('true to mark as read, false to mark as unread'),
       },
@@ -860,7 +863,7 @@ export function registerGmailTools(
       description:
         'Archive a Gmail message by removing it from INBOX. The message remains in All Mail and can still be found via search. Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID to archive'),
       },
     },
@@ -894,7 +897,7 @@ export function registerGmailTools(
       description:
         'Move a Gmail message to Trash. The message will be permanently deleted after 30 days. Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID to trash'),
       },
     },
@@ -927,7 +930,7 @@ export function registerGmailTools(
     {
       description: 'Restore a Gmail message from Trash back to the mailbox. Requires full scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID to restore from trash'),
       },
     },
@@ -963,7 +966,7 @@ export function registerGmailTools(
       description:
         'List all attachments in a Gmail message. Returns attachment IDs, filenames, MIME types, and sizes. Requires readonly scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID to list attachments from'),
       },
     },
@@ -992,7 +995,7 @@ export function registerGmailTools(
       description:
         'Download an attachment from a Gmail message. Returns base64-encoded data. Use gmail_list_attachments first to get attachment IDs. Requires readonly scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID containing the attachment'),
         attachmentId: z.string().describe('The attachment ID to download'),
       },
@@ -1025,7 +1028,7 @@ export function registerGmailTools(
       description:
         'Create a draft email with file attachments. The draft can be reviewed and sent later. Requires compose or full scope. Max 25MB total attachment size.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
         subject: z.string().describe('Email subject'),
         body: z.string().describe('Email body (plain text)'),
@@ -1087,7 +1090,7 @@ export function registerGmailTools(
       description:
         'List all Gmail filters for an account. Filters automatically process incoming messages based on criteria. Requires settings scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
       },
     },
     async (args) => {
@@ -1115,7 +1118,7 @@ export function registerGmailTools(
       description:
         'Create a Gmail filter to automatically process incoming messages. Criteria define which messages match; actions define what happens to them. Requires settings scope and confirmation.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         criteria: z
           .object({
             from: z.string().optional().describe('Match messages from this sender'),
@@ -1219,7 +1222,7 @@ export function registerGmailTools(
       description:
         'Delete a Gmail filter by ID. Use gmail_list_filters to see existing filters. Requires settings scope and confirmation.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         filterId: z.string().describe('The filter ID to delete'),
         confirm: z.boolean().describe('Must be true to delete the filter. This is a safety gate.'),
       },
@@ -1260,7 +1263,7 @@ export function registerGmailTools(
       description:
         'Get the vacation auto-reply settings for an account. Shows whether vacation responder is enabled and its configuration. Requires settings scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
       },
     },
     async (args) => {
@@ -1287,7 +1290,7 @@ export function registerGmailTools(
       description:
         'Configure the vacation auto-reply settings. Can enable or disable the vacation responder. Enabling requires confirmation. Requires settings scope.',
       inputSchema: {
-        accountId: z.string().describe('The Google account ID'),
+        accountId: z.string().describe('The Google account ID, alias, or email'),
         enableAutoReply: z.boolean().describe('Whether to enable the vacation auto-reply'),
         responseSubject: z.string().optional().describe('Subject line for the auto-reply'),
         responseBodyPlainText: z.string().optional().describe('Plain text body of the auto-reply'),
@@ -1361,6 +1364,122 @@ export function registerGmailTools(
             ? 'Vacation responder enabled'
             : 'Vacation responder disabled',
           vacation,
+        });
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // gmail_bulk_save_attachments - Download multiple attachments to local disk
+  server.registerTool(
+    'gmail_bulk_save_attachments',
+    {
+      description:
+        'Download all attachments from one or more Gmail messages to a local directory. Returns a manifest of saved files. Requires readonly scope.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID, alias, or email'),
+        messageIds: z
+          .array(z.string())
+          .describe('Array of message IDs to download attachments from'),
+        outputDir: z
+          .string()
+          .describe('Local directory path to save attachments to (will be created if needed)'),
+        filenamePrefix: z
+          .string()
+          .optional()
+          .describe(
+            'Optional prefix for filenames. If not set, files use their original names with message ID prefix to avoid collisions.',
+          ),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'mail_readonly');
+      if ('error' in validation) return validation.error;
+
+      // Validate messageIds is not empty
+      if (!args.messageIds.length) {
+        return errorResponse(
+          validationError('messageIds must contain at least one message ID').toResponse(),
+        );
+      }
+
+      // Limit batch size
+      if (args.messageIds.length > 50) {
+        return errorResponse(
+          validationError('Maximum 50 messages per bulk download').toResponse(),
+        );
+      }
+
+      // Sanitize output path — reject paths with traversal or hidden segments
+      const outputDir = args.outputDir;
+      if (outputDir.includes('..')) {
+        return errorResponse(
+          validationError('Output directory must not contain ".." path segments').toResponse(),
+        );
+      }
+
+      try {
+        // Create output directory if it doesn't exist
+        if (!existsSync(outputDir)) {
+          mkdirSync(outputDir, { recursive: true });
+        }
+
+        const client = new GmailClient(accountStore, args.accountId);
+        const savedFiles: Array<{
+          messageId: string;
+          filename: string;
+          path: string;
+          mimeType: string;
+          size: number;
+        }> = [];
+        const errors: Array<{ messageId: string; error: string }> = [];
+
+        for (const messageId of args.messageIds) {
+          try {
+            const attachments = await client.listAttachments(messageId);
+
+            for (const attachment of attachments) {
+              try {
+                const data = await client.getAttachment(messageId, attachment.attachmentId);
+
+                // Sanitize filename — strip path separators
+                const safeName = attachment.filename.replace(/[/\\]/g, '_');
+                const prefix = args.filenamePrefix ?? messageId.slice(0, 8);
+                const filename = `${prefix}_${safeName}`;
+                const filePath = join(outputDir, filename);
+
+                // Write binary data
+                const buffer = Buffer.from(data.data, 'base64');
+                writeFileSync(filePath, buffer);
+
+                savedFiles.push({
+                  messageId,
+                  filename,
+                  path: filePath,
+                  mimeType: attachment.mimeType,
+                  size: attachment.size,
+                });
+              } catch (err) {
+                errors.push({
+                  messageId,
+                  error: `Failed to download ${attachment.filename}: ${err instanceof Error ? err.message : String(err)}`,
+                });
+              }
+            }
+          } catch (err) {
+            errors.push({
+              messageId,
+              error: `Failed to list attachments: ${err instanceof Error ? err.message : String(err)}`,
+            });
+          }
+        }
+
+        return successResponse({
+          savedFiles,
+          totalFiles: savedFiles.length,
+          outputDir,
+          ...(errors.length > 0 && { errors }),
         });
       } catch (error) {
         return errorResponse(toMcpError(error));
