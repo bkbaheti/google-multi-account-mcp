@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "MCP server for multi-Google-account access (Gmail, Calendar, Drive)",
   "type": "module",
   "main": "dist/index.js",
