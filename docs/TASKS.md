@@ -248,3 +248,18 @@ Identified from comparing against mcp-gsuite, mcp-google-workspace, and gmail-mc
 - Descriptions included in `google_list_accounts` output and `accounts://list` resource
 - AI sees context like "Work - engineering team" when listing accounts before tool calls
 - Added 4 unit tests for description management
+
+### npm Trusted Publisher + GitHub Actions Publish Pipeline
+- [ ] Configure npm Trusted Publisher (OIDC) on npmjs.com — link to `bkbaheti/google-multi-account-mcp`, workflow `publish.yml`
+- [ ] Create `.github/workflows/publish.yml`:
+  - Trigger on `push: tags: ['v*']`
+  - `permissions: id-token: write, contents: read`
+  - Steps: checkout → setup Node 20 → `pnpm install` → `pnpm build` → `pnpm test` → `npm publish --provenance --access public`
+  - Use `environment: npm` for optional manual approval gate
+- [ ] Create GitHub environment `npm` with required reviewers (optional)
+- [ ] Test: `git tag v0.2.1 && git push --tags` to trigger first automated publish
+- [ ] Remove local npm token dependency once OIDC publishing is verified
+
+### Beta / Pre-Approval Notices
+- [ ] Add beta notice to package.json description, README, and landing page — "Google OAuth approval pending, by-invite access"
+- [ ] Publish with `--tag beta` dist-tag or use prerelease versioning (`x.y.z-beta.N`)
