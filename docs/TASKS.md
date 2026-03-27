@@ -250,7 +250,7 @@ Identified from comparing against mcp-gsuite, mcp-google-workspace, and gmail-mc
 - Added 4 unit tests for description management
 
 ### npm Trusted Publisher + GitHub Actions Publish Pipeline
-- [ ] Configure npm Trusted Publisher (OIDC) on npmjs.com — link to `bkbaheti/google-multi-account-mcp`, workflow `publish.yml`
+- [DONE] Configure npm Trusted Publisher (OIDC) on npmjs.com — link to `bkbaheti/google-multi-account-mcp`, workflow `publish.yml`
 - [DONE] Create `.github/workflows/publish.yml`:
   - Trigger on `push: tags: ['v*']`
   - `permissions: id-token: write, contents: read`
