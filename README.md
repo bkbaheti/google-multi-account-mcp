@@ -1,5 +1,7 @@
 # MCP Google Multi-Account Server
 
+> **Beta Notice:** This package uses OAuth credentials that are pending Google's verification review. During this period, access is by-invite only — you must be added as a test user in the Google Cloud Console to complete OAuth. Alternatively, you can [bring your own OAuth credentials](#advanced-bring-your-own-oauth-credentials). Once Google approval is granted, this notice will be removed.
+
 An MCP (Model Context Protocol) server for accessing multiple Google accounts from Claude Code, Claude Desktop, or any MCP-compatible client. Supports Gmail, Google Drive, and Google Calendar.
 
 **Just talk to Claude naturally:**

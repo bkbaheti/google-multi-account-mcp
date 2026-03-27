@@ -4,7 +4,7 @@
     "access": "public"
   },
   "version": "0.2.0",
-  "description": "MCP server for multi-Google-account access (Gmail, Calendar, Drive)",
+  "description": "MCP server for multi-Google-account access (Gmail, Calendar, Drive) [BETA - Google OAuth approval pending, by-invite access]",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

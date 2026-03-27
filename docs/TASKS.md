@@ -251,15 +251,15 @@ Identified from comparing against mcp-gsuite, mcp-google-workspace, and gmail-mc
 
 ### npm Trusted Publisher + GitHub Actions Publish Pipeline
 - [ ] Configure npm Trusted Publisher (OIDC) on npmjs.com — link to `bkbaheti/google-multi-account-mcp`, workflow `publish.yml`
-- [ ] Create `.github/workflows/publish.yml`:
+- [DONE] Create `.github/workflows/publish.yml`:
   - Trigger on `push: tags: ['v*']`
   - `permissions: id-token: write, contents: read`
-  - Steps: checkout → setup Node 20 → `pnpm install` → `pnpm build` → `pnpm test` → `npm publish --provenance --access public`
-  - Use `environment: npm` for optional manual approval gate
+  - Steps: checkout → setup Node 20 → `pnpm install` → `pnpm build` → `pnpm test` → `npm publish --provenance --access public --tag beta`
+  - Uses `environment: npm` for optional manual approval gate
 - [ ] Create GitHub environment `npm` with required reviewers (optional)
 - [ ] Test: `git tag v0.2.1 && git push --tags` to trigger first automated publish
 - [ ] Remove local npm token dependency once OIDC publishing is verified
 
 ### Beta / Pre-Approval Notices
-- [ ] Add beta notice to package.json description, README, and landing page — "Google OAuth approval pending, by-invite access"
-- [ ] Publish with `--tag beta` dist-tag or use prerelease versioning (`x.y.z-beta.N`)
+- [DONE] Add beta notice to package.json description, README, and landing page — "Google OAuth approval pending, by-invite access"
+- [DONE] Publish with `--tag beta` dist-tag (workflow uses `npm publish --tag beta`)
