@@ -12,7 +12,7 @@ import {
 } from '../errors/index.js';
 import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
 import type { ScopeTier } from '../types/index.js';
-import { coerceArgs } from '../utils/index.js';
+import { GMAIL_MAX_ATTACHMENT_BYTES, coerceArgs, readFileAsBase64 } from '../utils/index.js';
 
 export function registerGmailTools(
   server: McpServer,
@@ -1026,7 +1026,7 @@ export function registerGmailTools(
     'gmail_create_draft_with_attachment',
     {
       description:
-        'Create a draft email with file attachments. The draft can be reviewed and sent later. Requires compose or full scope. Max 25MB total attachment size.',
+        'Create a draft email with file attachments. Each attachment can provide base64-encoded data directly OR a local file path (the server reads the file from disk). The draft can be reviewed and sent later. Requires compose or full scope. Max 25MB total attachment size.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
@@ -1037,10 +1037,21 @@ export function registerGmailTools(
             z.object({
               filename: z.string().describe('Filename with extension'),
               mimeType: z.string().describe('MIME type (e.g., "application/pdf", "image/png")'),
-              data: z.string().describe('Base64-encoded file data'),
+              data: z
+                .string()
+                .optional()
+                .describe('Base64-encoded file data (provide this OR filePath)'),
+              filePath: z
+                .string()
+                .optional()
+                .describe(
+                  'Absolute path to file on disk (provide this OR data). Server reads and base64-encodes the file.',
+                ),
             }),
           )
-          .describe('Array of attachments to include'),
+          .describe(
+            'Array of attachments. Each must have either "data" (base64) or "filePath" (local path), not both.',
+          ),
         cc: z.string().optional().describe('CC email address(es)'),
         bcc: z.string().optional().describe('BCC email address(es)'),
         threadId: z.string().optional().describe('Thread ID to reply in'),
@@ -1051,6 +1062,43 @@ export function registerGmailTools(
     async (args) => {
       const validation = validateAccountScope(args.accountId, 'mail_compose');
       if ('error' in validation) return validation.error;
+
+      // Resolve attachments: convert filePath entries to base64 data
+      const resolvedAttachments: Array<{ filename: string; mimeType: string; data: string }> = [];
+      for (const attachment of args.attachments) {
+        if (attachment.data && attachment.filePath) {
+          return errorResponse(
+            validationError(
+              `Attachment "${attachment.filename}": provide either "data" or "filePath", not both`,
+            ).toResponse(),
+          );
+        }
+        if (!attachment.data && !attachment.filePath) {
+          return errorResponse(
+            validationError(
+              `Attachment "${attachment.filename}": must provide either "data" or "filePath"`,
+            ).toResponse(),
+          );
+        }
+
+        if (attachment.filePath) {
+          const fileResult = readFileAsBase64(attachment.filePath, GMAIL_MAX_ATTACHMENT_BYTES);
+          if ('error' in fileResult) {
+            return errorResponse(validationError(fileResult.error).toResponse());
+          }
+          resolvedAttachments.push({
+            filename: attachment.filename,
+            mimeType: attachment.mimeType,
+            data: fileResult.data,
+          });
+        } else {
+          resolvedAttachments.push({
+            filename: attachment.filename,
+            mimeType: attachment.mimeType,
+            data: attachment.data as string,
+          });
+        }
+      }
 
       try {
         const client = new GmailClient(accountStore, args.accountId);
@@ -1063,12 +1111,12 @@ export function registerGmailTools(
           threadId: args.threadId,
           inReplyTo: args.inReplyTo,
           references: args.references,
-          attachments: args.attachments,
+          attachments: resolvedAttachments,
         });
 
         return successResponse({
           success: true,
-          message: `Draft created with ${args.attachments.length} attachment(s)`,
+          message: `Draft created with ${resolvedAttachments.length} attachment(s)`,
           draft: {
             id: draft.id,
             messageId: draft.message?.id,

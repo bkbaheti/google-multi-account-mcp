@@ -7,9 +7,10 @@ import {
   errorResponse,
   successResponse,
   toMcpError,
+  validationError,
 } from '../errors/index.js';
 import type { ScopeTier } from '../types/index.js';
-import { coerceArgs } from '../utils/index.js';
+import { DRIVE_MAX_UPLOAD_BYTES, coerceArgs, readFileAsBase64 } from '../utils/index.js';
 
 /**
  * Convert common shorthand query formats to Google Drive API query syntax.
@@ -183,22 +184,61 @@ export function registerDriveTools(
     'drive_upload_file',
     {
       description:
-        'Upload a file to Google Drive. Provide content as UTF-8 text or base64-encoded binary (set isBase64: true).',
+        'Upload a file to Google Drive. Provide content as UTF-8 text, base64-encoded binary (set isBase64: true), or a local file path (the server reads the file from disk).',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         name: z.string().describe('File name including extension'),
-        content: z.string().describe('File content (UTF-8 text or base64-encoded binary)'),
+        content: z
+          .string()
+          .optional()
+          .describe('File content (UTF-8 text or base64-encoded binary). Provide this OR filePath.'),
         mimeType: z
           .string()
           .describe('MIME type of the file (e.g., "text/plain", "application/pdf")'),
         parentFolderId: z.string().optional().describe('Parent folder ID (default: root)'),
-        isBase64: z.boolean().optional().describe('Set to true if content is base64-encoded'),
+        isBase64: z
+          .boolean()
+          .optional()
+          .describe('Set to true if content is base64-encoded (only used with content, not filePath)'),
+        filePath: z
+          .string()
+          .optional()
+          .describe(
+            'Absolute path to file on disk (provide this OR content). Server reads the file directly.',
+          ),
       },
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { isBase64: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'drive_full');
       if ('error' in validation) return validation.error;
+
+      // Validate mutual exclusivity of content vs filePath
+      if (args.content && args.filePath) {
+        return errorResponse(
+          validationError('Provide either "content" or "filePath", not both').toResponse(),
+        );
+      }
+      if (!args.content && !args.filePath) {
+        return errorResponse(
+          validationError('Must provide either "content" or "filePath"').toResponse(),
+        );
+      }
+
+      let content: string;
+      let isBase64: boolean | undefined;
+
+      if (args.filePath) {
+        const fileResult = readFileAsBase64(args.filePath, DRIVE_MAX_UPLOAD_BYTES);
+        if ('error' in fileResult) {
+          return errorResponse(validationError(fileResult.error).toResponse());
+        }
+        content = fileResult.data;
+        isBase64 = true;
+      } else {
+        content = args.content as string;
+        isBase64 = args.isBase64;
+      }
 
       try {
         const client = new DriveClient(accountStore, args.accountId);
@@ -210,14 +250,14 @@ export function registerDriveTools(
           isBase64?: boolean;
         } = {
           name: args.name,
-          content: args.content,
+          content,
           mimeType: args.mimeType,
         };
         if (args.parentFolderId !== undefined) {
           input.parentFolderId = args.parentFolderId;
         }
-        if (args.isBase64 !== undefined) {
-          input.isBase64 = args.isBase64;
+        if (isBase64 !== undefined) {
+          input.isBase64 = isBase64;
         }
         const file = await client.uploadFile(input);
 

@@ -30,6 +30,7 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 
 **Gmail Write (with confirm gate):**
 - `gmail_create_draft` - create draft
+- `gmail_create_draft_with_attachment` - create draft with attachments (supports `filePath` for large files)
 - `gmail_update_draft` - modify draft
 - `gmail_get_draft` - preview draft before sending
 - `gmail_delete_draft` - delete draft
@@ -51,7 +52,7 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `drive_list_files` - list files in folder
 - `drive_get_file` - get file metadata
 - `drive_get_file_content` - download/export file content
-- `drive_upload_file` - upload a file
+- `drive_upload_file` - upload a file (supports `filePath` for large files)
 - `drive_create_folder` - create folder
 - `drive_move_file` - move file to folder
 - `drive_copy_file` - copy a file
