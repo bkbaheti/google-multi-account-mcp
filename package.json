@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.3.0",
+  "version": "0.3.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bkbaheti/google-multi-account-mcp.git"
@@ -19,7 +19,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc && node scripts/generate-build-info.js",
+    "build": "tsc && chmod +x dist/cli.js && node scripts/generate-build-info.js",
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
     "test": "vitest run",
