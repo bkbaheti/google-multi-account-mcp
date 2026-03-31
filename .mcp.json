@@ -53,7 +53,7 @@
       "type": "http",
       "url": "https://docs.mcp.cloudflare.com/mcp"
     },
-    "google": {
+    "proGoogleMCP": {
       "type": "stdio",
       "command": "npx",
       "args": [

@@ -8,14 +8,14 @@ MCP Google is a local-first Model Context Protocol (MCP) server that gives AI as
 
 For Claude Code CLI:
 ```
-claude mcp add google -- npx -y @procedure-tech/mcp-google
+claude mcp add proGoogleMCP -- npx -y @procedure-tech/mcp-google
 ```
 
 For Claude Desktop, add to claude_desktop_config.json:
 ```json
 {
   "mcpServers": {
-    "google": {
+    "proGoogleMCP": {
       "command": "npx",
       "args": ["-y", "@procedure-tech/mcp-google"]
     }

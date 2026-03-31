@@ -22,7 +22,7 @@ NARRATION: "MCP Google Multi-Account is a local MCP server that connects
 AI assistants to Google Workspace. Let me show how it works with Claude Code CLI."
 
 ACTION: Show terminal
-TYPE: claude mcp add google -- npx -y @procedure-tech/mcp-google
+TYPE: claude mcp add proGoogleMCP -- npx -y @procedure-tech/mcp-google
 TYPE: claude
 
 NARRATION: "First, I'll connect a Google account."
@@ -137,7 +137,7 @@ Users can also revoke access from their Google Account Permissions page."
   ```json
   {
     "mcpServers": {
-      "google": {
+      "proGoogleMCP": {
         "command": "npx",
         "args": ["-y", "@procedure-tech/mcp-google"]
       }

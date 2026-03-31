@@ -491,12 +491,12 @@ footer {
 
   <h2>Quick Start</h2>
   <p><strong>Claude Code CLI:</strong></p>
-  <pre><code>claude mcp add google -- npx -y @anthropic/mcp-google</code></pre>
+  <pre><code>claude mcp add proGoogleMCP -- npx -y @anthropic/mcp-google</code></pre>
 
   <p><strong>Claude Desktop</strong> — add to your <code>claude_desktop_config.json</code>:</p>
   <pre><code>{
   "mcpServers": {
-    "google": {
+    "proGoogleMCP": {
       "command": "npx",
       "args": ["-y", "@anthropic/mcp-google"]
     }
@@ -727,14 +727,14 @@ No Google Cloud setup needed — just install and connect:
 
 **Claude Code CLI:**
 ```bash
-claude mcp add google -- npx -y @anthropic/mcp-google
+claude mcp add proGoogleMCP -- npx -y @anthropic/mcp-google
 ```
 
 **Claude Desktop** — add to `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "google": {
+    "proGoogleMCP": {
       "command": "npx",
       "args": ["-y", "@anthropic/mcp-google"]
     }

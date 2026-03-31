@@ -181,14 +181,14 @@ site/
 
 **Claude Code CLI** (unchanged):
 ```bash
-claude mcp add google -- npx -y @anthropic/mcp-google
+claude mcp add proGoogleMCP -- npx -y @anthropic/mcp-google
 ```
 
 **Claude Desktop** (`claude_desktop_config.json`, unchanged):
 ```json
 {
   "mcpServers": {
-    "google": {
+    "proGoogleMCP": {
       "command": "npx",
       "args": ["-y", "@anthropic/mcp-google"]
     }
