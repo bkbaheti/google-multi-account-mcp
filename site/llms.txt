@@ -1,0 +1,60 @@
+# MCP Google Multi-Account
+
+> Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.
+
+MCP Google is a local-first Model Context Protocol (MCP) server that gives AI assistants like Claude direct access to Google Workspace services. It runs entirely on the user's machine — tokens and data never leave their computer.
+
+## Install
+
+For Claude Code CLI:
+```
+claude mcp add google -- npx -y @procedure-tech/mcp-google
+```
+
+For Claude Desktop, add to claude_desktop_config.json:
+```json
+{
+  "mcpServers": {
+    "google": {
+      "command": "npx",
+      "args": ["-y", "@procedure-tech/mcp-google"]
+    }
+  }
+}
+```
+
+## Key Features
+
+- **Gmail**: Search, read, draft, send emails with safety gates (draft-first, confirm before send). Bulk download attachments. File path support for large attachments.
+- **Google Drive**: Search, list, upload, download, share files. File path support for large uploads.
+- **Google Calendar**: List, search, create, update events. Check free/busy, RSVP to invitations.
+- **Multi-Account**: Connect multiple Google accounts. Name them with aliases like "work" or "personal".
+- **Security**: Local-first, zero telemetry. Tiered permission scopes (readonly, compose, full). OAuth tokens stored locally.
+- **Zero Config**: No Google Cloud project needed. Install and go.
+
+## MCP Tools (55+)
+
+### Account Management
+- google_version, google_list_accounts, google_add_account, google_check_pending_auth, google_remove_account, google_set_account_labels, google_set_account_alias, google_set_account_description
+
+### Gmail (19 tools)
+- gmail_search_messages, gmail_get_message, gmail_get_thread
+- gmail_create_draft, gmail_create_draft_with_attachment, gmail_update_draft, gmail_get_draft, gmail_delete_draft, gmail_send_draft, gmail_reply_in_thread
+- gmail_list_labels, gmail_modify_labels, gmail_mark_read_unread, gmail_archive, gmail_trash, gmail_untrash
+- gmail_bulk_save_attachments
+
+### Google Drive (12 tools)
+- drive_search_files, drive_list_files, drive_get_file, drive_get_file_content
+- drive_upload_file, drive_create_folder, drive_move_file, drive_copy_file, drive_rename_file, drive_trash_file
+- drive_share_file, drive_update_permissions
+
+### Google Calendar (10 tools)
+- calendar_list_calendars, calendar_list_events, calendar_get_event, calendar_search_events, calendar_freebusy
+- calendar_create_event, calendar_update_event, calendar_delete_event, calendar_rsvp, calendar_move_event
+
+## Links
+
+- npm: https://www.npmjs.com/package/@procedure-tech/mcp-google
+- GitHub: https://github.com/bkbaheti/google-multi-account-mcp
+- Website: https://mcp-google.procedure.tech
+- Built by: https://procedure.tech

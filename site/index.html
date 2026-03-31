@@ -4,7 +4,61 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MCP Google Multi-Account | Connect AI to Your Google Workspace</title>
-  <meta name="description" content="Local MCP server for multi-Google-account access. Gmail, Drive, Calendar — zero config, local tokens, open source.">
+  <meta name="description" content="Open-source MCP server that gives AI assistants like Claude access to Gmail, Google Drive, and Google Calendar. Multi-account, local-first, zero config. Install with one command.">
+  <link rel="canonical" href="https://mcp-google.procedure.tech/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="MCP Google — Connect AI to Your Google Workspace">
+  <meta property="og:description" content="Open-source MCP server for Gmail, Google Drive, and Google Calendar. Multi-account support, local-first security, 55+ tools. Install with one command.">
+  <meta property="og:url" content="https://mcp-google.procedure.tech/">
+  <meta property="og:site_name" content="MCP Google">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="MCP Google — Connect AI to Your Google Workspace">
+  <meta name="twitter:description" content="Open-source MCP server for Gmail, Drive, and Calendar. 55+ tools, multi-account, zero config.">
+
+  <!-- Additional SEO -->
+  <meta name="keywords" content="MCP server, Google Workspace, Gmail API, Google Drive API, Google Calendar API, Claude, AI assistant, Model Context Protocol, open source, multi-account, OAuth">
+  <meta name="robots" content="index, follow">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "MCP Google Multi-Account",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
+    "url": "https://mcp-google.procedure.tech/",
+    "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
+    "softwareVersion": "0.3.0",
+    "license": "https://opensource.org/licenses/MIT",
+    "author": {
+      "@type": "Organization",
+      "name": "Procedure Technologies",
+      "url": "https://procedure.tech"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "featureList": [
+      "Gmail read, draft, send with safety gates",
+      "Google Drive search, upload, share",
+      "Google Calendar events, scheduling, RSVP",
+      "Multi-account support with aliases",
+      "Local-first — tokens never leave your machine",
+      "Tiered permission scopes",
+      "55+ MCP tools"
+    ]
+  }
+  </script>
+
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -19,6 +73,7 @@
       </a>
       <div class="nav-links">
         <a href="/" class="active">Home</a>
+        <a href="#releases">Releases</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
         <a href="https://github.com/bkbaheti/google-multi-account-mcp">GitHub</a>
@@ -167,6 +222,81 @@
           <div class="step-number">3</div>
           <h3>Use</h3>
           <p>Ask Claude to read emails, search Drive, check your calendar. It just works.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section id="releases" class="section">
+      <div class="section-label">Release Notes</div>
+      <h2>What's new</h2>
+      <p>Latest updates and improvements.</p>
+
+      <div class="releases">
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.3.0</span>
+            <span class="release-tag">Latest</span>
+            <span class="release-date">March 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type feat">feat</span> File path support for attachments and uploads — the server reads large files directly from disk, bypassing AI context window limits</li>
+            <li><span class="change-type feat">feat</span> Gmail drafts with attachments now accept local file paths (PDFs, images, any file up to 25MB)</li>
+            <li><span class="change-type feat">feat</span> Drive file uploads accept local file paths (up to 50MB)</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.2.4</span>
+            <span class="release-date">March 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type fix">fix</span> Made keytar optional to fix slow <code>npx</code> startup times</li>
+            <li><span class="change-type fix">fix</span> Configured OIDC trusted publishing for npm</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.2.0</span>
+            <span class="release-date">March 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type feat">feat</span> GitHub Actions CI/CD pipeline for automated npm publishing</li>
+            <li><span class="change-type feat">feat</span> Account aliases — name accounts "work" or "personal" instead of UUIDs</li>
+            <li><span class="change-type feat">feat</span> Account descriptions for human-readable context</li>
+            <li><span class="change-type feat">feat</span> Bulk attachment download to local disk</li>
+            <li><span class="change-type feat">feat</span> Auto-open browser for OAuth flow</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.1.3</span>
+            <span class="release-date">March 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type feat">feat</span> Google Calendar support — 10 tools for events, scheduling, RSVP</li>
+            <li><span class="change-type feat">feat</span> Google Drive support — 12 tools for files, folders, sharing</li>
+            <li><span class="change-type feat">feat</span> Shorthand query syntax for Drive search</li>
+            <li><span class="change-type fix">fix</span> Param coercion for MCP client compatibility</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.1.1</span>
+            <span class="release-date">February 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type feat">feat</span> Zero-config OAuth — no Google Cloud project needed</li>
+            <li><span class="change-type feat">feat</span> Gmail read, draft, send with confirmation gates</li>
+            <li><span class="change-type feat">feat</span> Inbox management — labels, archive, trash</li>
+            <li><span class="change-type feat">feat</span> Tiered permission scopes (readonly, compose, full)</li>
+            <li><span class="change-type feat">feat</span> Static site with privacy policy and terms</li>
+          </ul>
         </div>
       </div>
     </section>
