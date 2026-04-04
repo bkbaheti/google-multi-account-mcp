@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://mcp-google.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.3.0",
+    "softwareVersion": "0.3.3",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -236,8 +236,20 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.3.0</span>
+            <span class="release-version">v0.3.3</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">April 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type fix">fix</span> Attachment downloads now work reliably — fixed a bug where Gmail's ephemeral attachment IDs caused every download to fail</li>
+            <li><span class="change-type fix">fix</span> <code>gmail_get_attachment</code> now saves files directly to disk instead of returning binary data in the response</li>
+            <li><span class="change-type fix">fix</span> <code>gmail_bulk_save_attachments</code> no longer fails due to the same stale ID issue</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.3.0</span>
             <span class="release-date">March 2026</span>
           </div>
           <ul class="release-changes">
