@@ -719,23 +719,17 @@ export class GmailClient {
     }
   }
 
-  // Get attachment data by ID
-  async getAttachment(messageId: string, attachmentId: string): Promise<AttachmentData> {
+  // Get attachment data using fresh AttachmentInfo from the same API call.
+  // Gmail attachment IDs are ephemeral — they change on every messages.get() call,
+  // so callers must pass info from a recent listAttachments() call, not a stale ID.
+  async getAttachment(messageId: string, attachmentInfo: AttachmentInfo): Promise<AttachmentData> {
     const gmail = await this.getGmail();
 
-    // First get attachment info from the message
-    const attachments = await this.listAttachments(messageId);
-    const attachmentInfo = attachments.find((a) => a.attachmentId === attachmentId);
-
-    if (!attachmentInfo) {
-      throw new Error(`Attachment not found: ${attachmentId}`);
-    }
-
-    // Fetch the attachment data
+    // Fetch the attachment data using the fresh attachment ID
     const response = await gmail.users.messages.attachments.get({
       userId: 'me',
       messageId,
-      id: attachmentId,
+      id: attachmentInfo.attachmentId,
     });
 
     const data = response.data.data;
@@ -747,7 +741,7 @@ export class GmailClient {
     const base64Data = data.replace(/-/g, '+').replace(/_/g, '/');
 
     return {
-      attachmentId,
+      attachmentId: attachmentInfo.attachmentId,
       filename: attachmentInfo.filename,
       mimeType: attachmentInfo.mimeType,
       size: attachmentInfo.size,

@@ -988,32 +988,69 @@ export function registerGmailTools(
     },
   );
 
-  // gmail_get_attachment - Download attachment by ID
+  // gmail_get_attachment - Download attachment to local disk
   server.registerTool(
     'gmail_get_attachment',
     {
       description:
-        'Download an attachment from a Gmail message. Returns base64-encoded data. Use gmail_list_attachments first to get attachment IDs. Requires readonly scope.',
+        'Download an attachment from a Gmail message and save it to local disk. Use gmail_list_attachments first to get filenames. Returns file path and metadata (no binary data in response). Requires readonly scope.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID containing the attachment'),
-        attachmentId: z.string().describe('The attachment ID to download'),
+        filename: z
+          .string()
+          .describe('The attachment filename (from gmail_list_attachments)'),
+        outputDir: z
+          .string()
+          .describe(
+            'Local directory path to save the attachment to (will be created if needed)',
+          ),
       },
     },
     async (args) => {
       const validation = validateAccountScope(args.accountId, 'mail_readonly');
       if ('error' in validation) return validation.error;
 
+      const outputDir = args.outputDir;
+      if (outputDir.includes('..')) {
+        return errorResponse(
+          validationError('Output directory must not contain ".." path segments').toResponse(),
+        );
+      }
+
       try {
+        if (!existsSync(outputDir)) {
+          mkdirSync(outputDir, { recursive: true });
+        }
+
         const client = new GmailClient(accountStore, args.accountId);
-        const attachment = await client.getAttachment(args.messageId, args.attachmentId);
+
+        // Fetch message to get fresh attachment IDs (Gmail IDs are ephemeral per API call)
+        const attachments = await client.listAttachments(args.messageId);
+        const attachmentInfo = attachments.find((a) => a.filename === args.filename);
+
+        if (!attachmentInfo) {
+          const available = attachments.map((a) => a.filename).join(', ');
+          return errorResponse(
+            validationError(
+              `Attachment "${args.filename}" not found. Available: ${available}`,
+            ).toResponse(),
+          );
+        }
+
+        const attachment = await client.getAttachment(args.messageId, attachmentInfo);
+
+        // Save to disk
+        const safeName = args.filename.replace(/[/\\]/g, '_');
+        const filePath = join(outputDir, safeName);
+        const buffer = Buffer.from(attachment.data, 'base64');
+        writeFileSync(filePath, buffer);
 
         return successResponse({
-          attachmentId: attachment.attachmentId,
-          filename: attachment.filename,
+          filename: safeName,
+          path: filePath,
           mimeType: attachment.mimeType,
-          size: attachment.size,
-          data: attachment.data,
+          size: buffer.length,
         });
       } catch (error) {
         return errorResponse(toMcpError(error));
@@ -1489,7 +1526,7 @@ export function registerGmailTools(
 
             for (const attachment of attachments) {
               try {
-                const data = await client.getAttachment(messageId, attachment.attachmentId);
+                const data = await client.getAttachment(messageId, attachment);
 
                 // Sanitize filename — strip path separators
                 const safeName = attachment.filename.replace(/[/\\]/g, '_');

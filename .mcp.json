@@ -55,10 +55,17 @@
     },
     "proGoogleMCP": {
       "type": "stdio",
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "@procedure-tech/mcp-google"
+        "/home/baheti/projects/google-multi-account-mcp/dist/cli.js"
+      ],
+      "env": {}
+    },
+    "localProGoogleMCP": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/baheti/projects/google-multi-account-mcp/dist/cli.js"
       ],
       "env": {}
     }
