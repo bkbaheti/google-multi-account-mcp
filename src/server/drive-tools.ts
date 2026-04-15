@@ -12,11 +12,14 @@ import {
 import type { ScopeTier } from '../types/index.js';
 import { DRIVE_MAX_UPLOAD_BYTES, coerceArgs, readFileAsBase64 } from '../utils/index.js';
 
+/** Default character limit for drive_get_file_content preview */
+const DEFAULT_PREVIEW_MAX_CHARS = 10_000;
+
 /**
  * Convert common shorthand query formats to Google Drive API query syntax.
  * For example, "type:document" becomes "mimeType='application/vnd.google-apps.document'".
  */
-function normalizeDriveQuery(query: string): string {
+export function normalizeDriveQuery(query: string): string {
   const typeMap: Record<string, string> = {
     document: 'application/vnd.google-apps.document',
     spreadsheet: 'application/vnd.google-apps.spreadsheet',
@@ -29,7 +32,13 @@ function normalizeDriveQuery(query: string): string {
     audio: 'audio/',
   };
 
-  return query.replace(/type:(\w+)/gi, (_match, type) => {
+  // Replace content:keyword with fullText contains 'keyword'
+  let normalized = query.replace(/content:(\S+)/gi, (_match, keyword) => {
+    return `fullText contains '${keyword}'`;
+  });
+
+  // Replace type:doctype with mimeType queries
+  normalized = normalized.replace(/type:(\w+)/gi, (_match, type) => {
     const mime = typeMap[type.toLowerCase()];
     if (mime) {
       // Use "contains" for partial mime types (image/, video/, audio/)
@@ -40,6 +49,8 @@ function normalizeDriveQuery(query: string): string {
     }
     return _match; // Leave unknown types as-is
   });
+
+  return normalized;
 }
 
 export function registerDriveTools(
@@ -57,7 +68,7 @@ export function registerDriveTools(
     'drive_search_files',
     {
       description:
-        'Search for files in Google Drive. Supports shorthand syntax like type:document, type:spreadsheet, type:pdf, type:folder, type:image, type:video, type:audio (automatically converted to mimeType queries). Also accepts raw Drive API query syntax (e.g., "name contains \'report\'", "mimeType=\'application/pdf\'").',
+        'Search for files in Google Drive. Supports shorthand syntax: type:document, type:spreadsheet, type:pdf, type:folder, type:image, type:video, type:audio (converted to mimeType queries), and content:keyword (searches inside file contents via fullText). Also accepts raw Drive API query syntax (e.g., "name contains \'report\'").',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         query: z.string().describe('Drive search query (e.g., "name contains \'report\'")'),
@@ -151,12 +162,44 @@ export function registerDriveTools(
     },
   );
 
-  // drive_get_file_content - Download/export file content
+  // drive_get_file_content - Preview file content (truncated to protect context)
   server.registerTool(
     'drive_get_file_content',
     {
       description:
-        'Download or export file content from Google Drive. Google Workspace files (Docs, Sheets, Slides) are exported to plain text/CSV. Binary files are returned as base64.',
+        'Get a preview of file content from Google Drive (default: first 10,000 characters). Returns truncated text with metadata (fileName, totalSize, truncated flag). For full content use drive_get_full_file_content. For large/binary files prefer drive_download_file to save to disk instead.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID, alias, or email'),
+        fileId: z.string().describe('The file ID'),
+        maxChars: z
+          .number()
+          .optional()
+          .describe('Maximum characters to return (default: 10000). Set higher only if you need more context.'),
+      },
+    },
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { maxChars: 'number' });
+      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new DriveClient(accountStore, args.accountId);
+        const maxChars = args.maxChars ?? DEFAULT_PREVIEW_MAX_CHARS;
+        const result = await client.getFileContent(args.fileId, { maxChars });
+
+        return successResponse(result);
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // drive_get_full_file_content - Full file content (use sparingly)
+  server.registerTool(
+    'drive_get_full_file_content',
+    {
+      description:
+        'WARNING: Returns the ENTIRE file content — can be very large and may overload your context window. Only use this when you genuinely need the complete file (e.g., for analysis or transformation). Prefer drive_get_file_content (preview) for browsing, or drive_download_file to save large files to disk.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID'),
@@ -169,6 +212,41 @@ export function registerDriveTools(
       try {
         const client = new DriveClient(accountStore, args.accountId);
         const result = await client.getFileContent(args.fileId);
+
+        return successResponse(result);
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // drive_download_file - Download file to local disk
+  server.registerTool(
+    'drive_download_file',
+    {
+      description:
+        'Download a file from Google Drive and save it to a local directory. Google Workspace files (Docs, Sheets, Slides) are exported to standard formats (txt, csv, etc.).',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID, alias, or email'),
+        fileId: z.string().describe('The file ID to download'),
+        outputDir: z
+          .string()
+          .describe('Absolute path to the local directory where the file will be saved'),
+        fileName: z
+          .string()
+          .optional()
+          .describe(
+            'Override the file name (default: original name from Drive). For Workspace files, include the export extension.',
+          ),
+      },
+    },
+    async (args) => {
+      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new DriveClient(accountStore, args.accountId);
+        const result = await client.downloadFileToLocal(args.fileId, args.outputDir, args.fileName);
 
         return successResponse(result);
       } catch (error) {

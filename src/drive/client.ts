@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { type drive_v3, google } from 'googleapis';
 import type { AccountStore } from '../auth/index.js';
@@ -121,8 +123,19 @@ export class DriveClient {
     return this.convertFile(response.data);
   }
 
-  async getFileContent(fileId: string): Promise<{ content: string; mimeType: string }> {
+  async getFileContent(
+    fileId: string,
+    options: { maxChars?: number } = {},
+  ): Promise<{
+    content: string;
+    mimeType: string;
+    fileName: string;
+    totalSize: number;
+    truncated: boolean;
+    encoding: 'utf-8' | 'base64';
+  }> {
     const drive = await this.getDrive();
+    const maxChars = options.maxChars;
 
     // First get file metadata to determine type
     const file = await this.getFile(fileId);
@@ -135,9 +148,15 @@ export class DriveClient {
         mimeType: exportMapping.mimeType,
       });
 
+      const full = String(response.data);
+      const truncated = maxChars !== undefined && full.length > maxChars;
       return {
-        content: String(response.data),
+        content: truncated ? full.slice(0, maxChars) : full,
         mimeType: exportMapping.mimeType,
+        fileName: file.name,
+        totalSize: full.length,
+        truncated,
+        encoding: 'utf-8',
       };
     }
 
@@ -155,16 +174,87 @@ export class DriveClient {
       file.mimeType === 'application/json' ||
       file.mimeType === 'application/xml'
     ) {
+      const full = buffer.toString('utf-8');
+      const truncated = maxChars !== undefined && full.length > maxChars;
       return {
-        content: buffer.toString('utf-8'),
+        content: truncated ? full.slice(0, maxChars) : full,
         mimeType: file.mimeType,
+        fileName: file.name,
+        totalSize: full.length,
+        truncated,
+        encoding: 'utf-8',
       };
     }
 
-    // Binary files: return as base64
+    // Binary files: return as base64 (no truncation — use drive_download_file instead)
+    const b64 = buffer.toString('base64');
     return {
-      content: buffer.toString('base64'),
+      content: b64,
       mimeType: file.mimeType,
+      fileName: file.name,
+      totalSize: buffer.length,
+      truncated: false,
+      encoding: 'base64',
+    };
+  }
+
+  async downloadFileToLocal(
+    fileId: string,
+    outputDir: string,
+    fileName?: string,
+  ): Promise<{ filePath: string; fileName: string; mimeType: string; sizeBytes: number }> {
+    const drive = await this.getDrive();
+
+    // Validate output directory path
+    if (outputDir.includes('..')) {
+      throw new Error('Output directory must not contain ".." path segments');
+    }
+
+    const resolvedDir = resolve(outputDir);
+    mkdirSync(resolvedDir, { recursive: true });
+
+    // Get file metadata
+    const file = await this.getFile(fileId);
+    const exportMapping = EXPORT_MIME_TYPES[file.mimeType];
+
+    let buffer: Buffer;
+    let mimeType: string;
+    let outputFileName: string;
+
+    if (exportMapping) {
+      // Google Workspace file: export it
+      const response = await drive.files.export({
+        fileId,
+        mimeType: exportMapping.mimeType,
+      });
+
+      buffer = Buffer.from(String(response.data), 'utf-8');
+      mimeType = exportMapping.mimeType;
+      // Use provided name or derive from file name + export extension
+      outputFileName = fileName ?? `${file.name}.${exportMapping.extension}`;
+    } else {
+      // Regular file: download it
+      const response = await drive.files.get(
+        { fileId, alt: 'media' },
+        { responseType: 'arraybuffer' },
+      );
+
+      buffer = Buffer.from(response.data as ArrayBuffer);
+      mimeType = file.mimeType;
+      outputFileName = fileName ?? file.name;
+    }
+
+    // Sanitize filename (strip path separators)
+    const safeName = basename(outputFileName).replace(/[/\\]/g, '_');
+    const filePath = join(resolvedDir, safeName);
+
+    writeFileSync(filePath, buffer);
+
+    return {
+      filePath,
+      fileName: safeName,
+      mimeType,
+      sizeBytes: buffer.length,
     };
   }
 

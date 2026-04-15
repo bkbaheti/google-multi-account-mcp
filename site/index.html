@@ -10,14 +10,14 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="MCP Google — Connect AI to Your Google Workspace">
-  <meta property="og:description" content="Open-source MCP server for Gmail, Google Drive, and Google Calendar. Multi-account support, local-first security, 55+ tools. Install with one command.">
+  <meta property="og:description" content="Open-source MCP server for Gmail, Google Drive, and Google Calendar. Multi-account support, local-first security, 57+ tools. Install with one command.">
   <meta property="og:url" content="https://mcp-google.procedure.tech/">
   <meta property="og:site_name" content="MCP Google">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="MCP Google — Connect AI to Your Google Workspace">
-  <meta name="twitter:description" content="Open-source MCP server for Gmail, Drive, and Calendar. 55+ tools, multi-account, zero config.">
+  <meta name="twitter:description" content="Open-source MCP server for Gmail, Drive, and Calendar. 57+ tools, multi-account, zero config.">
 
   <!-- Additional SEO -->
   <meta name="keywords" content="MCP server, Google Workspace, Gmail API, Google Drive API, Google Calendar API, Claude, AI assistant, Model Context Protocol, open source, multi-account, OAuth">
@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://mcp-google.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.3.3",
+    "softwareVersion": "0.4.0",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -54,7 +54,7 @@
       "Multi-account support with aliases",
       "Local-first — tokens never leave your machine",
       "Tiered permission scopes",
-      "55+ MCP tools"
+      "57+ MCP tools"
     ]
   }
   </script>
@@ -112,7 +112,7 @@
       </div>
 
       <div class="stats-bar animate-in delay-4">
-        <div class="stat"><strong>55+</strong> Tools</div>
+        <div class="stat"><strong>57+</strong> Tools</div>
         <div class="stat"><strong>3</strong> Google Services</div>
         <div class="stat"><strong>9</strong> Permission Levels</div>
         <div class="stat"><strong>MIT</strong> Open Source</div>
@@ -172,7 +172,7 @@
         <div class="feature-card animate-in delay-1">
           <span class="card-icon">&#128193;</span>
           <h3>Google Drive</h3>
-          <p>Search across all your Drive files, read documents, upload new files, and manage sharing — all from your AI assistant.</p>
+          <p>Search files by name or content, preview documents without context overload, download to disk, upload from disk, and manage sharing.</p>
         </div>
 
         <div class="feature-card animate-in delay-2">
@@ -236,8 +236,21 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.3.3</span>
+            <span class="release-version">v0.4.0</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">April 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type feat">feat</span> Smart file previews — <code>drive_get_file_content</code> now returns truncated content (default 10k chars) to protect AI context windows from overload</li>
+            <li><span class="change-type feat">feat</span> New <code>drive_get_full_file_content</code> tool for when you genuinely need the complete file</li>
+            <li><span class="change-type feat">feat</span> New <code>drive_download_file</code> tool — download files from Drive directly to local disk</li>
+            <li><span class="change-type feat">feat</span> Full-text search shorthand — use <code>content:keyword</code> in <code>drive_search_files</code> to search inside file contents</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.3.3</span>
             <span class="release-date">April 2026</span>
           </div>
           <ul class="release-changes">

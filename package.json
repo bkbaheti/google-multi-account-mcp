@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.3.3",
+  "version": "0.4.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bkbaheti/google-multi-account-mcp.git"
@@ -42,6 +42,12 @@
   "author": "Anthropic",
   "license": "MIT",
   "packageManager": "pnpm@10.28.2",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "keytar"
+    ]
+  },
   "engines": {
     "node": ">=20.0.0"
   },

@@ -1,5 +1,15 @@
 # Tasks
 
+## v0.4.0 - Drive Content Safety & Search (COMPLETED)
+
+- [DONE] `drive_get_file_content` now returns truncated preview (default 10k chars) with metadata (fileName, totalSize, truncated flag)
+- [DONE] New `drive_get_full_file_content` tool for complete content (with agent warning)
+- [DONE] New `drive_download_file` tool to save Drive files to local disk
+- [DONE] `content:keyword` shorthand in `drive_search_files` for full-text search
+- [DONE] Fixed pnpm "Ignored build scripts" warning for esbuild/keytar
+
+---
+
 ## Current Phase: 14 - Calendar Support (COMPLETED)
 
 ---
