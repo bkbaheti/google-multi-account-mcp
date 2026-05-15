@@ -1,5 +1,14 @@
 # Tasks
 
+## v0.4.1 - Outbound MIME Fixes (COMPLETED)
+
+- [DONE] RFC 2047 encode non-ASCII subjects on the simple draft/send/reply path (em-dash, smart quotes, accents no longer mojibake)
+- [DONE] Plain-text bodies sent with RFC 3676 `format=flowed; delsp=no` and soft-break markers so clients reflow paragraphs
+- [DONE] Added `bodyFormat: "text" | "html"` parameter to `gmail_create_draft`, `gmail_update_draft`, `gmail_create_draft_with_attachment`, `gmail_reply_in_thread`
+- [DONE] Routed simple-draft path through `buildRawMessage` so subject encoding and body formatting are consistent across attachment / non-attachment flows
+
+---
+
 ## v0.4.0 - Drive Content Safety & Search (COMPLETED)
 
 - [DONE] `drive_get_file_content` now returns truncated preview (default 10k chars) with metadata (fileName, totalSize, truncated flag)

@@ -308,6 +308,99 @@ describe('GmailClient drafts', () => {
     });
   });
 
+  describe('MIME bug fixes (subject encoding + body format)', () => {
+    it('createDraft RFC 2047 encodes non-ASCII subjects', async () => {
+      // Bug repro: em-dash in subject was sent as raw UTF-8, decoded as Latin-1
+      // by some clients, and rendered as "â€"".
+      mockDraftsCreate.mockResolvedValue({
+        data: { id: 'd1', message: { id: 'm1', threadId: 't1' } },
+      });
+
+      await client.createDraft({
+        to: 'to@example.com',
+        subject: 'Q3 update — final',
+        body: 'Body',
+      });
+
+      const raw = mockDraftsCreate.mock.calls[0][0].requestBody.message.raw;
+      const decoded = Buffer.from(raw, 'base64url').toString('utf-8');
+      expect(decoded).toMatch(/Subject: =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=/);
+      expect(decoded).not.toContain('Subject: Q3 update —');
+    });
+
+    it('createDraft unwraps plain-text bodies and declares format=flowed', async () => {
+      mockDraftsCreate.mockResolvedValue({
+        data: { id: 'd1', message: { id: 'm1', threadId: 't1' } },
+      });
+
+      await client.createDraft({
+        to: 'to@example.com',
+        subject: 'Test',
+        body: 'Line one of a paragraph.\nLine two of the same paragraph.',
+      });
+
+      const raw = mockDraftsCreate.mock.calls[0][0].requestBody.message.raw;
+      const decoded = Buffer.from(raw, 'base64url').toString('utf-8');
+      expect(decoded).toContain('Content-Type: text/plain; charset=utf-8; format=flowed; delsp=no');
+      // Intra-paragraph hard wrap is physically joined so Gmail reflows.
+      expect(decoded).toContain('Line one of a paragraph. Line two of the same paragraph.');
+    });
+
+    it('createDraft honors bodyFormat: "html"', async () => {
+      mockDraftsCreate.mockResolvedValue({
+        data: { id: 'd1', message: { id: 'm1', threadId: 't1' } },
+      });
+
+      await client.createDraft({
+        to: 'to@example.com',
+        subject: 'Test',
+        body: '<p>Hello</p>',
+        bodyFormat: 'html',
+      });
+
+      const raw = mockDraftsCreate.mock.calls[0][0].requestBody.message.raw;
+      const decoded = Buffer.from(raw, 'base64url').toString('utf-8');
+      expect(decoded).toContain('Content-Type: text/html; charset=utf-8');
+      expect(decoded).not.toContain('format=flowed');
+    });
+
+    it('updateDraft RFC 2047 encodes non-ASCII subjects', async () => {
+      mockDraftsUpdate.mockResolvedValue({
+        data: { id: 'd1', message: { id: 'm1', threadId: 't1' } },
+      });
+
+      await client.updateDraft('d1', {
+        to: 'to@example.com',
+        subject: 'Café meeting — Tuesday',
+        body: 'Body',
+      });
+
+      const raw = mockDraftsUpdate.mock.calls[0][0].requestBody.message.raw;
+      const decoded = Buffer.from(raw, 'base64url').toString('utf-8');
+      expect(decoded).toMatch(/Subject: =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=/);
+    });
+
+    it('replyToThread propagates bodyFormat: "html" to the draft', async () => {
+      mockDraftsCreate.mockResolvedValue({
+        data: { id: 'd1', message: { id: 'm1', threadId: 't1' } },
+      });
+
+      await client.replyToThread({
+        threadId: 't1',
+        to: 'to@example.com',
+        subject: 'Re: hi',
+        body: '<p>Reply</p>',
+        inReplyTo: '<orig@example.com>',
+        references: '<orig@example.com>',
+        bodyFormat: 'html',
+      });
+
+      const raw = mockDraftsCreate.mock.calls[0][0].requestBody.message.raw;
+      const decoded = Buffer.from(raw, 'base64url').toString('utf-8');
+      expect(decoded).toContain('Content-Type: text/html; charset=utf-8');
+    });
+  });
+
   describe('replyToThread', () => {
     it('creates a reply draft in an existing thread', async () => {
       const mockDraftResponse = {

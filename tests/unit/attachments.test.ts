@@ -5,6 +5,7 @@ import {
   encodeMimeHeader,
   type MimeAttachment,
   type MimeMessageOptions,
+  toFlowedFormat,
 } from '../../src/gmail/index.js';
 
 describe('Attachment and MIME utilities', () => {
@@ -26,6 +27,42 @@ describe('Attachment and MIME utilities', () => {
     it('handles mixed ASCII and non-ASCII', () => {
       const encoded = encodeMimeHeader('Hello 世界');
       expect(encoded).toMatch(/^=\?UTF-8\?B\?.+\?=$/);
+    });
+  });
+
+  describe('toFlowedFormat', () => {
+    it('joins intra-paragraph lines with a space so clients rewrap to viewport', () => {
+      expect(toFlowedFormat('line a\nline b')).toBe('line a line b');
+    });
+
+    it('keeps blank lines as paragraph separators', () => {
+      expect(toFlowedFormat('p1\n\np2')).toBe('p1\r\n\r\np2');
+    });
+
+    it('collapses repeated blank lines to a single paragraph break', () => {
+      expect(toFlowedFormat('p1\n\n\n\np2')).toBe('p1\r\n\r\np2');
+    });
+
+    it('trims trailing whitespace from each line before joining', () => {
+      expect(toFlowedFormat('line a   \nline b')).toBe('line a line b');
+    });
+
+    it('leaves a single line unchanged', () => {
+      expect(toFlowedFormat('only line')).toBe('only line');
+    });
+
+    it('normalizes mixed CRLF/CR/LF input', () => {
+      expect(toFlowedFormat('a\r\nb\rc\nd')).toBe('a b c d');
+    });
+
+    it('unwraps a hard-wrapped 76-col paragraph into a single line', () => {
+      const wrapped = [
+        'This is a deliberately long paragraph designed to exceed seventy-six',
+        'characters so that the receiving client wraps it on its own.',
+      ].join('\n');
+      expect(toFlowedFormat(wrapped)).toBe(
+        'This is a deliberately long paragraph designed to exceed seventy-six characters so that the receiving client wraps it on its own.',
+      );
     });
   });
 
@@ -234,6 +271,114 @@ describe('Attachment and MIME utilities', () => {
       expect(boundary2).toBeDefined();
       // Very unlikely to be the same with random generation
       // (but not guaranteed - this is a probabilistic test)
+    });
+
+    it('RFC 2047 encodes non-ASCII subjects (em-dash, smart quotes)', () => {
+      // Bug repro: em-dash in subject was being sent without encoded-word wrapping,
+      // causing recipients to see "â€"" instead of "—".
+      const options: MimeMessageOptions = {
+        to: 'to@example.com',
+        subject: 'Q3 update — final draft',
+        body: 'Body',
+      };
+
+      const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
+
+      // The raw subject line must be an encoded-word, not a UTF-8 literal.
+      expect(decoded).toMatch(/Subject: =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=/);
+      // Confirm the encoded payload round-trips to the original characters.
+      const match = decoded.match(/Subject: =\?UTF-8\?B\?([A-Za-z0-9+/=]+)\?=/);
+      expect(match).not.toBeNull();
+      const subjectRoundTrip = Buffer.from(match?.[1] ?? '', 'base64').toString('utf-8');
+      expect(subjectRoundTrip).toBe('Q3 update — final draft');
+      // And the raw bytes for the em-dash (U+2014 = 0xE2 0x80 0x94) must NOT appear unencoded.
+      expect(decoded).not.toContain('Subject: Q3 update —');
+    });
+
+    it('encodes subjects with smart quotes via RFC 2047', () => {
+      const options: MimeMessageOptions = {
+        to: 'to@example.com',
+        subject: 'Re: “Quick question”',
+        body: 'Body',
+      };
+
+      const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
+      expect(decoded).toMatch(/Subject: =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?=/);
+      expect(decoded).not.toContain('Subject: Re: “');
+    });
+
+    it('plain-text body is sent with format=flowed (RFC 3676)', () => {
+      // Bug repro: plain-text bodies render with visible mid-paragraph line breaks
+      // because format=flowed wasn't declared. Receiving clients reflow soft breaks
+      // (lines ending with a single space) to the viewport width when format=flowed
+      // is present, fixing the hard-wrap artifact.
+      const options: MimeMessageOptions = {
+        to: 'to@example.com',
+        subject: 'Test',
+        body: 'Short body',
+      };
+
+      const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
+      expect(decoded).toContain('Content-Type: text/plain; charset=utf-8; format=flowed; delsp=no');
+    });
+
+    it('unwraps intra-paragraph hard wraps into single lines so Gmail reflows', () => {
+      // Gmail's web view does not honor RFC 3676 soft breaks, so callers that
+      // hard-wrap at 76 chars would otherwise see visible mid-sentence breaks.
+      // We join those continuation lines and let Gmail wrap at the viewport.
+      const options: MimeMessageOptions = {
+        to: 'to@example.com',
+        subject: 'Test',
+        body: [
+          'This is the first line of a paragraph that was hard-wrapped.',
+          'It continues on a second line which should be reflowed.',
+          '',
+          'This is a second paragraph.',
+        ].join('\n'),
+      };
+
+      const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
+      expect(decoded).toContain(
+        'This is the first line of a paragraph that was hard-wrapped. It continues on a second line which should be reflowed.',
+      );
+      expect(decoded).toContain('\r\n\r\nThis is a second paragraph.');
+      // The original hard wrap inside the paragraph must NOT survive.
+      expect(decoded).not.toContain('hard-wrapped.\r\nIt continues');
+    });
+
+    it('html bodyFormat sends as text/html without flowed transformation', () => {
+      const options: MimeMessageOptions = {
+        to: 'to@example.com',
+        subject: 'Test',
+        body: '<p>Line one</p>\n<p>Line two</p>',
+        bodyFormat: 'html',
+      };
+
+      const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
+      expect(decoded).toContain('Content-Type: text/html; charset=utf-8');
+      expect(decoded).not.toContain('format=flowed');
+      // HTML body must not be space-stuffed for flowed semantics
+      expect(decoded).toContain('<p>Line one</p>');
+      expect(decoded).not.toContain('<p>Line one</p> \r\n');
+    });
+
+    it('format=flowed applies to multipart messages with attachments', () => {
+      const options: MimeMessageOptions = {
+        to: 'to@example.com',
+        subject: 'Test',
+        body: 'Hard-wrapped line one.\nContinuation line two.',
+        attachments: [
+          {
+            filename: 'file.txt',
+            mimeType: 'text/plain',
+            data: Buffer.from('Content').toString('base64'),
+          },
+        ],
+      };
+
+      const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
+      expect(decoded).toContain('Content-Type: text/plain; charset=utf-8; format=flowed; delsp=no');
+      expect(decoded).toContain('Hard-wrapped line one. Continuation line two.');
     });
 
     it('closes multipart message with proper boundary terminator', () => {

@@ -12,7 +12,7 @@ import {
 } from '../errors/index.js';
 import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
 import type { ScopeTier } from '../types/index.js';
-import { GMAIL_MAX_ATTACHMENT_BYTES, coerceArgs, readFileAsBase64 } from '../utils/index.js';
+import { coerceArgs, GMAIL_MAX_ATTACHMENT_BYTES, readFileAsBase64 } from '../utils/index.js';
 
 export function registerGmailTools(
   server: McpServer,
@@ -217,7 +217,7 @@ export function registerGmailTools(
         accountId: z.string().describe('The Google account ID, alias, or email'),
         to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
         subject: z.string().describe('Email subject'),
-        body: z.string().describe('Email body (plain text)'),
+        body: z.string().describe('Email body (plain text, or HTML when bodyFormat="html")'),
         cc: z.string().optional().describe('CC email address(es), comma-separated for multiple'),
         bcc: z.string().optional().describe('BCC email address(es), comma-separated for multiple'),
         threadId: z
@@ -226,6 +226,12 @@ export function registerGmailTools(
           .describe('Thread ID to reply in (for continuing a conversation)'),
         inReplyTo: z.string().optional().describe('Message-ID of the message being replied to'),
         references: z.string().optional().describe('References header for threading'),
+        bodyFormat: z
+          .enum(['text', 'html'])
+          .optional()
+          .describe(
+            'Body content type. "text" (default) sends as text/plain with RFC 3676 format=flowed so clients reflow paragraphs instead of rendering hard wraps. "html" sends as text/html for HTML-formatted bodies.',
+          ),
       },
     },
     async (args) => {
@@ -244,6 +250,7 @@ export function registerGmailTools(
         if (args.threadId) draftInput.threadId = args.threadId;
         if (args.inReplyTo) draftInput.inReplyTo = args.inReplyTo;
         if (args.references) draftInput.references = args.references;
+        if (args.bodyFormat) draftInput.bodyFormat = args.bodyFormat;
 
         const draft = await client.createDraft(draftInput);
 
@@ -273,12 +280,18 @@ export function registerGmailTools(
         draftId: z.string().describe('The draft ID to update'),
         to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
         subject: z.string().describe('Email subject'),
-        body: z.string().describe('Email body (plain text)'),
+        body: z.string().describe('Email body (plain text, or HTML when bodyFormat="html")'),
         cc: z.string().optional().describe('CC email address(es), comma-separated for multiple'),
         bcc: z.string().optional().describe('BCC email address(es), comma-separated for multiple'),
         threadId: z.string().optional().describe('Thread ID (for continuing a conversation)'),
         inReplyTo: z.string().optional().describe('Message-ID of the message being replied to'),
         references: z.string().optional().describe('References header for threading'),
+        bodyFormat: z
+          .enum(['text', 'html'])
+          .optional()
+          .describe(
+            'Body content type. "text" (default) sends as text/plain with RFC 3676 format=flowed so clients reflow paragraphs instead of rendering hard wraps. "html" sends as text/html for HTML-formatted bodies.',
+          ),
       },
     },
     async (args) => {
@@ -297,6 +310,7 @@ export function registerGmailTools(
         if (args.threadId) draftInput.threadId = args.threadId;
         if (args.inReplyTo) draftInput.inReplyTo = args.inReplyTo;
         if (args.references) draftInput.references = args.references;
+        if (args.bodyFormat) draftInput.bodyFormat = args.bodyFormat;
 
         const draft = await client.updateDraft(args.draftId, draftInput);
 
@@ -456,11 +470,17 @@ export function registerGmailTools(
         threadId: z.string().describe('The thread ID to reply in'),
         to: z.string().describe('Recipient email address(es)'),
         subject: z.string().describe('Email subject (typically Re: original subject)'),
-        body: z.string().describe('Reply body (plain text)'),
+        body: z.string().describe('Reply body (plain text, or HTML when bodyFormat="html")'),
         inReplyTo: z.string().describe('Message-ID of the message being replied to'),
         references: z.string().describe('References header (Message-ID chain for threading)'),
         cc: z.string().optional().describe('CC email address(es)'),
         bcc: z.string().optional().describe('BCC email address(es)'),
+        bodyFormat: z
+          .enum(['text', 'html'])
+          .optional()
+          .describe(
+            'Body content type. "text" (default) sends as text/plain with RFC 3676 format=flowed so clients reflow paragraphs instead of rendering hard wraps. "html" sends as text/html for HTML-formatted bodies.',
+          ),
         sendImmediately: z
           .boolean()
           .optional()
@@ -490,6 +510,7 @@ export function registerGmailTools(
         };
         if (args.cc) replyInput.cc = args.cc;
         if (args.bcc) replyInput.bcc = args.bcc;
+        if (args.bodyFormat) replyInput.bodyFormat = args.bodyFormat;
 
         // Create the draft
         const draft = await client.replyToThread(replyInput);
@@ -997,14 +1018,10 @@ export function registerGmailTools(
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         messageId: z.string().describe('The message ID containing the attachment'),
-        filename: z
-          .string()
-          .describe('The attachment filename (from gmail_list_attachments)'),
+        filename: z.string().describe('The attachment filename (from gmail_list_attachments)'),
         outputDir: z
           .string()
-          .describe(
-            'Local directory path to save the attachment to (will be created if needed)',
-          ),
+          .describe('Local directory path to save the attachment to (will be created if needed)'),
       },
     },
     async (args) => {
@@ -1068,7 +1085,7 @@ export function registerGmailTools(
         accountId: z.string().describe('The Google account ID, alias, or email'),
         to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
         subject: z.string().describe('Email subject'),
-        body: z.string().describe('Email body (plain text)'),
+        body: z.string().describe('Email body (plain text, or HTML when bodyFormat="html")'),
         attachments: z
           .array(
             z.object({
@@ -1094,6 +1111,12 @@ export function registerGmailTools(
         threadId: z.string().optional().describe('Thread ID to reply in'),
         inReplyTo: z.string().optional().describe('Message-ID being replied to'),
         references: z.string().optional().describe('References header for threading'),
+        bodyFormat: z
+          .enum(['text', 'html'])
+          .optional()
+          .describe(
+            'Body content type. "text" (default) sends as text/plain with RFC 3676 format=flowed so clients reflow paragraphs instead of rendering hard wraps. "html" sends as text/html for HTML-formatted bodies.',
+          ),
       },
     },
     async (args) => {
@@ -1149,6 +1172,7 @@ export function registerGmailTools(
           inReplyTo: args.inReplyTo,
           references: args.references,
           attachments: resolvedAttachments,
+          bodyFormat: args.bodyFormat,
         });
 
         return successResponse({
@@ -1491,9 +1515,7 @@ export function registerGmailTools(
 
       // Limit batch size
       if (args.messageIds.length > 50) {
-        return errorResponse(
-          validationError('Maximum 50 messages per bulk download').toResponse(),
-        );
+        return errorResponse(validationError('Maximum 50 messages per bulk download').toResponse());
       }
 
       // Sanitize output path — reject paths with traversal or hidden segments

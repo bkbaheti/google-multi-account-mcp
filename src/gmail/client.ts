@@ -1,6 +1,11 @@
 import { type gmail_v1, google } from 'googleapis';
 import type { AccountStore } from '../auth/index.js';
-import { buildDraftWithAttachments, type MimeAttachment } from './mime.js';
+import {
+  type BodyFormat,
+  buildDraftWithAttachments,
+  buildRawMessage,
+  type MimeAttachment,
+} from './mime.js';
 
 export interface MessageHeader {
   name: string;
@@ -75,6 +80,7 @@ export interface DraftInput {
   threadId?: string;
   inReplyTo?: string;
   references?: string;
+  bodyFormat?: BodyFormat;
 }
 
 export interface SentMessage {
@@ -92,6 +98,7 @@ export interface ReplyInput {
   bcc?: string;
   inReplyTo: string;
   references: string;
+  bodyFormat?: BodyFormat;
 }
 
 export interface SearchResult {
@@ -365,6 +372,7 @@ export class GmailClient {
     };
     if (input.cc) draftInput.cc = input.cc;
     if (input.bcc) draftInput.bcc = input.bcc;
+    if (input.bodyFormat) draftInput.bodyFormat = input.bodyFormat;
 
     return this.createDraft(draftInput);
   }
@@ -372,32 +380,19 @@ export class GmailClient {
   private buildDraftRequestBody(input: DraftInput): {
     message: { raw: string; threadId?: string };
   } {
-    const lines: string[] = [];
-    lines.push(`To: ${input.to}`);
-    if (input.cc) {
-      lines.push(`Cc: ${input.cc}`);
-    }
-    if (input.bcc) {
-      lines.push(`Bcc: ${input.bcc}`);
-    }
-    lines.push(`Subject: ${input.subject}`);
-    if (input.inReplyTo) {
-      lines.push(`In-Reply-To: ${input.inReplyTo}`);
-    }
-    if (input.references) {
-      lines.push(`References: ${input.references}`);
-    }
-    lines.push('Content-Type: text/plain; charset=utf-8');
-    lines.push('');
-    lines.push(input.body);
-
-    const rawMessage = lines.join('\r\n');
-    const encodedMessage = Buffer.from(rawMessage, 'utf-8').toString('base64url');
+    const raw = buildRawMessage({
+      to: input.to,
+      subject: input.subject,
+      body: input.body,
+      cc: input.cc,
+      bcc: input.bcc,
+      inReplyTo: input.inReplyTo,
+      references: input.references,
+      bodyFormat: input.bodyFormat,
+    });
 
     const requestBody: { message: { raw: string; threadId?: string } } = {
-      message: {
-        raw: encodedMessage,
-      },
+      message: { raw },
     };
 
     if (input.threadId) {
@@ -760,6 +755,7 @@ export class GmailClient {
     inReplyTo?: string | undefined;
     references?: string | undefined;
     attachments: MimeAttachment[];
+    bodyFormat?: BodyFormat | undefined;
   }): Promise<Draft> {
     const gmail = await this.getGmail();
 
@@ -773,6 +769,7 @@ export class GmailClient {
         inReplyTo: input.inReplyTo,
         references: input.references,
         attachments: input.attachments,
+        bodyFormat: input.bodyFormat,
       },
       input.threadId,
     );

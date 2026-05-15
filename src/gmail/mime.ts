@@ -6,6 +6,8 @@ export interface MimeAttachment {
   data: string; // base64-encoded
 }
 
+export type BodyFormat = 'text' | 'html';
+
 export interface MimeMessageOptions {
   to: string;
   subject: string;
@@ -15,6 +17,7 @@ export interface MimeMessageOptions {
   inReplyTo?: string | undefined;
   references?: string | undefined;
   attachments?: MimeAttachment[] | undefined;
+  bodyFormat?: BodyFormat | undefined;
 }
 
 // Generate a unique boundary string for MIME multipart
@@ -48,8 +51,46 @@ function chunkBase64(data: string, lineLength = 76): string {
   return lines.join('\r\n');
 }
 
+// Unwrap a plain-text body so each paragraph is a single long line that the
+// recipient's client will rewrap to its viewport. Gmail's web view ignores
+// RFC 3676 format=flowed soft breaks, so we have to physically join the lines
+// — leaving 76-col hard wraps in the body causes visible mid-sentence breaks
+// in the rendered email. Blank lines remain paragraph separators.
+//
+// Tradeoff: callers that want literal line breaks (lists, addresses, code,
+// signatures) should pass bodyFormat: "html" with explicit <br> or <pre>.
+export function toFlowedFormat(body: string): string {
+  const normalized = body.replace(/\r\n?/g, '\n');
+  return normalized
+    .split(/\n{2,}/)
+    .map((paragraph) =>
+      paragraph
+        .split('\n')
+        .map((line) => line.trimEnd())
+        .filter((line) => line !== '')
+        .join(' '),
+    )
+    .filter((paragraph) => paragraph !== '')
+    .join('\r\n\r\n');
+}
+
+function bodyContentType(bodyFormat: BodyFormat): string {
+  if (bodyFormat === 'html') {
+    return 'Content-Type: text/html; charset=utf-8';
+  }
+  return 'Content-Type: text/plain; charset=utf-8; format=flowed; delsp=no';
+}
+
+function formatBody(body: string, bodyFormat: BodyFormat): string {
+  if (bodyFormat === 'html') {
+    return body;
+  }
+  return toFlowedFormat(body);
+}
+
 // Build a simple text message (no attachments)
 function buildSimpleMessage(options: MimeMessageOptions): string {
+  const bodyFormat: BodyFormat = options.bodyFormat ?? 'text';
   const lines: string[] = [];
 
   lines.push(`To: ${options.to}`);
@@ -67,16 +108,17 @@ function buildSimpleMessage(options: MimeMessageOptions): string {
     lines.push(`References: ${options.references}`);
   }
   lines.push('MIME-Version: 1.0');
-  lines.push('Content-Type: text/plain; charset=utf-8');
-  lines.push('Content-Transfer-Encoding: 7bit');
+  lines.push(bodyContentType(bodyFormat));
+  lines.push('Content-Transfer-Encoding: 8bit');
   lines.push('');
-  lines.push(options.body);
+  lines.push(formatBody(options.body, bodyFormat));
 
   return lines.join('\r\n');
 }
 
 // Build a multipart message with attachments
 function buildMultipartMessage(options: MimeMessageOptions): string {
+  const bodyFormat: BodyFormat = options.bodyFormat ?? 'text';
   const boundary = generateBoundary();
   const lines: string[] = [];
 
@@ -99,12 +141,12 @@ function buildMultipartMessage(options: MimeMessageOptions): string {
   lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
   lines.push('');
 
-  // Text body part
+  // Body part
   lines.push(`--${boundary}`);
-  lines.push('Content-Type: text/plain; charset=utf-8');
-  lines.push('Content-Transfer-Encoding: 7bit');
+  lines.push(bodyContentType(bodyFormat));
+  lines.push('Content-Transfer-Encoding: 8bit');
   lines.push('');
-  lines.push(options.body);
+  lines.push(formatBody(options.body, bodyFormat));
   lines.push('');
 
   // Attachment parts

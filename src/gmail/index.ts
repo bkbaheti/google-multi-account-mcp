@@ -26,9 +26,11 @@ export {
 } from './client.js';
 
 export {
+  type BodyFormat,
   buildDraftWithAttachments,
   buildRawMessage,
   encodeMimeHeader,
   type MimeAttachment,
   type MimeMessageOptions,
+  toFlowedFormat,
 } from './mime.js';
