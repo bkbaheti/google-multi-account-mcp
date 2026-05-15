@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://mcp-google.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.4.0",
+    "softwareVersion": "0.4.1",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -236,8 +236,20 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.4.0</span>
+            <span class="release-version">v0.4.1</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">May 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type fix">fix</span> Non-ASCII subjects (em-dash, smart quotes, accents) now RFC 2047 encoded so recipients see them correctly instead of mojibake like <code>â€"</code></li>
+            <li><span class="change-type fix">fix</span> Plain-text bodies no longer render with visible mid-sentence line breaks in Gmail — hard-wrapped paragraphs are unwrapped before send so clients reflow to the viewport</li>
+            <li><span class="change-type feat">feat</span> New <code>bodyFormat: "text" | "html"</code> parameter on <code>gmail_create_draft</code>, <code>gmail_update_draft</code>, <code>gmail_create_draft_with_attachment</code>, and <code>gmail_reply_in_thread</code> for HTML-formatted email</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.4.0</span>
             <span class="release-date">April 2026</span>
           </div>
           <ul class="release-changes">
