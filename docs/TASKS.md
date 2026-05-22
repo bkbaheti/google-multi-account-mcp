@@ -1,5 +1,15 @@
 # Tasks
 
+## v0.4.2 - Re-authentication Support (COMPLETED)
+
+- [DONE] `google_reauth_account` MCP tool: re-run OAuth on an existing account while preserving accountId, alias, description, labels
+- [DONE] `AccountStore.startReauthAccount` + reauth-aware `checkPendingAuth` (updates scopes & lastUsedAt, no duplicate row)
+- [DONE] OAuth callback verifies the authorized Google email matches the existing account (prevents accidental account swap)
+- [DONE] Optional scopeTier / scopeTiers on reauth so tier upgrades don't require remove+add
+- [DONE] Unit tests for reauth flow (preservation, scope updates, email mismatch protection)
+
+---
+
 ## v0.4.1 - Outbound MIME Fixes (COMPLETED)
 
 - [DONE] RFC 2047 encode non-ASCII subjects on the simple draft/send/reply path (em-dash, smart quotes, accents no longer mojibake)

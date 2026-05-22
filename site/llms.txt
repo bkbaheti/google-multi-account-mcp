@@ -35,7 +35,7 @@ For Claude Desktop, add to claude_desktop_config.json:
 ## MCP Tools (55+)
 
 ### Account Management
-- google_version, google_list_accounts, google_add_account, google_check_pending_auth, google_remove_account, google_set_account_labels, google_set_account_alias, google_set_account_description
+- google_version, google_list_accounts, google_add_account, google_check_pending_auth, google_reauth_account, google_remove_account, google_set_account_labels, google_set_account_alias, google_set_account_description
 
 ### Gmail (19 tools)
 - gmail_search_messages, gmail_get_message, gmail_get_thread

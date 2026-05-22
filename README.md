@@ -353,6 +353,8 @@ You don't need to memorize tool names - just describe what you want. Here's what
 |-------------|--------------|
 | "Show my Google accounts" | Lists all connected accounts |
 | "Add my Gmail account" | Starts OAuth flow to add account |
+| "Reconnect my work account" | Re-runs OAuth, keeps alias/labels/ID |
+| "Upgrade my account to drive_full" | Reauths with new scope tier |
 | "Remove my work account" | Disconnects account and revokes tokens |
 | "Label this account as 'personal'" | Tags account for easy reference |
 
@@ -435,7 +437,7 @@ These prompts guide Claude through complex workflows:
 <summary>Click to see exact tool names (for advanced users)</summary>
 
 **Account Management:**
-- `google_version`, `google_list_accounts`, `google_add_account`, `google_check_pending_auth`, `google_remove_account`, `google_set_account_labels`
+- `google_version`, `google_list_accounts`, `google_add_account`, `google_check_pending_auth`, `google_reauth_account`, `google_remove_account`, `google_set_account_labels`, `google_set_account_alias`, `google_set_account_description`
 
 **Gmail Reading:**
 - `gmail_search_messages`, `gmail_get_message`, `gmail_get_messages_batch`, `gmail_get_thread`, `gmail_list_attachments`, `gmail_get_attachment`

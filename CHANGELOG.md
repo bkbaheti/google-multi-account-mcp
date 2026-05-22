@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.4.2 (May 2026)
+
+- **feat:** New `google_reauth_account` tool for re-running OAuth on an existing account. Use when a refresh token is invalidated (password change, revoked access, expired grant) or to upgrade/change scope tiers without losing the account ID, alias, description, or labels. Verifies the authorized Google account matches the existing email so reauth can't accidentally swap accounts.
+
 ## v0.4.1 (May 2026)
 
 - **fix:** Subjects with non-ASCII characters (em-dash, smart quotes, accents, etc.) are now RFC 2047 encoded so Gmail and other clients display them correctly instead of mojibake like `â€"`. Previously only the attachment-bearing path encoded subjects; the plain draft/send/reply path sent raw UTF-8.

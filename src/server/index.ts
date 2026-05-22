@@ -292,6 +292,105 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
+  // google_reauth_account - Re-authenticate an existing Google account
+  server.registerTool(
+    'google_reauth_account',
+    {
+      description:
+        'Re-authenticate an existing Google account. Use this when a refresh token is invalidated (e.g., password change, revoked access, expired grant) or when you need to add/change scope tiers without losing the account ID, alias, description, or labels. Returns an authorization URL. After the user authorizes, call google_check_pending_auth with the sessionId. If no scope tier is given, the account\'s current scopes are reused. The authorized Google account must match the existing email; otherwise the reauth fails.',
+      inputSchema: {
+        accountId: z
+          .string()
+          .describe('The account ID, alias, or email of the account to re-authenticate'),
+        scopeTier: z
+          .enum([
+            'mail_readonly',
+            'mail_compose',
+            'mail_full',
+            'mail_settings',
+            'drive_readonly',
+            'drive_full',
+            'calendar_readonly',
+            'calendar_full',
+            'all',
+            // Legacy aliases
+            'readonly',
+            'compose',
+            'full',
+            'settings',
+          ])
+          .optional()
+          .describe('Optional: change scope tier on reauth (use scopeTiers for multiple)'),
+        scopeTiers: z
+          .array(
+            z.enum([
+              'mail_readonly',
+              'mail_compose',
+              'mail_full',
+              'mail_settings',
+              'drive_readonly',
+              'drive_full',
+              'calendar_readonly',
+              'calendar_full',
+              'all',
+              // Legacy aliases
+              'readonly',
+              'compose',
+              'full',
+              'settings',
+            ]),
+          )
+          .optional()
+          .describe('Optional: combine multiple tiers on reauth'),
+      },
+    },
+    async (args) => {
+      const account = accountStore.resolveAccount(args.accountId);
+      if (!account) {
+        return errorResponse(accountNotFound(args.accountId).toResponse());
+      }
+
+      const scopeTierOrTiers: ScopeTier | ScopeTier[] | undefined = args.scopeTiers
+        ? ((args.scopeTiers as string[]).map(migrateTierName) as ScopeTier[])
+        : args.scopeTier
+          ? migrateTierName(args.scopeTier as string)
+          : undefined;
+
+      try {
+        const result = accountStore.startReauthAccount(account.id, scopeTierOrTiers);
+        if ('error' in result) {
+          return errorResponse(accountNotFound(args.accountId).toResponse());
+        }
+        const session = result.session;
+
+        // Auto-open browser, best-effort
+        open(session.authUrl).catch(() => {});
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: [
+                `Re-authorization required for ${account.email}. Opening your browser...`,
+                "If it didn't open, use this URL:",
+                '',
+                session.authUrl,
+                '',
+                `Session ID: ${session.sessionId}`,
+                '',
+                'Sign in with the SAME Google account; the reauth will fail otherwise.',
+                'After authorizing, call google_check_pending_auth with the sessionId above.',
+                'This session expires in 5 minutes.',
+              ].join('\n'),
+            },
+          ],
+        };
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
   // google_remove_account - Remove a Google account
   server.registerTool(
     'google_remove_account',

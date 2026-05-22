@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://mcp-google.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.4.1",
+    "softwareVersion": "0.4.2",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -236,8 +236,19 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.4.1</span>
+            <span class="release-version">v0.4.2</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">May 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type feat">feat</span> New <code>google_reauth_account</code> tool — re-run OAuth on an existing account when a refresh token is invalidated, or to upgrade scope tiers, without losing the account ID, alias, description, or labels</li>
+            <li><span class="change-type feat">feat</span> Reauth verifies the authorized Google account matches the existing email, preventing accidental account swaps</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.4.1</span>
             <span class="release-date">May 2026</span>
           </div>
           <ul class="release-changes">

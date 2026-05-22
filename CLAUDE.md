@@ -18,6 +18,7 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `google_list_accounts` - list connected accounts
 - `google_add_account` - start OAuth flow (returns auth URL + session ID)
 - `google_check_pending_auth` - check/complete pending auth session
+- `google_reauth_account` - re-run OAuth on an existing account (preserves ID, alias, description, labels; optionally change scope tier)
 - `google_remove_account` - delete account + tokens
 - `google_set_account_labels` - tag accounts
 - `google_set_account_alias` - set friendly alias (e.g., "work") for use in all tool calls

@@ -34,6 +34,15 @@ export interface PendingAuthSession {
   result?: OAuthResult;
   error?: string;
   createdAt: number;
+  // Reauth fields: when set, the callback reuses this accountId instead of
+  // generating a new one, and verifies the authorized email matches.
+  existingAccountId?: string;
+  existingEmail?: string;
+}
+
+export interface StartAuthOptions {
+  existingAccountId?: string;
+  existingEmail?: string;
 }
 
 // Store pending auth sessions (in-memory, cleared on restart)
@@ -66,8 +75,10 @@ export class GoogleOAuth {
   /**
    * Start auth flow asynchronously - returns immediately with auth URL.
    * The callback server runs in the background and updates the session status.
+   * Pass options.existingAccountId to reuse that account ID on completion
+   * (used by reauth so the alias/description/labels survive).
    */
-  startAuthFlowAsync(scopes: string[]): PendingAuthSession {
+  startAuthFlowAsync(scopes: string[], options?: StartAuthOptions): PendingAuthSession {
     cleanupExpiredSessions();
 
     const oauth2Client = this.createOAuth2Client();
@@ -85,6 +96,10 @@ export class GoogleOAuth {
     params.set('access_type', 'offline');
     params.set('prompt', 'consent');
     params.set('scope', scopes.join(' '));
+    // For reauth, hint Google to surface the right account picker entry.
+    if (options?.existingEmail) {
+      params.set('login_hint', options.existingEmail);
+    }
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
     const session: PendingAuthSession = {
@@ -94,6 +109,8 @@ export class GoogleOAuth {
       state,
       status: 'pending',
       createdAt: Date.now(),
+      ...(options?.existingAccountId ? { existingAccountId: options.existingAccountId } : {}),
+      ...(options?.existingEmail ? { existingEmail: options.existingEmail } : {}),
     };
 
     pendingAuthSessions.set(sessionId, session);
@@ -189,8 +206,13 @@ export class GoogleOAuth {
           throw new Error('Could not retrieve user email');
         }
 
-        // Generate account ID
-        const accountId = crypto.randomUUID();
+        // Reauth: verify email matches and reuse the existing account ID.
+        if (session.existingEmail && session.existingEmail !== email) {
+          throw new Error(
+            `Reauth email mismatch: expected ${session.existingEmail}, got ${email}. Pick the correct Google account in the consent screen.`,
+          );
+        }
+        const accountId = session.existingAccountId ?? crypto.randomUUID();
 
         // Store tokens
         const tokenData: TokenData = {

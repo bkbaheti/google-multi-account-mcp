@@ -98,6 +98,38 @@ export class AccountStore {
   }
 
   /**
+   * Start re-authenticating an existing account. Preserves the account ID
+   * (and therefore alias, description, labels). On completion, tokens and
+   * scopes on the existing account record are updated. If scopeTierOrTiers
+   * is omitted, the account's current scope tier is reused.
+   *
+   * Returns { session } on success or { error } if the account is unknown.
+   */
+  startReauthAccount(
+    accountIdOrAlias: string,
+    scopeTierOrTiers?: ScopeTier | ScopeTier[],
+  ): { session: PendingAuthSession } | { error: string } {
+    const account = this.resolveAccount(accountIdOrAlias);
+    if (!account) {
+      return { error: `Account not found: ${accountIdOrAlias}` };
+    }
+
+    // Default to the account's existing scopes if no tier specified.
+    const scopes = scopeTierOrTiers
+      ? Array.isArray(scopeTierOrTiers)
+        ? mergeScopeTiers(scopeTierOrTiers)
+        : [...SCOPE_TIERS[scopeTierOrTiers]]
+      : [...account.scopes];
+
+    const oauth = this.getOAuth();
+    const session = oauth.startAuthFlowAsync(scopes, {
+      existingAccountId: account.id,
+      existingEmail: account.email,
+    });
+    return { session };
+  }
+
+  /**
    * Check if a pending auth session completed. If completed, saves the account.
    * Returns the session status and account if completed.
    */
@@ -122,7 +154,18 @@ export class AccountStore {
     }
 
     if (session.status === 'completed' && session.result) {
-      // Save the account to config
+      const config = loadConfig();
+      const existing = config.accounts.find((a) => a.id === session.result?.accountId);
+
+      if (existing) {
+        // Reauth (or duplicate check on add): keep alias, description, labels,
+        // and addedAt; refresh scopes and lastUsedAt.
+        existing.scopes = session.result.scopes;
+        existing.lastUsedAt = new Date().toISOString();
+        saveConfig(config);
+        return { status: 'completed', account: existing };
+      }
+
       const account: Account = {
         id: session.result.accountId,
         email: session.result.email,
@@ -130,14 +173,8 @@ export class AccountStore {
         scopes: session.result.scopes,
         addedAt: new Date().toISOString(),
       };
-
-      const config = loadConfig();
-      // Check if account already saved (avoid duplicates)
-      if (!config.accounts.find((a) => a.id === account.id)) {
-        config.accounts.push(account);
-        saveConfig(config);
-      }
-
+      config.accounts.push(account);
+      saveConfig(config);
       return { status: 'completed', account };
     }
 

@@ -100,6 +100,10 @@
     - Inputs: { label?: string, scopesTier?: 1|2|3 }
     - Behavior: launches OAuth flow, stores account entry
     - Returns: { accountId, email }
+  - `google_reauth_account`
+    - Inputs: { accountId, scopeTier?, scopeTiers? }
+    - Behavior: launches OAuth flow against an existing account; preserves accountId, alias, description, labels; verifies authorized email matches; refreshes tokens (and scopes if a tier is specified)
+    - Returns: { sessionId, authUrl } (poll via `google_check_pending_auth`)
   - `google_remove_account`
     - Inputs: { accountId }
     - Behavior: deletes account entry + token
