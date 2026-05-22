@@ -171,6 +171,30 @@ This CLAUDE.md contains inlined spec sections that may evolve.
 - Integration tests for MCP tool handlers
 - Test before marking task complete
 
+## Debugging "google_version returns an old version" (npx cache gotcha)
+
+`google_version` reads `dist/build-info.json` next to the server's compiled JS (see `loadBuildInfo` in `src/server/index.ts`), which is generated from `package.json` + `git rev-parse --short HEAD` by `scripts/generate-build-info.js` during `pnpm build`. So a stale version reading from `google_version` means one of two things:
+
+1. **The release was built BEFORE the version bump.** `pnpm build` reads `package.json` at run time. Always bump version FIRST, THEN run `pnpm build`. (CI does this correctly; it's only an issue for local builds.)
+2. **The MCP client is launching a stale npx-cached install** — most common. `npx -y @procedure-tech/mcp-google` hashes the package spec (not the resolved version) into `~/.npm/_npx/<hash>/`. After the first install, npm's metadata cache (default ~10 min TTL, but effectively unbounded for content-addressed installs once present) can keep serving the old version even after a new release. Restarting the MCP client is NOT enough.
+
+**Diagnosis steps when google_version is wrong:**
+
+1. Confirm the registry is current: `npm view @procedure-tech/mcp-google version dist-tags`.
+2. Verify the published tarball: `npm pack @procedure-tech/mcp-google@<version>` then inspect `package/dist/build-info.json` inside.
+3. Find what's actually running on the user's machine: `ps aux | grep mcp-google` — the path tells you which install is live.
+4. Inspect that install's `dist/build-info.json` directly.
+5. Search all caches: `find ~/.npm/_npx -name "build-info.json" -path "*mcp-google*" -exec cat {} \;`
+
+**Fix on the consumer side:**
+
+- Quit the MCP client (Claude Desktop / Claude Code, etc.) fully — the running server is what's holding the old code.
+- `rm -rf ~/.npm/_npx/<hash>` for any stale dirs found in step 5.
+- Recommend pinning to an exact version in the MCP config: `npx -y @procedure-tech/mcp-google@<exact-version>` — each version becomes a separate cache hash, so updates are never silently skipped.
+- Relaunch the MCP client.
+
+**Important: a single MCP server process cannot return different versions across tool calls.** If the user reports "tool X is from the new version but google_version shows the old version", they almost certainly have two MCP servers configured (e.g., one in `~/Library/Application Support/Claude/claude_desktop_config.json` and another in `~/.claude.json` or a project-local `.mcp.json`) — or are looking at two different UI surfaces. Enumerate every config before assuming a code bug.
+
 ## File Structure
 ```
 CLAUDE.md                 # This file (agent instructions + key spec)
