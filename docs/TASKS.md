@@ -1,5 +1,17 @@
 # Tasks
 
+## v0.4.3 - Shared Drive Support (COMPLETED)
+
+- [DONE] Pass `supportsAllDrives: true` on every Drive `files.*` / `permissions.*` call so reads, writes, and sharing work on Shared Drive items
+- [DONE] Pass `includeItemsFromAllDrives: true` and `corpora: 'allDrives'` on `files.list` so `drive_search_files` finds Shared Drive content by default
+- [DONE] New `drive_list_shared_drives` MCP tool wraps `drives.list` so agents can discover Shared Drive IDs
+- [DONE] New optional `driveId` arg on `drive_search_files` scopes a search to a single Shared Drive (`corpora: 'drive'` + `driveId`)
+- [DONE] Surface `driveId` on returned `DriveFile` objects so agents can tell which Shared Drive a file lives in
+- [DONE] Update `drive_list_files` description: pass a Shared Drive ID as `folderId` to list its top level
+- [DONE] Unit tests asserting Shared Drive flags are forwarded on every read/write/share method + new `listSharedDrives`
+
+---
+
 ## v0.4.2 - Re-authentication Support (COMPLETED)
 
 - [DONE] `google_reauth_account` MCP tool: re-run OAuth on an existing account while preserving accountId, alias, description, labels

@@ -452,7 +452,7 @@ These prompts guide Claude through complex workflows:
 - `gmail_list_filters`, `gmail_create_filter`, `gmail_delete_filter`, `gmail_get_vacation`, `gmail_set_vacation`
 
 **Google Drive:**
-- `drive_search_files`, `drive_list_files`, `drive_get_file`, `drive_get_file_content`, `drive_get_full_file_content`, `drive_download_file`, `drive_upload_file`, `drive_create_folder`, `drive_move_file`, `drive_copy_file`, `drive_rename_file`, `drive_trash_file`, `drive_share_file`, `drive_update_permissions`
+- `drive_list_shared_drives`, `drive_search_files`, `drive_list_files`, `drive_get_file`, `drive_get_file_content`, `drive_get_full_file_content`, `drive_download_file`, `drive_upload_file`, `drive_create_folder`, `drive_move_file`, `drive_copy_file`, `drive_rename_file`, `drive_trash_file`, `drive_share_file`, `drive_update_permissions` — all tools work with Shared Drives (Team Drives)
 
 **Google Calendar:**
 - `calendar_list_calendars`, `calendar_list_events`, `calendar_get_event`, `calendar_search_events`, `calendar_freebusy`, `calendar_create_event`, `calendar_update_event`, `calendar_delete_event`, `calendar_rsvp`, `calendar_move_event`

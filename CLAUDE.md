@@ -49,8 +49,9 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `gmail_bulk_save_attachments` - download attachments from multiple messages to local disk
 
 **Drive:**
-- `drive_search_files` - search files in Drive (supports `content:keyword` for full-text search)
-- `drive_list_files` - list files in folder
+- `drive_list_shared_drives` - list Shared Drives (Team Drives) the user is a member of
+- `drive_search_files` - search files in Drive (supports `content:keyword` for full-text search; searches across My Drive + all Shared Drives by default, or pass `driveId` to scope to one)
+- `drive_list_files` - list files in folder (pass a Shared Drive ID as `folderId` to list its top level)
 - `drive_get_file` - get file metadata
 - `drive_get_file_content` - preview file content (truncated, default 10k chars)
 - `drive_get_full_file_content` - get complete file content (use sparingly)

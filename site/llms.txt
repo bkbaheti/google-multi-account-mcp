@@ -43,8 +43,8 @@ For Claude Desktop, add to claude_desktop_config.json:
 - gmail_list_labels, gmail_modify_labels, gmail_mark_read_unread, gmail_archive, gmail_trash, gmail_untrash
 - gmail_bulk_save_attachments
 
-### Google Drive (12 tools)
-- drive_search_files, drive_list_files, drive_get_file, drive_get_file_content
+### Google Drive (15 tools) — Shared Drives (Team Drives) fully supported
+- drive_list_shared_drives, drive_search_files (optional driveId), drive_list_files, drive_get_file, drive_get_file_content, drive_get_full_file_content, drive_download_file
 - drive_upload_file, drive_create_folder, drive_move_file, drive_copy_file, drive_rename_file, drive_trash_file
 - drive_share_file, drive_update_permissions
 
