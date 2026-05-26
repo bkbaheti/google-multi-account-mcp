@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy this file to .mcp.json (gitignored) and update the absolute path. Used by Claude Code to spawn the locally-built MCP server for dev/testing instead of the published npm version.",
+  "mcpServers": {
+    "localProGoogleMCP": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "<ABSOLUTE_PATH_TO_REPO>/dist/cli.js"
+      ],
+      "env": {}
+    }
+  }
+}

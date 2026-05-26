@@ -3,3 +3,7 @@ dist/
 *.log
 .DS_Store
 coverage/
+
+# Local MCP client configuration (personal paths, may grow env-block secrets).
+# See .mcp.json.example for a template.
+.mcp.json
