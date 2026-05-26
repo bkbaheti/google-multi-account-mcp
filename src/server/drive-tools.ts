@@ -63,17 +63,59 @@ export function registerDriveTools(
 ): void {
   // === Read tools (require drive_readonly) ===
 
+  // drive_list_shared_drives - List Shared Drives the user is a member of
+  server.registerTool(
+    'drive_list_shared_drives',
+    {
+      description:
+        'List the Shared Drives (Team Drives) the user is a member of. Use the returned drive IDs as the folderId argument to drive_list_files to browse a Shared Drive, or as driveId on drive_search_files to scope a search.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID, alias, or email'),
+        pageSize: z
+          .number()
+          .optional()
+          .describe('Maximum number of drives to return (default: 50, max: 100)'),
+        pageToken: z.string().optional().describe('Token for pagination'),
+      },
+    },
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { pageSize: 'number' });
+      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new DriveClient(accountStore, args.accountId);
+        const options: { pageSize?: number; pageToken?: string } = {};
+        if (args.pageSize !== undefined) {
+          options.pageSize = args.pageSize;
+        }
+        if (args.pageToken !== undefined) {
+          options.pageToken = args.pageToken;
+        }
+        const result = await client.listSharedDrives(options);
+
+        return successResponse(result);
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
   // drive_search_files - Search for files using Drive search syntax
   server.registerTool(
     'drive_search_files',
     {
       description:
-        'Search for files in Google Drive. Supports shorthand syntax: type:document, type:spreadsheet, type:pdf, type:folder, type:image, type:video, type:audio (converted to mimeType queries), and content:keyword (searches inside file contents via fullText). Also accepts raw Drive API query syntax (e.g., "name contains \'report\'").',
+        'Search for files in Google Drive. Searches across My Drive and all Shared Drives the user is a member of by default; pass driveId to scope the search to a single Shared Drive (discover IDs with drive_list_shared_drives). Supports shorthand syntax: type:document, type:spreadsheet, type:pdf, type:folder, type:image, type:video, type:audio (converted to mimeType queries), and content:keyword (searches inside file contents via fullText). Also accepts raw Drive API query syntax (e.g., "name contains \'report\'").',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         query: z.string().describe('Drive search query (e.g., "name contains \'report\'")'),
         maxResults: z.number().optional().describe('Maximum number of results (default: 20)'),
         pageToken: z.string().optional().describe('Token for pagination'),
+        driveId: z
+          .string()
+          .optional()
+          .describe('Restrict search to a single Shared Drive (omit to search My Drive + all Shared Drives)'),
       },
     },
     async (rawArgs) => {
@@ -83,12 +125,15 @@ export function registerDriveTools(
 
       try {
         const client = new DriveClient(accountStore, args.accountId);
-        const options: { maxResults?: number; pageToken?: string } = {};
+        const options: { maxResults?: number; pageToken?: string; driveId?: string } = {};
         if (args.maxResults !== undefined) {
           options.maxResults = args.maxResults;
         }
         if (args.pageToken !== undefined) {
           options.pageToken = args.pageToken;
+        }
+        if (args.driveId !== undefined) {
+          options.driveId = args.driveId;
         }
         const normalizedQuery = normalizeDriveQuery(args.query);
         const result = await client.searchFiles(normalizedQuery, options);
@@ -105,10 +150,13 @@ export function registerDriveTools(
     'drive_list_files',
     {
       description:
-        'List files in a Google Drive folder. If no folderId is provided, lists files in the root folder.',
+        'List files in a Google Drive folder. If no folderId is provided, lists files in the user\'s My Drive root. To list a Shared Drive\'s top level, pass the Shared Drive ID as folderId (discover IDs with drive_list_shared_drives).',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
-        folderId: z.string().optional().describe('Folder ID to list (default: root)'),
+        folderId: z
+          .string()
+          .optional()
+          .describe('Folder ID, or a Shared Drive ID for its top level (default: My Drive root)'),
         maxResults: z.number().optional().describe('Maximum number of results (default: 20)'),
         pageToken: z.string().optional().describe('Token for pagination'),
       },

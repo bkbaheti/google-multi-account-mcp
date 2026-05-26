@@ -16,10 +16,22 @@ export interface DriveFile {
   owners?: Array<{ emailAddress: string; displayName?: string }>;
   shared?: boolean;
   trashed?: boolean;
+  driveId?: string;
 }
 
 export interface DriveFileList {
   files: DriveFile[];
+  nextPageToken?: string;
+}
+
+export interface SharedDrive {
+  id: string;
+  name: string;
+  createdTime?: string;
+}
+
+export interface SharedDriveList {
+  drives: SharedDrive[];
   nextPageToken?: string;
 }
 
@@ -33,7 +45,7 @@ export interface DrivePermission {
 }
 
 const FILE_FIELDS =
-  'id, name, mimeType, size, createdTime, modifiedTime, parents, webViewLink, owners, shared, trashed';
+  'id, name, mimeType, size, createdTime, modifiedTime, parents, webViewLink, owners, shared, trashed, driveId';
 
 // Google Workspace MIME type export mappings
 const EXPORT_MIME_TYPES: Record<string, { mimeType: string; extension: string }> = {
@@ -69,6 +81,7 @@ export class DriveClient {
       maxResults?: number;
       pageToken?: string;
       orderBy?: string;
+      driveId?: string;
     } = {},
   ): Promise<DriveFileList> {
     const drive = await this.getDrive();
@@ -77,8 +90,14 @@ export class DriveClient {
       q: query,
       fields: `nextPageToken, files(${FILE_FIELDS})`,
       pageSize: options.maxResults ?? 20,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+      corpora: options.driveId ? 'drive' : 'allDrives',
     };
 
+    if (options.driveId) {
+      params.driveId = options.driveId;
+    }
     if (options.pageToken) {
       params.pageToken = options.pageToken;
     }
@@ -112,12 +131,47 @@ export class DriveClient {
     return this.searchFiles(query, options);
   }
 
+  async listSharedDrives(
+    options: { pageSize?: number; pageToken?: string } = {},
+  ): Promise<SharedDriveList> {
+    const drive = await this.getDrive();
+
+    const params: drive_v3.Params$Resource$Drives$List = {
+      pageSize: options.pageSize ?? 50,
+      fields: 'nextPageToken, drives(id, name, createdTime)',
+    };
+
+    if (options.pageToken) {
+      params.pageToken = options.pageToken;
+    }
+
+    const response = await drive.drives.list(params);
+
+    const drives: SharedDrive[] = (response.data.drives ?? []).map((d) => {
+      const result: SharedDrive = {
+        id: d.id ?? '',
+        name: d.name ?? '',
+      };
+      if (d.createdTime) {
+        result.createdTime = d.createdTime;
+      }
+      return result;
+    });
+
+    const result: SharedDriveList = { drives };
+    if (response.data.nextPageToken) {
+      result.nextPageToken = response.data.nextPageToken;
+    }
+    return result;
+  }
+
   async getFile(fileId: string): Promise<DriveFile> {
     const drive = await this.getDrive();
 
     const response = await drive.files.get({
       fileId,
       fields: FILE_FIELDS,
+      supportsAllDrives: true,
     });
 
     return this.convertFile(response.data);
@@ -162,7 +216,7 @@ export class DriveClient {
 
     // Regular file: download it
     const response = await drive.files.get(
-      { fileId, alt: 'media' },
+      { fileId, alt: 'media', supportsAllDrives: true },
       { responseType: 'arraybuffer' },
     );
 
@@ -235,7 +289,7 @@ export class DriveClient {
     } else {
       // Regular file: download it
       const response = await drive.files.get(
-        { fileId, alt: 'media' },
+        { fileId, alt: 'media', supportsAllDrives: true },
         { responseType: 'arraybuffer' },
       );
 
@@ -289,6 +343,7 @@ export class DriveClient {
         body: Readable.from(buffer),
       },
       fields: FILE_FIELDS,
+      supportsAllDrives: true,
     });
 
     return this.convertFile(response.data);
@@ -309,6 +364,7 @@ export class DriveClient {
     const response = await drive.files.create({
       requestBody,
       fields: FILE_FIELDS,
+      supportsAllDrives: true,
     });
 
     return this.convertFile(response.data);
@@ -326,6 +382,7 @@ export class DriveClient {
       addParents: newParentId,
       removeParents: previousParents,
       fields: FILE_FIELDS,
+      supportsAllDrives: true,
     });
 
     return this.convertFile(response.data);
@@ -343,6 +400,7 @@ export class DriveClient {
       fileId,
       requestBody,
       fields: FILE_FIELDS,
+      supportsAllDrives: true,
     });
 
     return this.convertFile(response.data);
@@ -355,6 +413,7 @@ export class DriveClient {
       fileId,
       requestBody: { name },
       fields: FILE_FIELDS,
+      supportsAllDrives: true,
     });
 
     return this.convertFile(response.data);
@@ -367,6 +426,7 @@ export class DriveClient {
       fileId,
       requestBody: { trashed: true },
       fields: FILE_FIELDS,
+      supportsAllDrives: true,
     });
 
     return this.convertFile(response.data);
@@ -398,6 +458,7 @@ export class DriveClient {
       requestBody,
       sendNotificationEmail: sendNotification ?? false,
       fields: 'id, type, role, emailAddress, domain, displayName',
+      supportsAllDrives: true,
     });
 
     return this.convertPermission(response.data);
@@ -415,6 +476,7 @@ export class DriveClient {
       permissionId,
       requestBody: { role },
       fields: 'id, type, role, emailAddress, domain, displayName',
+      supportsAllDrives: true,
     });
 
     return this.convertPermission(response.data);
@@ -460,6 +522,9 @@ export class DriveClient {
     }
     if (f.trashed !== undefined && f.trashed !== null) {
       result.trashed = f.trashed;
+    }
+    if (f.driveId) {
+      result.driveId = f.driveId;
     }
 
     return result;
