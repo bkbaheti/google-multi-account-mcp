@@ -1,5 +1,31 @@
 # Tasks
 
+## Drive Comments & Export Format (PROPOSED)
+
+Requirement doc: `docs/plans/2026-06-08-drive-comments-and-export-format.md`.
+Two complementary capabilities; can ship independently.
+
+Motivation: a client left review comments on a shared contract Doc (SOW) and there is
+currently **no way** to read Google Doc comments through this MCP. Workspace Docs export
+to `text/plain` only (`src/drive/client.ts:50-56`), which strips all comments and
+formatting, and there is no comments tool at all.
+
+(A) Read Google Doc comments
+- [ ] New `drive_get_comments` tool wrapping Drive `comments.list` (explicit `fields` mask, `includeDeleted: false`, `supportsAllDrives: true`)
+- [ ] Output per comment: author, quoted/anchored text (`quotedFileContent.value`), content, created/modified time, `resolved` flag, inline replies
+- [ ] Optional `includeResolved` (default true), pagination via `pageToken`/`pageSize` (max 100)
+- [ ] Optional `drive_get_comment_replies` wrapping `drive.replies.list` for separately-paginated replies
+- [ ] Gate on `drive_readonly` tier — `drive.file` (`drive_full`) is insufficient for client-shared Docs (see scope caveat in requirement doc); add `driveGetComments: 'drive_readonly'` to the tier map (`src/types/index.ts:236-240`)
+- [ ] Unit tests asserting fields mask, `includeDeleted: false`, and shared-drive flags forwarded
+
+(B) Choose export format on download/export
+- [ ] Add optional `exportMimeType` to `drive_download_file` (and `downloadFileToLocal`) so Workspace files can export as e.g. `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`), preserving comments + formatting
+- [ ] Keep `EXPORT_MIME_TYPES` table as the default when `exportMimeType` is omitted (non-breaking; Doc still defaults to `.txt`)
+- [ ] Derive output extension from the chosen export MIME type
+- [ ] Unit test asserting `exportMimeType` forwarded to `files.export` and drives the extension
+
+---
+
 ## v0.4.3 - Shared Drive Support (COMPLETED)
 
 - [DONE] Pass `supportsAllDrives: true` on every Drive `files.*` / `permissions.*` call so reads, writes, and sharing work on Shared Drive items
