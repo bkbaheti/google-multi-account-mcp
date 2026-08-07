@@ -55,6 +55,15 @@ const EXPORT_MIME_TYPES: Record<string, { mimeType: string; extension: string }>
   'application/vnd.google-apps.drawing': { mimeType: 'image/png', extension: 'png' },
 };
 
+/** Content types safe to hand back as UTF-8 text rather than base64 */
+function isTextMimeType(mimeType: string): boolean {
+  return (
+    mimeType.startsWith('text/') ||
+    mimeType === 'application/json' ||
+    mimeType === 'application/xml'
+  );
+}
+
 export class DriveClient {
   private readonly accountStore: AccountStore;
   private readonly accountId: string;
@@ -195,44 +204,38 @@ export class DriveClient {
     const file = await this.getFile(fileId);
     const exportMapping = EXPORT_MIME_TYPES[file.mimeType];
 
-    if (exportMapping) {
-      // Google Workspace file: export it
-      const response = await drive.files.export({
-        fileId,
-        mimeType: exportMapping.mimeType,
-      });
+    let buffer: Buffer;
+    let contentMimeType: string;
 
-      const full = String(response.data);
-      const truncated = maxChars !== undefined && full.length > maxChars;
-      return {
-        content: truncated ? full.slice(0, maxChars) : full,
-        mimeType: exportMapping.mimeType,
-        fileName: file.name,
-        totalSize: full.length,
-        truncated,
-        encoding: 'utf-8',
-      };
+    if (exportMapping) {
+      // Google Workspace file: export it. Read as an arraybuffer so binary export
+      // formats (a Drawing exports to image/png) survive intact — decoding those as
+      // UTF-8 replaces every invalid byte sequence with U+FFFD.
+      const response = await drive.files.export(
+        { fileId, mimeType: exportMapping.mimeType },
+        { responseType: 'arraybuffer' },
+      );
+
+      buffer = Buffer.from(response.data as ArrayBuffer);
+      contentMimeType = exportMapping.mimeType;
+    } else {
+      // Regular file: download it
+      const response = await drive.files.get(
+        { fileId, alt: 'media', supportsAllDrives: true },
+        { responseType: 'arraybuffer' },
+      );
+
+      buffer = Buffer.from(response.data as ArrayBuffer);
+      contentMimeType = file.mimeType;
     }
 
-    // Regular file: download it
-    const response = await drive.files.get(
-      { fileId, alt: 'media', supportsAllDrives: true },
-      { responseType: 'arraybuffer' },
-    );
-
-    const buffer = Buffer.from(response.data as ArrayBuffer);
-
-    // Text files: return as utf-8
-    if (
-      file.mimeType.startsWith('text/') ||
-      file.mimeType === 'application/json' ||
-      file.mimeType === 'application/xml'
-    ) {
+    // Text: return as utf-8
+    if (isTextMimeType(contentMimeType)) {
       const full = buffer.toString('utf-8');
       const truncated = maxChars !== undefined && full.length > maxChars;
       return {
         content: truncated ? full.slice(0, maxChars) : full,
-        mimeType: file.mimeType,
+        mimeType: contentMimeType,
         fileName: file.name,
         totalSize: full.length,
         truncated,
@@ -240,11 +243,11 @@ export class DriveClient {
       };
     }
 
-    // Binary files: return as base64 (no truncation — use drive_download_file instead)
+    // Binary: return as base64 (no truncation — use drive_download_file instead)
     const b64 = buffer.toString('base64');
     return {
       content: b64,
-      mimeType: file.mimeType,
+      mimeType: contentMimeType,
       fileName: file.name,
       totalSize: buffer.length,
       truncated: false,

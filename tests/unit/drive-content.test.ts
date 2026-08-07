@@ -112,7 +112,7 @@ describe('DriveClient getFileContent', () => {
           mimeType: 'application/vnd.google-apps.document',
         },
       });
-      mockFilesExport.mockResolvedValueOnce({ data: longDoc });
+      mockFilesExport.mockResolvedValueOnce({ data: toArrayBuffer(longDoc) });
 
       const result = await client.getFileContent('doc-1', { maxChars: 500 });
 
@@ -131,12 +131,34 @@ describe('DriveClient getFileContent', () => {
           mimeType: 'application/vnd.google-apps.document',
         },
       });
-      mockFilesExport.mockResolvedValueOnce({ data: longDoc });
+      mockFilesExport.mockResolvedValueOnce({ data: toArrayBuffer(longDoc) });
 
       const result = await client.getFileContent('doc-1');
 
       expect(result.truncated).toBe(false);
       expect(result.content.length).toBe(15_000);
+    });
+  });
+
+  describe('Workspace files whose default export is binary', () => {
+    // A Drawing exports to image/png. Decoding those bytes as UTF-8 replaces every
+    // invalid sequence with U+FFFD, so the caller got mojibake labelled as text.
+    it('returns a Drawing export as base64 rather than corrupted text', async () => {
+      const pngBytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x80];
+
+      mockFilesGet.mockResolvedValueOnce({
+        data: { id: 'draw-1', name: 'Diagram', mimeType: 'application/vnd.google-apps.drawing' },
+      });
+      mockFilesExport.mockResolvedValueOnce({ data: toArrayBufferFromBytes(pngBytes) });
+
+      const result = await client.getFileContent('draw-1', { maxChars: 5 });
+
+      expect(result.encoding).toBe('base64');
+      expect(result.content).toBe(Buffer.from(pngBytes).toString('base64'));
+      expect(result.mimeType).toBe('image/png');
+      expect(result.fileName).toBe('Diagram');
+      expect(result.totalSize).toBe(pngBytes.length);
+      expect(result.truncated).toBe(false);
     });
   });
 
