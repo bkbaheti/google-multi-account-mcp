@@ -55,7 +55,9 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `drive_get_file` - get file metadata
 - `drive_get_file_content` - preview file content (truncated, default 10k chars)
 - `drive_get_full_file_content` - get complete file content (use sparingly)
-- `drive_download_file` - download file from Drive to local disk
+- `drive_get_comments` - read comments on a Doc/Sheet/Slide (author, quoted text, resolved flag, replies); needs `drive_readonly` tier
+- `drive_get_comment_replies` - read replies to a single comment (only when a comment's inline replies are paginated)
+- `drive_download_file` - download file from Drive to local disk (supports `exportMimeType` to export Workspace files as `.docx`/`.pdf`/`.xlsx` instead of the default flat text)
 - `drive_upload_file` - upload a file (supports `filePath` for large files)
 - `drive_create_folder` - create folder
 - `drive_move_file` - move file to folder

@@ -315,6 +315,13 @@ describe('Scope Validation', () => {
       expect(OPERATION_SCOPE_REQUIREMENTS.driveGetContent).toBe('drive_readonly');
     });
 
+    it('drive comment reads require drive_readonly, not drive_full', () => {
+      // drive.file (drive_full) only covers app-created files, so it cannot read
+      // comments on a Doc shared by a third party — these must sit on drive_readonly.
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveGetComments).toBe('drive_readonly');
+      expect(OPERATION_SCOPE_REQUIREMENTS.driveGetCommentReplies).toBe('drive_readonly');
+    });
+
     it('drive write operations require drive_full scope', () => {
       expect(OPERATION_SCOPE_REQUIREMENTS.driveUpload).toBe('drive_full');
       expect(OPERATION_SCOPE_REQUIREMENTS.driveCreateFolder).toBe('drive_full');

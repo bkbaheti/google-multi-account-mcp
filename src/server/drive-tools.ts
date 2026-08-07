@@ -268,12 +268,100 @@ export function registerDriveTools(
     },
   );
 
+  // drive_get_comments - Read reviewer comments on a Drive file
+  server.registerTool(
+    'drive_get_comments',
+    {
+      description:
+        'Read the comments on a Google Drive file (Doc, Sheet, Slide), including the document text each comment is anchored to, the author, timestamps, resolved status, and replies. Use this to review feedback left on a shared document. Requires the drive_readonly scope tier: an account authorized only at drive_full (drive.file) cannot read comments on documents it did not create — re-authorize with google_reauth_account if you hit a permission error.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID, alias, or email'),
+        fileId: z.string().describe('The Drive file ID'),
+        pageSize: z
+          .number()
+          .optional()
+          .describe('Maximum number of comments to return (default: 20, max: 100)'),
+        pageToken: z.string().optional().describe('Token for pagination'),
+        includeResolved: z
+          .boolean()
+          .optional()
+          .describe(
+            'Include comments already marked resolved (default: true). Resolved comments are filtered out after Drive paginates, so with includeResolved: false a page can come back empty while unresolved comments still remain — keep paging while nextPageToken is present rather than treating an empty page as "no comments".',
+          ),
+      },
+    },
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { pageSize: 'number', includeResolved: 'boolean' });
+      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new DriveClient(accountStore, args.accountId);
+        const options: { pageSize?: number; pageToken?: string; includeResolved?: boolean } = {};
+        if (args.pageSize !== undefined) {
+          options.pageSize = args.pageSize;
+        }
+        if (args.pageToken !== undefined) {
+          options.pageToken = args.pageToken;
+        }
+        if (args.includeResolved !== undefined) {
+          options.includeResolved = args.includeResolved;
+        }
+        const result = await client.getComments(args.fileId, options);
+
+        return successResponse(result);
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // drive_get_comment_replies - Read replies to a single comment
+  server.registerTool(
+    'drive_get_comment_replies',
+    {
+      description:
+        'Read the replies to a single comment on a Google Drive file. drive_get_comments already returns replies inline, so use this only when a comment has more replies than that inline list returned.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID, alias, or email'),
+        fileId: z.string().describe('The Drive file ID'),
+        commentId: z.string().describe('The parent comment ID (from drive_get_comments)'),
+        pageSize: z
+          .number()
+          .optional()
+          .describe('Maximum number of replies to return (default: 20, max: 100)'),
+        pageToken: z.string().optional().describe('Token for pagination'),
+      },
+    },
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { pageSize: 'number' });
+      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new DriveClient(accountStore, args.accountId);
+        const options: { pageSize?: number; pageToken?: string } = {};
+        if (args.pageSize !== undefined) {
+          options.pageSize = args.pageSize;
+        }
+        if (args.pageToken !== undefined) {
+          options.pageToken = args.pageToken;
+        }
+        const result = await client.getCommentReplies(args.fileId, args.commentId, options);
+
+        return successResponse(result);
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
   // drive_download_file - Download file to local disk
   server.registerTool(
     'drive_download_file',
     {
       description:
-        'Download a file from Google Drive and save it to a local directory. Google Workspace files (Docs, Sheets, Slides) are exported to standard formats (txt, csv, etc.).',
+        'Download a file from Google Drive and save it to a local directory. Google Workspace files (Docs, Sheets, Slides) are exported — by default to plain formats (txt, csv, png) which discard comments and formatting. Pass exportMimeType to choose a richer format instead: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" (.docx, preserves a Doc\'s comments and formatting), "application/pdf" (.pdf, rendered, no comments), or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" (.xlsx) for a Sheet.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The file ID to download'),
@@ -286,6 +374,12 @@ export function registerDriveTools(
           .describe(
             'Override the file name (default: original name from Drive). For Workspace files, include the export extension.',
           ),
+        exportMimeType: z
+          .string()
+          .optional()
+          .describe(
+            'Export format for Google Workspace files (e.g. "application/pdf"). The file extension is derived from it. Only valid for Workspace files; omit for regular files.',
+          ),
       },
     },
     async (args) => {
@@ -294,7 +388,12 @@ export function registerDriveTools(
 
       try {
         const client = new DriveClient(accountStore, args.accountId);
-        const result = await client.downloadFileToLocal(args.fileId, args.outputDir, args.fileName);
+        const result = await client.downloadFileToLocal(
+          args.fileId,
+          args.outputDir,
+          args.fileName,
+          args.exportMimeType,
+        );
 
         return successResponse(result);
       } catch (error) {

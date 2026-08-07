@@ -1,8 +1,18 @@
 # Requirement: Read Google Doc comments + choose export format on download
 
-**Status:** Proposed (not yet scheduled)
-**Date:** 2026-06-08
+**Status:** Implemented (2026-08-07) — see `docs/TASKS.md` for the shipped checklist
+**Date:** 2026-08-07
 **Area:** Drive
+
+> **Implementation note:** `supportsAllDrives` is not forwarded on the comment calls.
+> Drive's `comments.list` / `replies.list` do not accept that parameter — verified
+> against `node_modules/googleapis/build/src/apis/drive/v3.d.ts`, where
+> `Params$Resource$Comments$List` and `Params$Resource$Replies$List` accept only
+> `fileId` / `commentId`, `includeDeleted`, `pageSize`, `pageToken` and
+> `startModifiedTime`. It exists only on the `files.*` / `permissions.*` resources, so
+> there is no way to pass it here. **Not yet verified against a live Shared Drive:**
+> whether comments on a Shared Drive file are readable without it is untested — the
+> parameter's absence implies it should be, but no call has been made to confirm.
 
 These are two related, complementary capabilities. They can ship independently — (A)
 delivers the core missing functionality; (B) is a smaller, useful companion that also

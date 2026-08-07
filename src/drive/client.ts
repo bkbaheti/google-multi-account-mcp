@@ -44,16 +44,99 @@ export interface DrivePermission {
   displayName?: string;
 }
 
+export interface DriveCommentAuthor {
+  displayName?: string;
+  emailAddress?: string;
+}
+
+export interface DriveCommentReply {
+  id: string;
+  author: DriveCommentAuthor;
+  content: string;
+  htmlContent?: string;
+  createdTime?: string;
+  modifiedTime?: string;
+}
+
+export interface DriveComment {
+  id: string;
+  author: DriveCommentAuthor;
+  content: string;
+  htmlContent?: string;
+  /** The document text the comment is anchored to (quotedFileContent.value) */
+  quotedText?: string;
+  /** Opaque Drive anchor region descriptor */
+  anchor?: string;
+  createdTime?: string;
+  modifiedTime?: string;
+  resolved: boolean;
+  replies: DriveCommentReply[];
+}
+
+export interface DriveCommentList {
+  comments: DriveComment[];
+  nextPageToken?: string;
+}
+
+export interface DriveCommentReplyList {
+  replies: DriveCommentReply[];
+  nextPageToken?: string;
+}
+
 const FILE_FIELDS =
   'id, name, mimeType, size, createdTime, modifiedTime, parents, webViewLink, owners, shared, trashed, driveId';
 
-// Google Workspace MIME type export mappings
-const EXPORT_MIME_TYPES: Record<string, { mimeType: string; extension: string }> = {
-  'application/vnd.google-apps.document': { mimeType: 'text/plain', extension: 'txt' },
-  'application/vnd.google-apps.spreadsheet': { mimeType: 'text/csv', extension: 'csv' },
-  'application/vnd.google-apps.presentation': { mimeType: 'text/plain', extension: 'txt' },
-  'application/vnd.google-apps.drawing': { mimeType: 'image/png', extension: 'png' },
+const REPLY_FIELDS =
+  'id,author(displayName,emailAddress),content,htmlContent,createdTime,modifiedTime';
+
+// Drive's comments resource returns almost nothing without an explicit fields mask.
+const COMMENT_FIELDS = `id,author(displayName,emailAddress),content,htmlContent,quotedFileContent(value),anchor,createdTime,modifiedTime,resolved,replies(${REPLY_FIELDS})`;
+
+/** Drive caps comments.list / replies.list at 100 items per page */
+const COMMENTS_MAX_PAGE_SIZE = 100;
+const COMMENTS_DEFAULT_PAGE_SIZE = 20;
+
+const GOOGLE_APPS_MIME_PREFIX = 'application/vnd.google-apps.';
+const GOOGLE_APPS_FOLDER_MIME = 'application/vnd.google-apps.folder';
+
+// Default export format for each Google Workspace file type
+const EXPORT_MIME_TYPES: Record<string, string> = {
+  'application/vnd.google-apps.document': 'text/plain',
+  'application/vnd.google-apps.spreadsheet': 'text/csv',
+  'application/vnd.google-apps.presentation': 'text/plain',
+  'application/vnd.google-apps.drawing': 'image/png',
 };
+
+// File extensions for export formats whose MIME subtype isn't usable as-is
+const EXPORT_EXTENSIONS: Record<string, string> = {
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.oasis.opendocument.text': 'odt',
+  'application/vnd.oasis.opendocument.spreadsheet': 'ods',
+  'application/vnd.oasis.opendocument.presentation': 'odp',
+  'application/epub+zip': 'epub',
+  'application/rtf': 'rtf',
+  'text/plain': 'txt',
+  'text/tab-separated-values': 'tsv',
+  'text/markdown': 'md',
+  'image/jpeg': 'jpg',
+};
+
+/**
+ * Pick a file extension for an export MIME type: the lookup table first, then the
+ * MIME subtype when it is already extension-shaped (e.g. `image/svg+xml` -> `svg`),
+ * falling back to `bin` for anything unrecognized.
+ */
+function exportExtensionFor(mimeType: string): string {
+  const known = EXPORT_EXTENSIONS[mimeType];
+  if (known) {
+    return known;
+  }
+
+  const subtype = mimeType.split('/')[1]?.split('+')[0] ?? '';
+  return /^[a-z0-9]{1,5}$/.test(subtype) ? subtype : 'bin';
+}
 
 /** Content types safe to hand back as UTF-8 text rather than base64 */
 function isTextMimeType(mimeType: string): boolean {
@@ -62,6 +145,13 @@ function isTextMimeType(mimeType: string): boolean {
     mimeType === 'application/json' ||
     mimeType === 'application/xml'
   );
+}
+
+function clampPageSize(pageSize?: number): number {
+  if (pageSize === undefined) {
+    return COMMENTS_DEFAULT_PAGE_SIZE;
+  }
+  return Math.min(Math.max(1, Math.floor(pageSize)), COMMENTS_MAX_PAGE_SIZE);
 }
 
 export class DriveClient {
@@ -202,22 +292,22 @@ export class DriveClient {
 
     // First get file metadata to determine type
     const file = await this.getFile(fileId);
-    const exportMapping = EXPORT_MIME_TYPES[file.mimeType];
+    const defaultExportMimeType = EXPORT_MIME_TYPES[file.mimeType];
 
     let buffer: Buffer;
     let contentMimeType: string;
 
-    if (exportMapping) {
+    if (defaultExportMimeType) {
       // Google Workspace file: export it. Read as an arraybuffer so binary export
       // formats (a Drawing exports to image/png) survive intact — decoding those as
       // UTF-8 replaces every invalid byte sequence with U+FFFD.
       const response = await drive.files.export(
-        { fileId, mimeType: exportMapping.mimeType },
+        { fileId, mimeType: defaultExportMimeType },
         { responseType: 'arraybuffer' },
       );
 
       buffer = Buffer.from(response.data as ArrayBuffer);
-      contentMimeType = exportMapping.mimeType;
+      contentMimeType = defaultExportMimeType;
     } else {
       // Regular file: download it
       const response = await drive.files.get(
@@ -255,10 +345,16 @@ export class DriveClient {
     };
   }
 
+  /**
+   * Download a Drive file to disk. Google Workspace files are exported; pass
+   * `exportMimeType` to override the default export format (e.g. `.docx` to preserve
+   * comments and formatting instead of the default flattened `text/plain`).
+   */
   async downloadFileToLocal(
     fileId: string,
     outputDir: string,
     fileName?: string,
+    exportMimeType?: string,
   ): Promise<{ filePath: string; fileName: string; mimeType: string; sizeBytes: number }> {
     const drive = await this.getDrive();
 
@@ -272,23 +368,36 @@ export class DriveClient {
 
     // Get file metadata
     const file = await this.getFile(fileId);
-    const exportMapping = EXPORT_MIME_TYPES[file.mimeType];
+
+    if (exportMimeType !== undefined) {
+      if (file.mimeType === GOOGLE_APPS_FOLDER_MIME) {
+        throw new Error(`Cannot export "${file.name}": it is a folder, not a document.`);
+      }
+      if (!file.mimeType.startsWith(GOOGLE_APPS_MIME_PREFIX)) {
+        throw new Error(
+          `exportMimeType is only supported for Google Workspace files; "${file.name}" is ${file.mimeType}. Omit exportMimeType to download it as-is.`,
+        );
+      }
+    }
+
+    const effectiveExportMimeType = exportMimeType ?? EXPORT_MIME_TYPES[file.mimeType];
 
     let buffer: Buffer;
     let mimeType: string;
     let outputFileName: string;
 
-    if (exportMapping) {
-      // Google Workspace file: export it
-      const response = await drive.files.export({
-        fileId,
-        mimeType: exportMapping.mimeType,
-      });
+    if (effectiveExportMimeType) {
+      // Google Workspace file: export it. Request an arraybuffer so binary export
+      // formats (.docx, .xlsx, .pdf) are written byte-for-byte rather than stringified.
+      const response = await drive.files.export(
+        { fileId, mimeType: effectiveExportMimeType },
+        { responseType: 'arraybuffer' },
+      );
 
-      buffer = Buffer.from(String(response.data), 'utf-8');
-      mimeType = exportMapping.mimeType;
+      buffer = Buffer.from(response.data as ArrayBuffer);
+      mimeType = effectiveExportMimeType;
       // Use provided name or derive from file name + export extension
-      outputFileName = fileName ?? `${file.name}.${exportMapping.extension}`;
+      outputFileName = fileName ?? `${file.name}.${exportExtensionFor(effectiveExportMimeType)}`;
     } else {
       // Regular file: download it
       const response = await drive.files.get(
@@ -313,6 +422,84 @@ export class DriveClient {
       mimeType,
       sizeBytes: buffer.length,
     };
+  }
+
+  // === Comment methods ===
+
+  /**
+   * List the comments on a Drive file, including the anchored document text each
+   * comment refers to and its inline replies. Requires the `drive.readonly` scope —
+   * `drive.file` only covers app-created files, not Docs shared by someone else.
+   */
+  async getComments(
+    fileId: string,
+    options: { pageSize?: number; pageToken?: string; includeResolved?: boolean } = {},
+  ): Promise<DriveCommentList> {
+    const drive = await this.getDrive();
+
+    const params: drive_v3.Params$Resource$Comments$List = {
+      fileId,
+      fields: `nextPageToken, comments(${COMMENT_FIELDS})`,
+      includeDeleted: false,
+      pageSize: clampPageSize(options.pageSize),
+    };
+
+    if (options.pageToken) {
+      params.pageToken = options.pageToken;
+    }
+
+    const response = await drive.comments.list(params);
+
+    let comments = (response.data.comments ?? []).map((c) => this.convertComment(c));
+
+    // Drive has no server-side filter for resolved comments, so filter here.
+    if (options.includeResolved === false) {
+      comments = comments.filter((c) => !c.resolved);
+    }
+
+    const result: DriveCommentList = { comments };
+
+    if (response.data.nextPageToken) {
+      result.nextPageToken = response.data.nextPageToken;
+    }
+
+    return result;
+  }
+
+  /**
+   * List the replies to a single comment. `getComments` already inlines replies; use
+   * this when a comment has more replies than that inline list returns.
+   */
+  async getCommentReplies(
+    fileId: string,
+    commentId: string,
+    options: { pageSize?: number; pageToken?: string } = {},
+  ): Promise<DriveCommentReplyList> {
+    const drive = await this.getDrive();
+
+    const params: drive_v3.Params$Resource$Replies$List = {
+      fileId,
+      commentId,
+      fields: `nextPageToken, replies(${REPLY_FIELDS})`,
+      includeDeleted: false,
+      pageSize: clampPageSize(options.pageSize),
+    };
+
+    if (options.pageToken) {
+      params.pageToken = options.pageToken;
+    }
+
+    const response = await drive.replies.list(params);
+
+    const replies = (response.data.replies ?? []).map((r) => this.convertReply(r));
+
+    const result: DriveCommentReplyList = { replies };
+
+    if (response.data.nextPageToken) {
+      result.nextPageToken = response.data.nextPageToken;
+    }
+
+    return result;
   }
 
   // === Write methods ===
@@ -528,6 +715,67 @@ export class DriveClient {
     }
     if (f.driveId) {
       result.driveId = f.driveId;
+    }
+
+    return result;
+  }
+
+  private convertAuthor(author?: drive_v3.Schema$User | null): DriveCommentAuthor {
+    const result: DriveCommentAuthor = {};
+
+    if (author?.displayName) {
+      result.displayName = author.displayName;
+    }
+    if (author?.emailAddress) {
+      result.emailAddress = author.emailAddress;
+    }
+
+    return result;
+  }
+
+  private convertReply(r: drive_v3.Schema$Reply): DriveCommentReply {
+    const result: DriveCommentReply = {
+      id: r.id ?? '',
+      author: this.convertAuthor(r.author),
+      content: r.content ?? '',
+    };
+
+    if (r.htmlContent) {
+      result.htmlContent = r.htmlContent;
+    }
+    if (r.createdTime) {
+      result.createdTime = r.createdTime;
+    }
+    if (r.modifiedTime) {
+      result.modifiedTime = r.modifiedTime;
+    }
+
+    return result;
+  }
+
+  private convertComment(c: drive_v3.Schema$Comment): DriveComment {
+    const result: DriveComment = {
+      id: c.id ?? '',
+      author: this.convertAuthor(c.author),
+      content: c.content ?? '',
+      resolved: c.resolved === true,
+      replies: (c.replies ?? []).map((r) => this.convertReply(r)),
+    };
+
+    if (c.htmlContent) {
+      result.htmlContent = c.htmlContent;
+    }
+    if (c.quotedFileContent?.value) {
+      result.quotedText = c.quotedFileContent.value;
+    }
+    if (c.anchor) {
+      result.anchor = c.anchor;
+    }
+    if (c.createdTime) {
+      result.createdTime = c.createdTime;
+    }
+    if (c.modifiedTime) {
+      result.modifiedTime = c.modifiedTime;
     }
 
     return result;

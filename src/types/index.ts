@@ -238,6 +238,10 @@ export const OPERATION_SCOPE_REQUIREMENTS = {
   driveListFiles: 'drive_readonly',
   driveGetFile: 'drive_readonly',
   driveGetContent: 'drive_readonly',
+  // drive.file (drive_full) only covers app-created/app-opened files, so it cannot
+  // read comments on a Doc shared by a third party — these need drive.readonly.
+  driveGetComments: 'drive_readonly',
+  driveGetCommentReplies: 'drive_readonly',
 
   // Drive write operations - drive_full tier
   driveUpload: 'drive_full',

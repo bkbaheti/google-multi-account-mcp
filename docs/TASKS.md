@@ -1,28 +1,42 @@
 # Tasks
 
-## Drive Comments & Export Format (PROPOSED)
+## Drive Comments & Export Format (COMPLETED)
 
 Requirement doc: `docs/plans/2026-06-08-drive-comments-and-export-format.md`.
-Two complementary capabilities; can ship independently.
+Two complementary capabilities; shipped together.
 
-Motivation: a client left review comments on a shared contract Doc (SOW) and there is
-currently **no way** to read Google Doc comments through this MCP. Workspace Docs export
-to `text/plain` only (`src/drive/client.ts:50-56`), which strips all comments and
-formatting, and there is no comments tool at all.
+Motivation: a client left review comments on a shared contract Doc (SOW) and there was
+**no way** to read Google Doc comments through this MCP. Workspace Docs exported to
+`text/plain` only, which strips all comments and formatting, and there was no comments
+tool at all.
 
 (A) Read Google Doc comments
-- [ ] New `drive_get_comments` tool wrapping Drive `comments.list` (explicit `fields` mask, `includeDeleted: false`, `supportsAllDrives: true`)
-- [ ] Output per comment: author, quoted/anchored text (`quotedFileContent.value`), content, created/modified time, `resolved` flag, inline replies
-- [ ] Optional `includeResolved` (default true), pagination via `pageToken`/`pageSize` (max 100)
-- [ ] Optional `drive_get_comment_replies` wrapping `drive.replies.list` for separately-paginated replies
-- [ ] Gate on `drive_readonly` tier — `drive.file` (`drive_full`) is insufficient for client-shared Docs (see scope caveat in requirement doc); add `driveGetComments: 'drive_readonly'` to the tier map (`src/types/index.ts:236-240`)
-- [ ] Unit tests asserting fields mask, `includeDeleted: false`, and shared-drive flags forwarded
+- [DONE] New `drive_get_comments` tool wrapping Drive `comments.list` (explicit `fields` mask, `includeDeleted: false`)
+- [DONE] Output per comment: author, quoted/anchored text (`quotedFileContent.value`), content, created/modified time, `resolved` flag, inline replies
+- [DONE] Optional `includeResolved` (default true, filtered client-side), pagination via `pageToken`/`pageSize` (clamped to max 100)
+- [DONE] `drive_get_comment_replies` wrapping `drive.replies.list` for separately-paginated replies
+- [DONE] Gate on `drive_readonly` tier — `drive.file` (`drive_full`) is insufficient for client-shared Docs; added `driveGetComments` / `driveGetCommentReplies` to the tier map
+- [DONE] Unit tests asserting fields mask, `includeDeleted: false`, page-size clamping, resolved filtering, and pagination
+
+Deviation from the requirement doc: `supportsAllDrives` is **not** forwarded. Drive's
+`comments.list` / `replies.list` do not accept that parameter (only `fileId`,
+`includeDeleted`, `pageSize`, `pageToken`, `startModifiedTime`) — unlike `files.*`. The
+tests assert the fields mask and `includeDeleted: false` instead. Reading comments on a
+Shared Drive file has not been exercised against a live account.
 
 (B) Choose export format on download/export
-- [ ] Add optional `exportMimeType` to `drive_download_file` (and `downloadFileToLocal`) so Workspace files can export as e.g. `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`), preserving comments + formatting
-- [ ] Keep `EXPORT_MIME_TYPES` table as the default when `exportMimeType` is omitted (non-breaking; Doc still defaults to `.txt`)
-- [ ] Derive output extension from the chosen export MIME type
-- [ ] Unit test asserting `exportMimeType` forwarded to `files.export` and drives the extension
+- [DONE] Added optional `exportMimeType` to `drive_download_file` and `downloadFileToLocal` so Workspace files export as e.g. `.docx`, preserving comments + formatting
+- [DONE] Default export table still applies when `exportMimeType` is omitted (non-breaking; Doc still defaults to `.txt`)
+- [DONE] Output extension derived from the chosen export MIME type (lookup table, then MIME subtype, then `.bin`)
+- [DONE] `exportMimeType` on a non-Workspace file raises a clear error instead of being silently ignored, with a dedicated message for folders
+- [DONE] Unit tests asserting forwarding, extension derivation, byte-exact binary output, and unchanged default behaviour (Doc → `.txt`, Sheet → `.csv`, Drawing → `.png`)
+
+(C) Fix binary Workspace exports being corrupted — **pre-existing bug, not introduced here**
+- [DONE] Both export call sites now request `responseType: 'arraybuffer'`; the previous `String(response.data)` decoded binary as UTF-8, replacing every invalid sequence with U+FFFD
+- [DONE] `downloadFileToLocal` — a Google Drawing (default export `image/png`) was being written to disk as a corrupt PNG. Shipped broken since Drive support landed; would also have mangled every new `.docx`/`.pdf` export
+- [DONE] `getFileContent` — the same path returned mojibake stamped `encoding: 'utf-8'` through `drive_get_file_content` / `drive_get_full_file_content`. Binary exports now return base64 with `encoding: 'base64'`, matching how the non-Workspace binary branch already behaved
+- [DONE] Text/binary split extracted to a shared `isTextMimeType` predicate so both branches agree
+- [DONE] Regression tests pinning byte-exact PNG output on disk and base64 output from `getFileContent`
 
 ---
 
