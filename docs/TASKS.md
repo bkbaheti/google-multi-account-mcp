@@ -302,6 +302,20 @@ Lower priority features for power users.
 
 ---
 
+## Future Enhancements (Identified)
+
+### Create native Google Docs/Sheets/Slides on upload
+- [ ] `drive_upload_file` cannot produce a native Workspace file. `uploadFile` sets `requestBody.mimeType` and `media.mimeType` to the same value (`src/drive/client.ts`), so Drive's convert-on-upload never triggers — passing `application/vnd.google-apps.document` makes Drive reject the media as an un-uploadable Google Apps type
+- [ ] Add an optional `convertToGoogleDoc` / `targetMimeType` so `requestBody.mimeType` can be the Workspace type while `media.mimeType` stays the source type (`text/plain`, `text/html`, `.docx`), which is Drive's documented conversion path
+- [ ] Gate on `drive_full`; unit test asserting the two MIME types are sent independently
+- Surfaced while designing the E2E harness: the fixture seeder has to bypass the MCP and call `drive.files.create` directly because of this
+
+### Write Drive comments (`comments.create` / `replies.create`)
+- [ ] Comment *writing* was explicitly out of scope for the read-side work (see `docs/plans/2026-06-08-drive-comments-and-export-format.md`); revisit as its own capability
+- [ ] `drive_create_comment` (anchored + unanchored), `drive_reply_to_comment`, and possibly `drive_resolve_comment`
+- [ ] Requires `drive.file` or broader — note `drive.file` only covers app-created files, so commenting on a client-shared Doc needs a wider scope than the read path
+- [ ] Would let the E2E fixture seeder use the MCP's own tools instead of calling the Drive API directly, making the harness self-hosting
+
 ## Future Enhancements (from Competitive Analysis)
 
 Identified from comparing against mcp-gsuite, mcp-google-workspace, and gmail-mcp-multi.
