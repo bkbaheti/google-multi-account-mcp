@@ -38,6 +38,10 @@
 
 `.mcp.json` contains a `proGoogleMCP` entry pointing at `/home/baheti/projects/google-multi-account-mcp/dist/cli.js` — a Linux path that does not exist on this machine. Two servers answering as "the local build" makes the stage-3 version gate meaningless. Delete the whole `proGoogleMCP` block, keeping `localProGoogleMCP`.
 
+**`.mcp.json` is gitignored on purpose and must stay untracked.** Commit `c8d86ca` untracked it deliberately: it is personal Claude Code client config holding absolute paths, unrelated MCP servers, and `env` blocks that are a footgun for committing API keys. This edit is **local only** — never `git add` it, and never `git add -f` it. If a later step's `git add` appears to need it, that step is wrong.
+
+`.mcp.json.example` is the tracked template and already lists only `localProGoogleMCP`, so it needs no change.
+
 - [ ] **Step 2: Verify only one local server remains**
 
 Run: `python3 -c "import json;d=json.load(open('.mcp.json'));print([k for k in d['mcpServers'] if 'oogle' in k])"`
@@ -92,9 +96,11 @@ Expected: exits 0 with no output (no `scripts/e2e/` files exist yet, so only `sr
 - [ ] **Step 7: Commit**
 
 ```bash
-git add .mcp.json .gitignore tsconfig.e2e.json package.json
-git commit -m "chore(e2e): add harness typecheck config, gitignore, drop dead MCP server entry"
+git add .gitignore tsconfig.e2e.json package.json
+git commit -m "chore(e2e): add harness typecheck config and gitignore entries"
 ```
+
+`.mcp.json` is deliberately absent from that `git add` — see Step 1. Verify with `git status --short` that it does not appear as staged or tracked.
 
 ---
 
