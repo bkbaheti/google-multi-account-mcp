@@ -968,7 +968,12 @@ export async function tryCreateDrawing(
     });
 
     return response.data.id ?? null;
-  } catch {
+  } catch (error) {
+    // Surface why Drive refused — swallowing it silently would leave the
+    // operator with "FAILED" and no way to tell a scope problem from an
+    // unsupported operation.
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn(`  drawing   Drive refused to create a blank Drawing: ${detail}`);
     return null;
   }
 }
