@@ -7,3 +7,7 @@ coverage/
 # Local MCP client configuration (personal paths, may grow env-block secrets).
 # See .mcp.json.example for a template.
 .mcp.json
+
+# E2E harness — local machine state, never commit
+.e2e/
+e2e.config.json
