@@ -4,18 +4,27 @@ import { fileURLToPath } from 'node:url';
 import open from 'open';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type Capability, hasAnyCapability, hasCapability } from '../auth/capabilities.js';
+import { capabilitiesRemovedBy } from '../auth/account-store.js';
+import {
+  CAPABILITIES,
+  type Capability,
+  capabilitiesOf,
+  hasAnyCapability,
+  hasCapability,
+  isCapability,
+} from '../auth/capabilities.js';
 import type { TokenStorage } from '../auth/index.js';
 import { AccountStore } from '../auth/index.js';
 import {
   accountNotFound,
   aliasDuplicate,
+  confirmationRequired,
   errorResponse,
   insufficientCapability,
   successResponse,
   toMcpError,
+  validationError,
 } from '../errors/index.js';
-import { getScopeTier, SCOPE_TIERS, type ScopeTier } from '../types/index.js';
 import { cache, coerceArgs } from '../utils/index.js';
 import { registerCalendarTools } from './calendar-tools.js';
 import { registerDriveTools } from './drive-tools.js';
@@ -88,6 +97,43 @@ export function createServer(options: ServerOptions): McpServer {
     return { account };
   }
 
+  // Validate a raw list of capability strings from tool input. Rejects
+  // unknown values by name rather than silently dropping them - a dropped
+  // typo means a user authorizes fewer capabilities than they asked for and
+  // finds out only when a later gate refuses them.
+  function validateCapabilities(
+    values: string[],
+  ): { capabilities: Capability[] } | { error: ReturnType<typeof errorResponse> } {
+    const invalid = values.filter((value) => !isCapability(value));
+    if (invalid.length > 0) {
+      return {
+        error: errorResponse(
+          validationError(
+            `Unknown capabilit${invalid.length === 1 ? 'y' : 'ies'}: ${invalid.join(', ')}. Valid values are: ${CAPABILITIES.join(', ')}.`,
+            'capabilities',
+          ).toResponse(),
+        ),
+      };
+    }
+    return { capabilities: values as Capability[] };
+  }
+
+  // Build a per-service view of an account's capabilities, e.g.
+  // { mail: ['read', 'compose'], drive: ['read'] }.
+  function capabilityView(scopes: string[]): Record<string, string[]> {
+    const view: Record<string, string[]> = {};
+
+    for (const capability of capabilitiesOf(scopes)) {
+      const [service, level] = capability.split(':') as [string, string];
+      if (!view[service]) {
+        view[service] = [];
+      }
+      view[service].push(level);
+    }
+
+    return view;
+  }
+
   // google_version - Get server version and build info
   server.registerTool(
     'google_version',
@@ -119,6 +165,7 @@ export function createServer(options: ServerOptions): McpServer {
         alias: account.alias,
         description: account.description,
         labels: account.labels,
+        capabilities: capabilityView(account.scopes),
         scopes: account.scopes,
         addedAt: account.addedAt,
         lastUsedAt: account.lastUsedAt,
@@ -128,94 +175,55 @@ export function createServer(options: ServerOptions): McpServer {
     },
   );
 
-  // Helper to migrate legacy tier names to new namespaced names
-  function migrateTierName(tier: string): ScopeTier {
-    const LEGACY_MAP: Record<string, ScopeTier> = {
-      readonly: 'mail_readonly',
-      compose: 'mail_compose',
-      full: 'mail_full',
-      settings: 'mail_settings',
-    };
-    return (LEGACY_MAP[tier] ?? tier) as ScopeTier;
-  }
-
   // google_add_account - Add a new Google account via OAuth (async flow)
   server.registerTool(
     'google_add_account',
     {
       description:
-        'Add a new Google account via OAuth. Returns an authorization URL that you must show to the user. The user opens this URL in their browser to authorize. After authorization, use google_check_pending_auth to complete the process. Tiers: mail_readonly (default), mail_compose, mail_full, mail_settings, drive_readonly, drive_full, calendar_readonly, calendar_full, or all.',
+        'Add a new Google account via OAuth. Returns an authorization URL that you must show to the user. The user opens this URL in their browser to authorize. After authorization, use google_check_pending_auth to complete the process.',
       inputSchema: {
-        scopeTier: z
-          .enum([
-            'mail_readonly',
-            'mail_compose',
-            'mail_full',
-            'mail_settings',
-            'drive_readonly',
-            'drive_full',
-            'calendar_readonly',
-            'calendar_full',
-            'all',
-            // Legacy aliases
-            'readonly',
-            'compose',
-            'full',
-            'settings',
-          ])
+        capabilities: z
+          .array(z.string())
           .optional()
-          .describe('Single permission tier (use scopeTiers for multiple)'),
-        scopeTiers: z
-          .array(
-            z.enum([
-              'mail_readonly',
-              'mail_compose',
-              'mail_full',
-              'mail_settings',
-              'drive_readonly',
-              'drive_full',
-              'calendar_readonly',
-              'calendar_full',
-              'all',
-              // Legacy aliases
-              'readonly',
-              'compose',
-              'full',
-              'settings',
-            ]),
-          )
-          .optional()
-          .describe('Combine multiple tiers (e.g., ["mail_full", "drive_readonly"])'),
+          .describe(
+            'Capabilities to authorize, as service:level strings. Valid values: mail:read, mail:compose, mail:modify, mail:settings, drive:read, drive:appfiles, calendar:read, calendar:write. Note drive:read (read all files) and drive:appfiles (per-file access to files this app created) are independent — grant both for full Drive access.',
+          ),
       },
     },
     async (args) => {
-      // If no scope specified, prompt for selection
-      if (!args.scopeTier && !args.scopeTiers) {
+      // If no capabilities specified, prompt for selection
+      if (!args.capabilities || args.capabilities.length === 0) {
         return successResponse({
           needsScopeSelection: true,
-          message: 'Which permissions would you like for this account?',
+          message: 'Which capabilities would you like for this account?',
           options: [
-            { tier: 'mail_readonly', description: 'Read and search emails only' },
-            { tier: 'mail_compose', description: 'Also compose and send emails' },
-            { tier: 'mail_full', description: 'Also manage labels, archive, trash' },
-            { tier: 'mail_settings', description: 'Also manage filters and vacation responder' },
-            { tier: 'drive_readonly', description: 'Read Google Drive files' },
-            { tier: 'drive_full', description: 'Read and write Google Drive files' },
-            { tier: 'calendar_readonly', description: 'Read Google Calendar events' },
-            { tier: 'calendar_full', description: 'Read and write Google Calendar events' },
-            { tier: 'all', description: 'All permissions across all services' },
+            { capability: 'mail:read', description: 'Read and search emails' },
+            { capability: 'mail:compose', description: 'Compose and send emails' },
+            {
+              capability: 'mail:modify',
+              description: 'Manage labels, archive, trash (includes mail:read)',
+            },
+            { capability: 'mail:settings', description: 'Manage filters and vacation responder' },
+            { capability: 'drive:read', description: 'Read all files in Google Drive' },
+            {
+              capability: 'drive:appfiles',
+              description: 'Read and write files this app created in Google Drive',
+            },
+            { capability: 'calendar:read', description: 'Read Google Calendar events' },
+            {
+              capability: 'calendar:write',
+              description: 'Create and modify Google Calendar events',
+            },
           ],
         });
       }
 
-      // scopeTiers takes precedence if provided; migrate any legacy tier names
-      const scopeTierOrTiers: ScopeTier | ScopeTier[] = args.scopeTiers
-        ? ((args.scopeTiers as string[]).map(migrateTierName) as ScopeTier[])
-        : migrateTierName(args.scopeTier as string);
+      const validated = validateCapabilities(args.capabilities);
+      if ('error' in validated) return validated.error;
 
       try {
         // Start async auth flow - returns immediately with auth URL
-        const session = accountStore.startAddAccount(scopeTierOrTiers);
+        const session = accountStore.startAddAccount(validated.capabilities);
 
         // Auto-open browser, best-effort (ignore errors for headless/SSH environments)
         open(session.authUrl).catch(() => {});
@@ -305,67 +313,52 @@ export function createServer(options: ServerOptions): McpServer {
     'google_reauth_account',
     {
       description:
-        'Re-authenticate an existing Google account. Use this when a refresh token is invalidated (e.g., password change, revoked access, expired grant) or when you need to add/change scope tiers without losing the account ID, alias, description, or labels. Returns an authorization URL. After the user authorizes, call google_check_pending_auth with the sessionId. If no scope tier is given, the account\'s current scopes are reused. The authorized Google account must match the existing email; otherwise the reauth fails.',
+        "Re-authenticate an existing Google account. Use this when a refresh token is invalidated (e.g., password change, revoked access, expired grant) or when you need to add/change capabilities without losing the account ID, alias, description, or labels. Returns an authorization URL. After the user authorizes, call google_check_pending_auth with the sessionId. If no capabilities are given, the account's current capabilities are reused. Reauth REPLACES the capability set rather than adding to it, so dropping a capability the account currently holds requires confirm: true. The authorized Google account must match the existing email; otherwise the reauth fails.",
       inputSchema: {
         accountId: z
           .string()
           .describe('The account ID, alias, or email of the account to re-authenticate'),
-        scopeTier: z
-          .enum([
-            'mail_readonly',
-            'mail_compose',
-            'mail_full',
-            'mail_settings',
-            'drive_readonly',
-            'drive_full',
-            'calendar_readonly',
-            'calendar_full',
-            'all',
-            // Legacy aliases
-            'readonly',
-            'compose',
-            'full',
-            'settings',
-          ])
+        capabilities: z
+          .array(z.string())
           .optional()
-          .describe('Optional: change scope tier on reauth (use scopeTiers for multiple)'),
-        scopeTiers: z
-          .array(
-            z.enum([
-              'mail_readonly',
-              'mail_compose',
-              'mail_full',
-              'mail_settings',
-              'drive_readonly',
-              'drive_full',
-              'calendar_readonly',
-              'calendar_full',
-              'all',
-              // Legacy aliases
-              'readonly',
-              'compose',
-              'full',
-              'settings',
-            ]),
-          )
+          .describe(
+            "Capabilities to authorize, as service:level strings. Valid values: mail:read, mail:compose, mail:modify, mail:settings, drive:read, drive:appfiles, calendar:read, calendar:write. Note drive:read (read all files) and drive:appfiles (per-file access to files this app created) are independent — grant both for full Drive access. Omit to reuse the account's current capabilities.",
+          ),
+        confirm: z
+          .boolean()
           .optional()
-          .describe('Optional: combine multiple tiers on reauth'),
+          .describe('Set to true to confirm when the new capabilities would drop existing ones'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const account = accountStore.resolveAccount(args.accountId);
       if (!account) {
         return errorResponse(accountNotFound(args.accountId).toResponse());
       }
 
-      const scopeTierOrTiers: ScopeTier | ScopeTier[] | undefined = args.scopeTiers
-        ? ((args.scopeTiers as string[]).map(migrateTierName) as ScopeTier[])
-        : args.scopeTier
-          ? migrateTierName(args.scopeTier as string)
-          : undefined;
+      let capabilities: Capability[] | undefined;
+      if (args.capabilities) {
+        const validated = validateCapabilities(args.capabilities);
+        if ('error' in validated) return validated.error;
+        capabilities = validated.capabilities;
+
+        // Reauth replaces the scope set wholesale, so narrowing it here would
+        // silently destroy capabilities the account currently holds unless
+        // the caller confirms the loss.
+        const removed = capabilitiesRemovedBy(account.scopes, capabilities);
+        if (removed.length > 0 && args.confirm !== true) {
+          return errorResponse(
+            confirmationRequired(
+              `re-authorize ${account.email} with capabilities=${JSON.stringify(capabilities)}`,
+              `This would remove capabilit${removed.length === 1 ? 'y' : 'ies'} the account currently holds: ${removed.join(', ')}. Set confirm: true to proceed anyway.`,
+            ).toResponse(),
+          );
+        }
+      }
 
       try {
-        const result = accountStore.startReauthAccount(account.id, scopeTierOrTiers);
+        const result = accountStore.startReauthAccount(account.id, capabilities);
         if ('error' in result) {
           return errorResponse(accountNotFound(args.accountId).toResponse());
         }
@@ -878,7 +871,7 @@ Tips:
     'accounts',
     'accounts://list',
     {
-      description: 'List all connected Google accounts with their scope tiers',
+      description: 'List all connected Google accounts with their capabilities',
       mimeType: 'application/json',
     },
     async () => {
@@ -888,7 +881,7 @@ Tips:
         email: account.email,
         alias: account.alias,
         description: account.description,
-        scopeTier: getScopeTier(account.scopes),
+        capabilities: capabilityView(account.scopes),
         labels: account.labels,
         addedAt: account.addedAt,
       }));
@@ -940,5 +933,3 @@ Tips:
 
   return server;
 }
-
-export { SCOPE_TIERS };

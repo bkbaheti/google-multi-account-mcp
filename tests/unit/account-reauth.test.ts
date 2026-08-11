@@ -129,7 +129,7 @@ describe('AccountStore reauth', () => {
       expect('error' in result).toBe(true);
     });
 
-    it('defaults scopes to the account current scopes when no tier given', async () => {
+    it('defaults scopes to the account current scopes when no capabilities given', async () => {
       const store = await getAccountStore();
       store.startReauthAccount('uuid-1');
       expect(lastStartAuthFlowArgs?.scopes).toEqual([
@@ -137,17 +137,17 @@ describe('AccountStore reauth', () => {
       ]);
     });
 
-    it('uses provided scope tier when supplied', async () => {
+    it('uses provided capability when supplied', async () => {
       const store = await getAccountStore();
-      store.startReauthAccount('uuid-1', 'mail_compose');
+      store.startReauthAccount('uuid-1', ['mail:compose']);
       expect(lastStartAuthFlowArgs?.scopes).toContain(
         'https://www.googleapis.com/auth/gmail.compose',
       );
     });
 
-    it('uses provided multi-tier scopes when supplied', async () => {
+    it('uses provided multiple capabilities when supplied', async () => {
       const store = await getAccountStore();
-      store.startReauthAccount('uuid-1', ['mail_readonly', 'drive_readonly']);
+      store.startReauthAccount('uuid-1', ['mail:read', 'drive:read']);
       const scopes = lastStartAuthFlowArgs?.scopes ?? [];
       expect(scopes).toContain('https://www.googleapis.com/auth/gmail.readonly');
       expect(scopes).toContain('https://www.googleapis.com/auth/drive.readonly');
