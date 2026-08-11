@@ -68,10 +68,11 @@ describe('capabilitiesOf', () => {
     expect(capabilitiesOf([GMAIL_READONLY])).toEqual(['mail:read']);
   });
 
-  it('treats mail:modify as implying mail:read', () => {
+  it('treats mail:modify as implying mail:read and mail:compose', () => {
     const caps = capabilitiesOf([GMAIL_MODIFY, GMAIL_LABELS]);
     expect(caps).toContain('mail:modify');
     expect(caps).toContain('mail:read');
+    expect(caps).toContain('mail:compose');
   });
 
   // calendar.events authorizes neither calendarList.list nor freebusy.query,
@@ -134,6 +135,10 @@ describe('hasCapability and missingCapabilities', () => {
 
   it('honours implication when checking', () => {
     expect(hasCapability([GMAIL_MODIFY, GMAIL_LABELS], 'mail:read')).toBe(true);
+  });
+
+  it('honours the compose implication when checking', () => {
+    expect(hasCapability([GMAIL_MODIFY, GMAIL_LABELS], 'mail:compose')).toBe(true);
   });
 
   it('lists only the capabilities actually missing', () => {

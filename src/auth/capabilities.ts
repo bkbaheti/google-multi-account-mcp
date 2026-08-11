@@ -37,8 +37,15 @@ export const CAPABILITY_SCOPES: Record<Capability, readonly string[]> = {
 };
 
 /**
- * The ONLY implication that is actually true of Google's scopes: gmail.modify is
- * documented as "Read, compose, and send emails", so it subsumes gmail.readonly.
+ * The implications that are actually true of Google's scopes, each checked against
+ * a method-level scope list in Google's API reference:
+ *
+ * - gmail.modify implies mail:read: it is documented as "Read, compose, and send
+ *   emails", so it subsumes gmail.readonly.
+ * - gmail.modify implies mail:compose: both users.drafts.create and
+ *   users.messages.send list mail.google.com, gmail.modify, and gmail.compose as
+ *   accepted scopes (users.messages.send also accepts gmail.send), so gmail.modify
+ *   alone authorizes every draft/send operation gmail.compose authorizes.
  *
  * Deliberately absent, and verified against Google's documentation:
  * - drive.file does NOT imply drive.readonly. drive.file grants per-file access to
@@ -52,7 +59,7 @@ export const CAPABILITY_SCOPES: Record<Capability, readonly string[]> = {
  * API reference. A false entry silently disables a gate.
  */
 const CAPABILITY_IMPLIES: Partial<Record<Capability, readonly Capability[]>> = {
-  'mail:modify': ['mail:read'],
+  'mail:modify': ['mail:read', 'mail:compose'],
 };
 
 export function isCapability(value: string): value is Capability {
