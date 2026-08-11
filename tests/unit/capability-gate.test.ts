@@ -129,4 +129,25 @@ describe('capabilityGateError', () => {
     expect(message).not.toContain('calendar:write');
     expect(message).toContain('calendar:read');
   });
+
+  // The one real escalation this codebase defines (Drive's app-created
+  // reach) must explain the actual mechanism - a property of the file the
+  // call names - and must not fall back to the generic "operations it does
+  // not cover" wording, which reads as an upsell for unrelated future
+  // calls rather than a reason THIS call could fail. Assert on the
+  // mechanism, not the exact sentence, so a rewording doesn't spuriously
+  // fail this test.
+  it('explains the drive:appfiles escalation as a per-file reach limitation, not a future-operations upsell', () => {
+    const message = capabilityGateError(
+      'Personal',
+      { accept: ['drive:appfiles', 'drive:read'], remedy: 'drive:appfiles', escalation: 'drive:read' },
+      [],
+    ).message;
+
+    const [, escalationLine] = message.split('\n\n');
+    expect(escalationLine).toBeDefined();
+    expect(escalationLine?.toLowerCase()).toContain('created');
+    expect(escalationLine?.toLowerCase()).not.toContain('does not cover');
+    expect(escalationLine?.toLowerCase()).not.toContain('other operations');
+  });
 });

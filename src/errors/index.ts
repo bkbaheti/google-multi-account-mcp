@@ -132,11 +132,24 @@ export function insufficientCapability(
  * being made right now — not a reason some other, future call might need
  * more (see the `escalation` field's doc comment on CapabilityGate for why
  * that distinction matters). Add an entry here whenever a new gate is given
- * an `escalation`; there are none yet, since every gate this codebase
- * defines today either has no escalation or falls back to the generic
- * wording below.
+ * an `escalation`; the generic fallback below exists only for a gate that
+ * hasn't been given a specific entry yet, and reads as exactly the
+ * "you might want more for later" upsell this field must never be.
+ *
+ * - drive:appfiles → drive:read: drive.file grants access only to files
+ *   this server created (or that the user explicitly opened with it via a
+ *   picker) — verified against Google's drive.file scope description. A
+ *   file someone else shared with the account was reached neither way, so
+ *   it is invisible to drive:appfiles regardless of how many other files
+ *   the account has touched through this server. That is a property of
+ *   the file the current call names, not of some future call.
  */
-const ESCALATION_CONDITIONS: Partial<Record<Capability, Partial<Record<Capability, string>>>> = {};
+const ESCALATION_CONDITIONS: Partial<Record<Capability, Partial<Record<Capability, string>>>> = {
+  'drive:appfiles': {
+    'drive:read':
+      'the file was not created by this server and was not explicitly opened with it (for example, it was shared with the account by someone else)',
+  },
+};
 
 function escalationCondition(remedy: Capability, escalation: Capability): string {
   return (
