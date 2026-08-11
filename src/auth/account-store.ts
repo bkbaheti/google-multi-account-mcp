@@ -1,6 +1,6 @@
 import { loadConfig, resolveOAuthConfig, saveConfig } from '../config/index.js';
-import type { Account, ScopeTier } from '../types/index.js';
-import { mergeScopeTiers, SCOPE_TIERS } from '../types/index.js';
+import type { Account } from '../types/index.js';
+import { type Capability, capabilitiesOf, scopesFor } from './capabilities.js';
 import {
   type AuthFlowOptions,
   GoogleOAuth,
@@ -89,10 +89,8 @@ export class AccountStore {
    * Start adding an account asynchronously - returns auth URL immediately.
    * Use checkPendingAuth to poll for completion.
    */
-  startAddAccount(scopeTierOrTiers: ScopeTier | ScopeTier[] = 'mail_readonly'): PendingAuthSession {
-    const scopes = Array.isArray(scopeTierOrTiers)
-      ? mergeScopeTiers(scopeTierOrTiers)
-      : [...SCOPE_TIERS[scopeTierOrTiers]];
+  startAddAccount(capabilities: Capability[] = ['mail:read']): PendingAuthSession {
+    const scopes = scopesFor(capabilities);
     const oauth = this.getOAuth();
     return oauth.startAuthFlowAsync(scopes);
   }
@@ -100,26 +98,22 @@ export class AccountStore {
   /**
    * Start re-authenticating an existing account. Preserves the account ID
    * (and therefore alias, description, labels). On completion, tokens and
-   * scopes on the existing account record are updated. If scopeTierOrTiers
-   * is omitted, the account's current scope tier is reused.
+   * scopes on the existing account record are updated. If capabilities
+   * is omitted, the account's current scopes are reused.
    *
    * Returns { session } on success or { error } if the account is unknown.
    */
   startReauthAccount(
     accountIdOrAlias: string,
-    scopeTierOrTiers?: ScopeTier | ScopeTier[],
+    capabilities?: Capability[],
   ): { session: PendingAuthSession } | { error: string } {
     const account = this.resolveAccount(accountIdOrAlias);
     if (!account) {
       return { error: `Account not found: ${accountIdOrAlias}` };
     }
 
-    // Default to the account's existing scopes if no tier specified.
-    const scopes = scopeTierOrTiers
-      ? Array.isArray(scopeTierOrTiers)
-        ? mergeScopeTiers(scopeTierOrTiers)
-        : [...SCOPE_TIERS[scopeTierOrTiers]]
-      : [...account.scopes];
+    // Default to the account's existing scopes if no capabilities specified.
+    const scopes = capabilities ? scopesFor(capabilities) : [...account.scopes];
 
     const oauth = this.getOAuth();
     const session = oauth.startAuthFlowAsync(scopes, {
@@ -193,13 +187,10 @@ export class AccountStore {
    * Original blocking addAccount method for backwards compatibility
    */
   async addAccount(
-    scopeTierOrTiers: ScopeTier | ScopeTier[] = 'mail_readonly',
+    capabilities: Capability[] = ['mail:read'],
     options?: AuthFlowOptions,
   ): Promise<Account> {
-    // Support both single tier (backwards compat) and array of tiers
-    const scopes = Array.isArray(scopeTierOrTiers)
-      ? mergeScopeTiers(scopeTierOrTiers)
-      : [...SCOPE_TIERS[scopeTierOrTiers]];
+    const scopes = scopesFor(capabilities);
     const oauth = this.getOAuth();
     const result = await oauth.startAuthFlow(scopes, options);
 
@@ -306,4 +297,17 @@ export class AccountStore {
     this.updateLastUsed(id);
     return oauth.getAuthenticatedClient(id);
   }
+}
+
+/**
+ * Capabilities an account holds today that the requested set would not grant.
+ * Reauth replaces the scope set wholesale, so this is what a narrowing reauth
+ * would silently destroy.
+ */
+export function capabilitiesRemovedBy(
+  currentScopes: string[],
+  requested: Capability[],
+): Capability[] {
+  const wouldHold = new Set(capabilitiesOf(scopesFor(requested)));
+  return capabilitiesOf(currentScopes).filter((capability) => !wouldHold.has(capability));
 }
