@@ -4,7 +4,7 @@
 
 **Goal:** Replace the scope-tier model with eight per-service capabilities, so an operation gate names the permission it needs instead of resolving a tier through a lookup table that could lie.
 
-**Architecture:** A new `src/auth/capabilities.ts` owns the vocabulary, the scope mapping, the two true implications, and derivation from granted scopes. `SCOPE_TIERS`, `SCOPE_IMPLIES`, `OPERATION_SCOPE_REQUIREMENTS`, `getScopeTier` and `hasSufficientScope` are deleted. All 57 gates migrate from a tier string to a capability string. The account store and OAuth flow take capability lists; reauth refuses to narrow without confirmation.
+**Architecture:** A new `src/auth/capabilities.ts` owns the vocabulary, the scope mapping, the single true implication, and derivation from granted scopes. `SCOPE_TIERS`, `SCOPE_IMPLIES`, `OPERATION_SCOPE_REQUIREMENTS`, `getScopeTier` and `hasSufficientScope` are deleted. All 57 gates migrate from a tier string to a capability string. The account store and OAuth flow take capability lists; reauth refuses to narrow without confirmation.
 
 **Tech Stack:** TypeScript (ES2022/NodeNext, strict), vitest, zod, Biome, pnpm.
 
