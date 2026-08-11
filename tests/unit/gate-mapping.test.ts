@@ -4,6 +4,7 @@ import type { Capability } from '../../src/auth/capabilities.js';
 import type { AccountStore } from '../../src/auth/index.js';
 import { registerCalendarTools } from '../../src/server/calendar-tools.js';
 import { registerDriveTools } from '../../src/server/drive-tools.js';
+import { registerGmailTools } from '../../src/server/gmail-tools.js';
 
 /** Register a tool family against fakes and record which capability each tool demands. */
 function captureGates(
@@ -30,7 +31,18 @@ function captureGates(
   for (const [name, handler] of Object.entries(handlers)) {
     current = name;
     try {
-      void handler({ accountId: 'acct', fileId: 'f', calendarId: 'c', eventId: 'e' });
+      void handler({
+        accountId: 'acct',
+        fileId: 'f',
+        calendarId: 'c',
+        eventId: 'e',
+        messageId: 'm',
+        draftId: 'd',
+        threadId: 't',
+        labelId: 'l',
+        filterId: 'flt',
+        query: 'q',
+      });
     } catch {
       // A handler may throw on the stub args; the gate already recorded what we need.
     }
@@ -97,5 +109,58 @@ describe('Calendar gate mapping', () => {
     'calendar_move_event',
   ])('%s requires calendar:write', (tool) => {
     expect(gates[tool]).toBe('calendar:write');
+  });
+});
+
+describe('Gmail gate mapping', () => {
+  const gates = captureGates(registerGmailTools as never);
+
+  it.each([
+    'gmail_search_messages',
+    'gmail_get_message',
+    'gmail_get_messages_batch',
+    'gmail_get_thread',
+    'gmail_get_attachment',
+    'gmail_list_attachments',
+    'gmail_bulk_save_attachments',
+  ])('%s requires mail:read', (tool) => {
+    expect(gates[tool]).toBe('mail:read');
+  });
+
+  it.each([
+    'gmail_create_draft',
+    'gmail_create_draft_with_attachment',
+    'gmail_update_draft',
+    'gmail_get_draft',
+    'gmail_delete_draft',
+    'gmail_send_draft',
+    'gmail_reply_in_thread',
+  ])('%s requires mail:compose', (tool) => {
+    expect(gates[tool]).toBe('mail:compose');
+  });
+
+  it.each([
+    'gmail_list_labels',
+    'gmail_create_label',
+    'gmail_update_label',
+    'gmail_delete_label',
+    'gmail_modify_labels',
+    'gmail_batch_modify_labels',
+    'gmail_mark_read_unread',
+    'gmail_archive',
+    'gmail_trash',
+    'gmail_untrash',
+  ])('%s requires mail:modify', (tool) => {
+    expect(gates[tool]).toBe('mail:modify');
+  });
+
+  it.each([
+    'gmail_list_filters',
+    'gmail_create_filter',
+    'gmail_delete_filter',
+    'gmail_get_vacation',
+    'gmail_set_vacation',
+  ])('%s requires mail:settings', (tool) => {
+    expect(gates[tool]).toBe('mail:settings');
   });
 });
