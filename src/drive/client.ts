@@ -291,35 +291,39 @@ export class DriveClient {
     const drive = await this.getDrive();
     const maxChars = options.maxChars;
 
-    // First get file metadata to determine type
+    // First get file metadata to determine type. contentMimeType is what the
+    // caller will actually receive: the Workspace export format if this file has
+    // one (a Drawing exports to image/png), otherwise the file's own MIME type.
     const file = await this.getFile(fileId);
     const defaultExportMimeType = EXPORT_MIME_TYPES[file.mimeType];
+    const contentMimeType = defaultExportMimeType ?? file.mimeType;
+
+    // A bounded preview (maxChars set — always true for drive_get_file_content,
+    // never for drive_get_full_file_content) can't do anything useful with binary
+    // content: truncated base64 isn't valid binary data, and untruncated base64
+    // breaks the "preview" contract. That is true regardless of *why* the content
+    // is binary — a Workspace file whose default export is binary (a Drawing) and
+    // a directly-stored binary file (an uploaded photo.png) are indistinguishable
+    // to the caller, so both must refuse identically. Checked before either
+    // network call so a refusal never pays for the download it's rejecting.
+    if (maxChars !== undefined && !isTextMimeType(contentMimeType)) {
+      throw validationError(
+        `"${file.name}" is ${contentMimeType}, a binary format that cannot be previewed as bounded text. Use drive_download_file to save it to disk, or drive_get_full_file_content to fetch the complete base64 payload.`,
+      );
+    }
 
     let buffer: Buffer;
-    let contentMimeType: string;
 
     if (defaultExportMimeType) {
-      // Google Workspace file: export it. A binary export (a Drawing exports to
-      // image/png) can't be bounded by maxChars, so a preview call — maxChars is
-      // always set by drive_get_file_content, never by drive_get_full_file_content —
-      // refuses up front rather than returning an unbounded base64 blob truncation
-      // can't make useful.
-      if (maxChars !== undefined && !isTextMimeType(defaultExportMimeType)) {
-        throw validationError(
-          `"${file.name}" exports to ${defaultExportMimeType}, a binary format that cannot be previewed as bounded text. Use drive_download_file to save it to disk, or drive_get_full_file_content to fetch the complete base64 payload.`,
-        );
-      }
-
-      // Read as an arraybuffer so binary export formats (a Drawing exports to
-      // image/png) survive intact — decoding those as UTF-8 replaces every
-      // invalid byte sequence with U+FFFD.
+      // Google Workspace file: export it. Read as an arraybuffer so binary export
+      // formats (a Drawing exports to image/png) survive intact — decoding those as
+      // UTF-8 replaces every invalid byte sequence with U+FFFD.
       const response = await drive.files.export(
         { fileId, mimeType: defaultExportMimeType },
         { responseType: 'arraybuffer' },
       );
 
       buffer = Buffer.from(response.data as ArrayBuffer);
-      contentMimeType = defaultExportMimeType;
     } else {
       // Regular file: download it
       const response = await drive.files.get(
@@ -328,7 +332,6 @@ export class DriveClient {
       );
 
       buffer = Buffer.from(response.data as ArrayBuffer);
-      contentMimeType = file.mimeType;
     }
 
     // Text: return as utf-8

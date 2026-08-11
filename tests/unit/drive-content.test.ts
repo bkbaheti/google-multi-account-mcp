@@ -179,7 +179,25 @@ describe('DriveClient getFileContent', () => {
   });
 
   describe('binary files', () => {
-    it('returns base64 without truncation regardless of maxChars', async () => {
+    // A directly-stored binary file (not a Workspace export) is indistinguishable
+    // from a Workspace-export binary to the caller of drive_get_file_content, so it
+    // must refuse identically rather than returning unbounded base64 — same as the
+    // Drawing case above, and for the same reason: truncated base64 isn't usable,
+    // and untruncated base64 breaks the "preview" contract.
+    it('refuses to preview a regular binary file when maxChars is set, without downloading it', async () => {
+      mockFilesGet.mockResolvedValueOnce({
+        data: { id: 'bin-1', name: 'photo.png', mimeType: 'image/png' },
+      });
+
+      await expect(client.getFileContent('bin-1', { maxChars: 2 })).rejects.toThrow(
+        /drive_download_file/,
+      );
+      expect(mockFilesGet).toHaveBeenCalledTimes(1); // metadata only — no raw-media get
+    });
+
+    // drive_get_full_file_content never passes maxChars, so it must keep working
+    // for a regular binary file exactly as it does for a Workspace export.
+    it('still returns base64 when maxChars is omitted', async () => {
       const bytes = [0x00, 0x01, 0x02, 0xff, 0xfe];
 
       mockFilesGet
@@ -190,7 +208,7 @@ describe('DriveClient getFileContent', () => {
           data: toArrayBufferFromBytes(bytes),
         });
 
-      const result = await client.getFileContent('bin-1', { maxChars: 2 });
+      const result = await client.getFileContent('bin-1');
 
       expect(result.truncated).toBe(false);
       expect(result.encoding).toBe('base64');
