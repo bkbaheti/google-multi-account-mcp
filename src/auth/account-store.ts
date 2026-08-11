@@ -71,7 +71,10 @@ export class AccountStore {
     return null;
   }
 
-  setAccountAlias(accountId: string, alias: string | null): { success: boolean; error?: string; existingAccountId?: string } {
+  setAccountAlias(
+    accountId: string,
+    alias: string | null,
+  ): { success: boolean; error?: string; existingAccountId?: string } {
     const config = loadConfig();
     const account = config.accounts.find((a) => a.id === accountId);
 
@@ -324,4 +327,20 @@ export function capabilitiesRemovedBy(
 ): Capability[] {
   const wouldHold = new Set(capabilitiesOf(scopesFor(requested)));
   return capabilitiesOf(currentScopes).filter((capability) => !wouldHold.has(capability));
+}
+
+/**
+ * Capabilities the requested set would grant that the account does not
+ * already hold. Mirror of capabilitiesRemovedBy above, for the widening
+ * side of a reauth - see CONFIRM_ON_WIDEN in ./capabilities.ts for which of
+ * these actually warrant a confirm: true gate.
+ */
+export function capabilitiesAddedBy(
+  currentScopes: string[],
+  requested: Capability[],
+): Capability[] {
+  const currentlyHeld = new Set(capabilitiesOf(currentScopes));
+  return capabilitiesOf(scopesFor(requested)).filter(
+    (capability) => !currentlyHeld.has(capability),
+  );
 }

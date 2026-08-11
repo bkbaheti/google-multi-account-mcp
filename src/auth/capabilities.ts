@@ -159,6 +159,59 @@ export function isCapability(value: string): value is Capability {
 }
 
 /**
+ * Named bundles of capabilities, expanded to primitives before anything is
+ * stored - a front door onto the vocabulary above, not a second vocabulary.
+ * An account's stored scopes, gates, and errors only ever speak in
+ * Capability names; a preset name never reaches storage.
+ *
+ * - `read-only` covers all three services at read-only, for someone who just
+ *   wants their assistant to see things.
+ * - `inbox-assistant` is `mail:modify` alone - it already includes
+ *   mail:read and mail:compose (see CAPABILITY_IMPLIES), so listing them
+ *   here too would be redundant, not more complete.
+ * - `scheduler` grants BOTH calendar capabilities, always. calendar:write
+ *   alone cannot list calendars or check free/busy (see CAPABILITY_INFO
+ *   above), so a scheduler preset granting only write would leave the agent
+ *   able to reach nothing but the "primary" calendar - a broken product,
+ *   not a narrower one.
+ *
+ * Deliberately absent:
+ * - No `full-access` preset. Bundling every capability into one name hides
+ *   exactly the choice presets exist to make explicit elsewhere.
+ * - No Drive preset beyond read-only's drive:read. drive:read means "read
+ *   every file in this Drive, including everything anyone has shared with
+ *   you" - the one grant broad enough that it must be chosen deliberately
+ *   via `capabilities`, not folded into a convenience bundle.
+ */
+export const CAPABILITY_PRESETS = {
+  'read-only': ['mail:read', 'drive:read', 'calendar:read'],
+  'inbox-assistant': ['mail:modify'],
+  scheduler: ['calendar:read', 'calendar:write'],
+} as const satisfies Record<string, readonly Capability[]>;
+
+export type PresetName = keyof typeof CAPABILITY_PRESETS;
+
+export const PRESET_NAMES = Object.keys(CAPABILITY_PRESETS) as PresetName[];
+
+export function isPreset(value: string): value is PresetName {
+  return (PRESET_NAMES as readonly string[]).includes(value);
+}
+
+/**
+ * Capabilities whose gain via reauth warrants the same confirm: true
+ * friction the narrowing gate already requires - see capabilitiesRemovedBy
+ * in ../auth/account-store.ts and its mirror capabilitiesAddedBy.
+ *
+ * Only drive:read: gaining it means "read every file in this Drive,
+ * including everything shared with the user" (CAPABILITY_INFO['drive:read']
+ * above), the one grant where silently sliding into it on a reauth costs
+ * real exposure. mail:read and calendar:read are deliberately excluded -
+ * over-warning trains people to click through, which costs you the warning
+ * that matters.
+ */
+export const CONFIRM_ON_WIDEN: readonly Capability[] = ['drive:read'];
+
+/**
  * Old scope-tier names (removed in 0.5.0, commit 6387f1c) mapped to their
  * capability-model equivalent, derived from the scopes each tier used to
  * request (see SCOPE_TIERS as it stood at 6387f1c^:src/types/index.ts).

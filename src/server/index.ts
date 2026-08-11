@@ -1,18 +1,24 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import open from 'open';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import open from 'open';
 import { z } from 'zod';
-import { capabilitiesRemovedBy } from '../auth/account-store.js';
+import { capabilitiesAddedBy, capabilitiesRemovedBy } from '../auth/account-store.js';
 import {
   CAPABILITIES,
+  CAPABILITY_INFO,
+  CAPABILITY_PRESETS,
   type Capability,
   type CapabilityGate,
+  CONFIRM_ON_WIDEN,
   capabilitiesOf,
   hasAnyCapability,
   isCapability,
+  isPreset,
   normalizeGate,
+  PRESET_NAMES,
+  type PresetName,
 } from '../auth/capabilities.js';
 import type { TokenStorage } from '../auth/index.js';
 import { AccountStore } from '../auth/index.js';
@@ -124,6 +130,34 @@ export function createServer(options: ServerOptions): McpServer {
     return { capabilities: values as Capability[] };
   }
 
+  // Validate a raw list of preset names and expand each to its primitive
+  // capabilities. Rejects unknown names by name, same treatment as an
+  // unknown capability - see validateCapabilities above. A preset never
+  // reaches storage: only the expanded Capability[] does.
+  function validatePresets(
+    values: string[],
+  ): { capabilities: Capability[] } | { error: ReturnType<typeof errorResponse> } {
+    const invalid = values.filter((value) => !isPreset(value));
+    if (invalid.length > 0) {
+      return {
+        error: errorResponse(
+          validationError(
+            `Unknown preset${invalid.length === 1 ? '' : 's'}: ${invalid.join(', ')}. Valid presets are: ${PRESET_NAMES.join(', ')}.`,
+            'presets',
+          ).toResponse(),
+        ),
+      };
+    }
+
+    const expanded = new Set<Capability>();
+    for (const value of values) {
+      for (const capability of CAPABILITY_PRESETS[value as PresetName]) {
+        expanded.add(capability);
+      }
+    }
+    return { capabilities: Array.from(expanded) };
+  }
+
   // Build a per-service view of an account's capabilities, e.g.
   // { mail: ['read', 'compose'], drive: ['read'] }.
   function capabilityView(scopes: string[]): Record<string, string[]> {
@@ -197,20 +231,49 @@ export function createServer(options: ServerOptions): McpServer {
             .array(z.string())
             .optional()
             .describe(
-              'Capabilities to authorize, as service:level strings. Valid values: mail:read, mail:compose, mail:modify, mail:settings, drive:read, drive:appfiles, calendar:read, calendar:write. Note drive:read (read all files) and drive:appfiles (per-file access to files this app created) are independent — grant both for full Drive access.',
+              'Capabilities to authorize, as service:level strings. Valid values: mail:read, mail:compose, mail:modify, mail:settings, drive:read, drive:appfiles, calendar:read, calendar:write. Note drive:read (read all files) and drive:appfiles (per-file access to files this app created) are independent — grant both for full Drive access. Composes with presets; the combined set is deduplicated.',
+            ),
+          presets: z
+            .array(z.string())
+            .optional()
+            .describe(
+              'Named bundles of capabilities, as a front door onto the same primitives - no preset name is ever stored. Valid values: read-only (mail:read, drive:read, calendar:read), inbox-assistant (mail:modify), scheduler (calendar:read and calendar:write - both, since calendar:write alone cannot list calendars). There is no full-access or Drive-only preset: broad Drive access must be chosen explicitly via capabilities. Composes with capabilities; the combined set is deduplicated.',
             ),
         })
         .passthrough(),
     },
     async (args) => {
-      const unknownArgs = rejectUnknownArgs(args, ['capabilities']);
+      const unknownArgs = rejectUnknownArgs(args, ['capabilities', 'presets']);
       if (unknownArgs) return errorResponse(unknownArgs.toResponse());
 
-      // If no capabilities specified, prompt for selection
-      if (!args.capabilities || args.capabilities.length === 0) {
+      const hasCapabilities = args.capabilities && args.capabilities.length > 0;
+      const hasPresets = args.presets && args.presets.length > 0;
+
+      // If neither capabilities nor a preset was specified, prompt for
+      // selection. Presets slot into this same prompt rather than a separate
+      // flow, and - like the individual options below - none is preselected.
+      if (!hasCapabilities && !hasPresets) {
         return successResponse({
           needsScopeSelection: true,
-          message: 'Which capabilities would you like for this account?',
+          message:
+            'Which capabilities would you like for this account? Pick a preset for a common combination, or select individual capabilities.',
+          presets: [
+            {
+              preset: 'read-only',
+              capabilities: CAPABILITY_PRESETS['read-only'],
+              description: 'Read mail, Drive, and calendar. No writes anywhere.',
+            },
+            {
+              preset: 'inbox-assistant',
+              capabilities: CAPABILITY_PRESETS['inbox-assistant'],
+              description: 'Read, send, and organize mail: labels, archive, trash.',
+            },
+            {
+              preset: 'scheduler',
+              capabilities: CAPABILITY_PRESETS.scheduler,
+              description: 'Read and manage calendar events.',
+            },
+          ],
           options: [
             { capability: 'mail:read', description: 'Read and search emails' },
             { capability: 'mail:compose', description: 'Compose and send emails' },
@@ -233,12 +296,28 @@ export function createServer(options: ServerOptions): McpServer {
         });
       }
 
-      const validated = validateCapabilities(args.capabilities);
-      if ('error' in validated) return validated.error;
+      let presetCapabilities: Capability[] = [];
+      if (hasPresets && args.presets) {
+        const validatedPresets = validatePresets(args.presets);
+        if ('error' in validatedPresets) return validatedPresets.error;
+        presetCapabilities = validatedPresets.capabilities;
+      }
+
+      let explicitCapabilities: Capability[] = [];
+      if (hasCapabilities && args.capabilities) {
+        const validated = validateCapabilities(args.capabilities);
+        if ('error' in validated) return validated.error;
+        explicitCapabilities = validated.capabilities;
+      }
+
+      // Presets are expanded to primitives before anything downstream sees
+      // them - startAddAccount only ever receives Capability values, deduped
+      // across whatever mix of presets and explicit capabilities was given.
+      const capabilities = Array.from(new Set([...presetCapabilities, ...explicitCapabilities]));
 
       try {
         // Start async auth flow - returns immediately with auth URL
-        const session = accountStore.startAddAccount(validated.capabilities);
+        const session = accountStore.startAddAccount(capabilities);
 
         // Auto-open browser, best-effort (ignore errors for headless/SSH environments)
         open(session.authUrl).catch(() => {});
@@ -249,7 +328,7 @@ export function createServer(options: ServerOptions): McpServer {
               type: 'text' as const,
               text: [
                 'Authorization required. Opening your browser...',
-                'If it didn\'t open, use this URL:',
+                "If it didn't open, use this URL:",
                 '',
                 session.authUrl,
                 '',
@@ -328,7 +407,7 @@ export function createServer(options: ServerOptions): McpServer {
     'google_reauth_account',
     {
       description:
-        "Re-authenticate an existing Google account. Use this when a refresh token is invalidated (e.g., password change, revoked access, expired grant) or when you need to add/change capabilities without losing the account ID, alias, description, or labels. Returns an authorization URL. After the user authorizes, call google_check_pending_auth with the sessionId. If no capabilities are given, the account's current capabilities are reused. Reauth REPLACES the capability set rather than adding to it, so dropping a capability the account currently holds requires confirm: true. The authorized Google account must match the existing email; otherwise the reauth fails.",
+        "Re-authenticate an existing Google account. Use this when a refresh token is invalidated (e.g., password change, revoked access, expired grant) or when you need to add/change capabilities without losing the account ID, alias, description, or labels. Returns an authorization URL. After the user authorizes, call google_check_pending_auth with the sessionId. If no capabilities are given, the account's current capabilities are reused. Reauth REPLACES the capability set rather than adding to it, so dropping a capability the account currently holds requires confirm: true. Gaining drive:read the account doesn't already hold requires confirm: true too, since it grants read access to every file in the Drive, including everything shared with the user. If a reauth both narrows and widens at once, both are reported together and one confirm: true covers both. The authorized Google account must match the existing email; otherwise the reauth fails.",
       // .passthrough() so a removed `scopeTier`/`scopeTiers` argument survives
       // into `args` for rejectUnknownArgs to see below, instead of the SDK's
       // default zod parsing silently stripping it before the handler runs.
@@ -371,15 +450,34 @@ export function createServer(options: ServerOptions): McpServer {
         if ('error' in validated) return validated.error;
         capabilities = validated.capabilities;
 
-        // Reauth replaces the scope set wholesale, so narrowing it here would
-        // silently destroy capabilities the account currently holds unless
-        // the caller confirms the loss.
+        // Reauth replaces the scope set wholesale, so a single call can both
+        // silently destroy capabilities the account currently holds
+        // (narrowing) and silently grant new ones worth pausing on
+        // (widening - currently just drive:read, see CONFIRM_ON_WIDEN).
+        // Both are checked here and, when either applies, reported together
+        // behind one confirm: true - the caller confirms once, not twice,
+        // for one reauth that does both.
         const removed = capabilitiesRemovedBy(account.scopes, capabilities);
-        if (removed.length > 0 && args.confirm !== true) {
+        const widened = capabilitiesAddedBy(account.scopes, capabilities).filter((capability) =>
+          CONFIRM_ON_WIDEN.includes(capability),
+        );
+
+        if ((removed.length > 0 || widened.length > 0) && args.confirm !== true) {
+          const facts: string[] = [];
+          if (removed.length > 0) {
+            facts.push(
+              `This would remove capabilit${removed.length === 1 ? 'y' : 'ies'} the account currently holds: ${removed.join(', ')}.`,
+            );
+          }
+          for (const capability of widened) {
+            facts.push(`This would grant ${capability}: ${CAPABILITY_INFO[capability].canDo}`);
+          }
+          facts.push('Set confirm: true to proceed anyway.');
+
           return errorResponse(
             confirmationRequired(
               `re-authorize ${account.email} with capabilities=${JSON.stringify(capabilities)}`,
-              `This would remove capabilit${removed.length === 1 ? 'y' : 'ies'} the account currently holds: ${removed.join(', ')}. Set confirm: true to proceed anyway.`,
+              facts.join(' '),
             ).toResponse(),
           );
         }
@@ -495,9 +593,7 @@ export function createServer(options: ServerOptions): McpServer {
 
       if (!result.success) {
         if (result.existingAccountId) {
-          return errorResponse(
-            aliasDuplicate(args.alias, result.existingAccountId).toResponse(),
-          );
+          return errorResponse(aliasDuplicate(args.alias, result.existingAccountId).toResponse());
         }
         return errorResponse(accountNotFound(args.accountId).toResponse());
       }
