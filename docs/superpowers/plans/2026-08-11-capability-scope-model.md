@@ -13,7 +13,12 @@
 ## Global Constraints
 
 - Capabilities are the exact strings `mail:read`, `mail:compose`, `mail:modify`, `mail:settings`, `drive:read`, `drive:appfiles`, `calendar:read`, `calendar:write`. No others exist.
-- Only two implications are real: `mail:modify ⇒ mail:read`, `calendar:write ⇒ calendar:read`. Never add a drive implication — `drive:read` and `drive:appfiles` are independent. This is the bug the whole change exists to fix.
+- **Exactly one implication is real: `mail:modify ⇒ mail:read`.** Never add any other. Verified against Google's documentation:
+  - `drive.file` and `drive.readonly` are independent — neither contains the other. This is the bug the whole change exists to fix.
+  - `calendar.events` does **not** imply `calendar.readonly`. It authorizes neither `calendarList.list` nor `freebusy.query`; both accept only `calendar.readonly`. An earlier draft of this plan wrongly listed this as a second true implication.
+  - `gmail.compose` grants no read access.
+  - `gmail.modify` does not cover label management, so `mail:modify` maps to both `gmail.modify` and `gmail.labels`.
+- A gate may require one capability, or a list meaning **any of these suffices** (needed because reading calendar events is authorized by either calendar scope).
 - `userinfo.email` (`https://www.googleapis.com/auth/userinfo.email`) is always requested and is never a capability.
 - Capabilities are **derived** from an account's stored scopes on every read. Never persist a capability list; `Account.scopes` stays the only stored form, so no config migration is needed.
 - Strict TypeScript: `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess` are on. Never assign `undefined` to an optional property.
@@ -55,6 +60,7 @@ Used by several tasks; the single source of truth is Task 1's `CAPABILITY_SCOPES
   - `scopesFor(capabilities: Capability[]): string[]` — deduped, always includes `USERINFO_EMAIL_SCOPE`
   - `capabilitiesOf(scopes: string[]): Capability[]` — derived, implications applied
   - `hasCapability(scopes: string[], capability: Capability): boolean`
+  - `hasAnyCapability(scopes: string[], capabilities: Capability[]): boolean`
   - `missingCapabilities(scopes: string[], required: Capability[]): Capability[]`
 
 - [ ] **Step 1: Write the failing test**
@@ -137,10 +143,14 @@ describe('capabilitiesOf', () => {
     expect(caps).toContain('mail:read');
   });
 
-  it('treats calendar:write as implying calendar:read', () => {
-    const caps = capabilitiesOf([CAL_EVENTS]);
-    expect(caps).toContain('calendar:write');
-    expect(caps).toContain('calendar:read');
+  // calendar.events authorizes neither calendarList.list nor freebusy.query,
+  // so it must NOT imply calendar:read. The old model claimed it did.
+  it('does NOT derive calendar:read from calendar.events', () => {
+    expect(capabilitiesOf([CAL_EVENTS])).toEqual(['calendar:write']);
+  });
+
+  it('does NOT derive calendar:write from calendar.readonly', () => {
+    expect(capabilitiesOf([CAL_READONLY])).toEqual(['calendar:read']);
   });
 
   // The bug this whole change exists to fix.
@@ -202,6 +212,25 @@ describe('hasCapability and missingCapabilities', () => {
     expect(missingCapabilities([DRIVE_FILE], ['drive:appfiles'])).toEqual([]);
   });
 });
+
+describe('hasAnyCapability', () => {
+  // Reading calendar events is authorized by either calendar scope.
+  it('accepts an account holding only calendar:write for an event read', () => {
+    expect(hasAnyCapability([CAL_EVENTS], ['calendar:read', 'calendar:write'])).toBe(true);
+  });
+
+  it('accepts an account holding only calendar:read for an event read', () => {
+    expect(hasAnyCapability([CAL_READONLY], ['calendar:read', 'calendar:write'])).toBe(true);
+  });
+
+  it('rejects an account holding neither', () => {
+    expect(hasAnyCapability([DRIVE_FILE], ['calendar:read', 'calendar:write'])).toBe(false);
+  });
+
+  it('rejects an empty requirement list', () => {
+    expect(hasAnyCapability([CAL_EVENTS], [])).toBe(false);
+  });
+});
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -253,17 +282,22 @@ export const CAPABILITY_SCOPES: Record<Capability, readonly string[]> = {
 };
 
 /**
- * The only two implications that are actually true of Google's scopes:
- * gmail.modify includes gmail.readonly, and calendar.events includes
- * calendar.readonly.
+ * The ONLY implication that is actually true of Google's scopes: gmail.modify is
+ * documented as "Read, compose, and send emails", so it subsumes gmail.readonly.
  *
- * There is deliberately NO drive entry. drive.file grants per-file access to
- * app-created files; drive.readonly grants read access to everything. Neither
- * contains the other, and asserting otherwise is the bug this model replaces.
+ * Deliberately absent, and verified against Google's documentation:
+ * - drive.file does NOT imply drive.readonly. drive.file grants per-file access to
+ *   app-created files; drive.readonly reads everything. Asserting otherwise is the
+ *   bug this model replaces.
+ * - calendar.events does NOT imply calendar.readonly. It authorizes neither
+ *   calendarList.list nor freebusy.query, both of which accept only
+ *   calendar.readonly.
+ *
+ * Do not add entries here without checking the method-level scope list in Google's
+ * API reference. A false entry silently disables a gate.
  */
 const CAPABILITY_IMPLIES: Partial<Record<Capability, readonly Capability[]>> = {
   'mail:modify': ['mail:read'],
-  'calendar:write': ['calendar:read'],
 };
 
 export function isCapability(value: string): value is Capability {
@@ -306,6 +340,16 @@ export function capabilitiesOf(scopes: string[]): Capability[] {
 
 export function hasCapability(scopes: string[], capability: Capability): boolean {
   return capabilitiesOf(scopes).includes(capability);
+}
+
+/**
+ * True when the account holds at least one of the listed capabilities. Needed
+ * where more than one scope authorizes an operation — reading calendar events is
+ * permitted by either calendar.readonly or calendar.events.
+ */
+export function hasAnyCapability(scopes: string[], capabilities: Capability[]): boolean {
+  const held = new Set(capabilitiesOf(scopes));
+  return capabilities.some((capability) => held.has(capability));
 }
 
 export function missingCapabilities(scopes: string[], required: Capability[]): Capability[] {
@@ -450,7 +494,9 @@ git commit -m "feat(errors): add capability gate error with non-narrowing remedy
 
 **Interfaces:**
 - Consumes: `Capability`, `hasCapability`, `missingCapabilities` (Task 1); `insufficientCapability` (Task 2).
-- Produces: `requireCapability(accountRef: string, capability: Capability)` — same return shape as today's `validateAccountScope`, i.e. `{ error }` on failure or `{ account }` on success, so tool bodies keep their `if ('error' in validation) return validation.error;` line unchanged.
+- Produces: `requireCapability(accountRef: string, required: Capability | Capability[])` — same return shape as today's `validateAccountScope`, i.e. `{ error }` on failure or `{ account }` on success, so tool bodies keep their `if ('error' in validation) return validation.error;` line unchanged.
+
+An array argument means **any of these suffices** (via `hasAnyCapability`), not all of them. On failure with an array, the error lists every candidate so the user can pick one. A single capability uses `hasCapability`.
 
 - [ ] **Step 1: Rename the helper, keeping its return shape**
 
@@ -514,12 +560,22 @@ The nine read tools (`drive_list_shared_drives`, `drive_search_files`, `drive_li
 
 - [ ] **Step 2: Migrate the Calendar gates**
 
-In `src/server/calendar-tools.ts`:
+**Not a 1:1 tier mapping.** `calendar.events` authorizes neither `calendarList.list` nor `freebusy.query`, so the old `calendar_readonly` tier splits three ways in `src/server/calendar-tools.ts`:
 
-| Old tier | New capability |
+| Tool | New requirement |
 |---|---|
-| `calendar_readonly` | `calendar:read` |
-| `calendar_full` | `calendar:write` |
+| `calendar_list_calendars` | `'calendar:read'` |
+| `calendar_freebusy` | `'calendar:read'` |
+| `calendar_list_events` | `['calendar:read', 'calendar:write']` (any-of) |
+| `calendar_get_event` | `['calendar:read', 'calendar:write']` (any-of) |
+| `calendar_search_events` | `['calendar:read', 'calendar:write']` (any-of) |
+| `calendar_create_event` | `'calendar:write'` |
+| `calendar_update_event` | `'calendar:write'` |
+| `calendar_delete_event` | `'calendar:write'` |
+| `calendar_rsvp` | `'calendar:write'` |
+| `calendar_move_event` | `'calendar:write'` |
+
+The three any-of entries exist because `events.list` and `events.get` accept either scope, so requiring `calendar:read` alone would wrongly lock out an account holding only `calendar.events`.
 
 - [ ] **Step 3: Update the two comment tool descriptions**
 
