@@ -4,6 +4,14 @@ export {
   type TokenData,
   type TokenStorage,
 } from './auth/index.js';
+export {
+  CAPABILITIES,
+  type Capability,
+  type CapabilityGate,
+  capabilitiesOf,
+  isCapability,
+  scopesFor,
+} from './auth/capabilities.js';
 export { getConfigPath, loadConfig, saveConfig } from './config/index.js';
 export {
   decodeBody,

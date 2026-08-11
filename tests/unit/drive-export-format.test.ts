@@ -27,6 +27,7 @@ vi.mock('googleapis', () => ({
 
 import type { AccountStore } from '../../src/auth/index.js';
 import { DriveClient } from '../../src/drive/client.js';
+import { ErrorCode, McpToolError } from '../../src/errors/index.js';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -219,6 +220,66 @@ describe('DriveClient downloadFileToLocal — export format', () => {
     ).rejects.toThrow(/exportMimeType/);
 
     expect(mockFilesExport).not.toHaveBeenCalled();
+  });
+
+  // Both exportMimeType misuse cases must surface as a classifiable McpToolError
+  // (VALIDATION_ERROR) rather than a bare Error, which toMcpError falls back to
+  // classifying by substring match and can misfire into UNKNOWN_ERROR — or worse,
+  // into an unrelated code if the message happens to contain a matched substring.
+  it('surfaces the folder rejection as a VALIDATION_ERROR, not UNKNOWN_ERROR', async () => {
+    mockFilesGet.mockResolvedValueOnce({
+      data: { id: 'fold-1', name: 'Contracts', mimeType: 'application/vnd.google-apps.folder' },
+    });
+
+    const error: unknown = await client
+      .downloadFileToLocal('fold-1', outputDir, undefined, 'application/pdf')
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(McpToolError);
+    expect((error as McpToolError).code).toBe(ErrorCode.VALIDATION_ERROR);
+    // Guards against a message that happens to contain "not found", which
+    // toMcpError's substring fallback would reclassify as a not-found error.
+    expect((error as McpToolError).message).not.toMatch(/not found/i);
+  });
+
+  it('surfaces the non-Workspace-file rejection as a VALIDATION_ERROR, not UNKNOWN_ERROR', async () => {
+    mockFilesGet.mockResolvedValueOnce({
+      data: { id: 'bin-1', name: 'photo.png', mimeType: 'image/png' },
+    });
+
+    const error: unknown = await client
+      .downloadFileToLocal('bin-1', outputDir, undefined, DOCX_MIME)
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(McpToolError);
+    expect((error as McpToolError).code).toBe(ErrorCode.VALIDATION_ERROR);
+  });
+
+  // exportMimeType !== undefined is true for '', so the Workspace-file guards used
+  // to run and pass for a Doc, then '' ?? EXPORT_MIME_TYPES[...] evaluated to '' —
+  // nullish coalescing does not treat '' as absent — which is falsy, so control fell
+  // through to the raw-media branch and called files.get({ alt: 'media' }) on a
+  // Google Doc, which Drive rejects. An empty string must take the same default
+  // export path as omitting the argument entirely.
+  it('treats exportMimeType: "" as absent and takes the default text/plain export for a Doc', async () => {
+    mockDoc('Report');
+    mockFilesExport.mockResolvedValueOnce({ data: utf8ArrayBuffer('plain text body') });
+
+    const result = await client.downloadFileToLocal('doc-1', outputDir, undefined, '');
+
+    expect(mockFilesGet).toHaveBeenCalledTimes(1); // metadata only — no raw-media get
+    expect(mockFilesExport.mock.calls[0][0].mimeType).toBe('text/plain');
+    expect(result.fileName).toBe('Report.txt');
+  });
+
+  it('treats a whitespace-only exportMimeType as absent', async () => {
+    mockDoc('Report');
+    mockFilesExport.mockResolvedValueOnce({ data: utf8ArrayBuffer('plain text body') });
+
+    const result = await client.downloadFileToLocal('doc-1', outputDir, undefined, '   ');
+
+    expect(mockFilesExport.mock.calls[0][0].mimeType).toBe('text/plain');
+    expect(result.fileName).toBe('Report.txt');
   });
 
   it('still downloads a regular binary file when exportMimeType is omitted', async () => {

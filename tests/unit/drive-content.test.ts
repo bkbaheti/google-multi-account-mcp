@@ -141,9 +141,25 @@ describe('DriveClient getFileContent', () => {
   });
 
   describe('Workspace files whose default export is binary', () => {
-    // A Drawing exports to image/png. Decoding those bytes as UTF-8 replaces every
-    // invalid sequence with U+FFFD, so the caller got mojibake labelled as text.
-    it('returns a Drawing export as base64 rather than corrupted text', async () => {
+    // A Drawing exports to image/png. drive_get_file_content always passes maxChars
+    // (defaulted to 10,000 by the tool layer), so a bounded preview call can't turn
+    // that binary export into anything usable — truncated base64 isn't a valid PNG,
+    // and untruncated base64 blows past the "preview" contract. Refuse instead of
+    // silently ignoring maxChars, and point at the two tools that actually work here.
+    it('refuses to preview a Drawing export when maxChars is set, without calling export', async () => {
+      mockFilesGet.mockResolvedValueOnce({
+        data: { id: 'draw-1', name: 'Diagram', mimeType: 'application/vnd.google-apps.drawing' },
+      });
+
+      await expect(client.getFileContent('draw-1', { maxChars: 5 })).rejects.toThrow(
+        /drive_download_file/,
+      );
+      expect(mockFilesExport).not.toHaveBeenCalled();
+    });
+
+    // drive_get_full_file_content never passes maxChars — it promises the whole
+    // file — so that path must keep returning the export as base64.
+    it('still returns a Drawing export as base64 rather than corrupted text when maxChars is omitted', async () => {
       const pngBytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x80];
 
       mockFilesGet.mockResolvedValueOnce({
@@ -151,7 +167,7 @@ describe('DriveClient getFileContent', () => {
       });
       mockFilesExport.mockResolvedValueOnce({ data: toArrayBufferFromBytes(pngBytes) });
 
-      const result = await client.getFileContent('draw-1', { maxChars: 5 });
+      const result = await client.getFileContent('draw-1');
 
       expect(result.encoding).toBe('base64');
       expect(result.content).toBe(Buffer.from(pngBytes).toString('base64'));

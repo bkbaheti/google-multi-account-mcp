@@ -3,6 +3,7 @@ import { basename, join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { type drive_v3, google } from 'googleapis';
 import type { AccountStore } from '../auth/index.js';
+import { validationError } from '../errors/index.js';
 
 export interface DriveFile {
   id: string;
@@ -298,9 +299,20 @@ export class DriveClient {
     let contentMimeType: string;
 
     if (defaultExportMimeType) {
-      // Google Workspace file: export it. Read as an arraybuffer so binary export
-      // formats (a Drawing exports to image/png) survive intact — decoding those as
-      // UTF-8 replaces every invalid byte sequence with U+FFFD.
+      // Google Workspace file: export it. A binary export (a Drawing exports to
+      // image/png) can't be bounded by maxChars, so a preview call — maxChars is
+      // always set by drive_get_file_content, never by drive_get_full_file_content —
+      // refuses up front rather than returning an unbounded base64 blob truncation
+      // can't make useful.
+      if (maxChars !== undefined && !isTextMimeType(defaultExportMimeType)) {
+        throw validationError(
+          `"${file.name}" exports to ${defaultExportMimeType}, a binary format that cannot be previewed as bounded text. Use drive_download_file to save it to disk, or drive_get_full_file_content to fetch the complete base64 payload.`,
+        );
+      }
+
+      // Read as an arraybuffer so binary export formats (a Drawing exports to
+      // image/png) survive intact — decoding those as UTF-8 replaces every
+      // invalid byte sequence with U+FFFD.
       const response = await drive.files.export(
         { fileId, mimeType: defaultExportMimeType },
         { responseType: 'arraybuffer' },
@@ -369,18 +381,30 @@ export class DriveClient {
     // Get file metadata
     const file = await this.getFile(fileId);
 
-    if (exportMimeType !== undefined) {
+    // Treat empty/whitespace-only as absent. `??` does not treat '' as absent, so a
+    // caller that fills this optional string with '' rather than omitting it would
+    // otherwise skip the Workspace-file guards below yet still fall through to the
+    // raw-media branch for a Workspace file, which Drive rejects with "Only files
+    // with binary content can be downloaded" — the opposite of what those guards
+    // just verified.
+    const trimmedExportMimeType = exportMimeType?.trim();
+
+    if (trimmedExportMimeType) {
       if (file.mimeType === GOOGLE_APPS_FOLDER_MIME) {
-        throw new Error(`Cannot export "${file.name}": it is a folder, not a document.`);
+        throw validationError(
+          `Cannot export "${file.name}": it is a folder. exportMimeType only applies to Google Workspace files (Docs, Sheets, Slides, Drawings).`,
+          'exportMimeType',
+        );
       }
       if (!file.mimeType.startsWith(GOOGLE_APPS_MIME_PREFIX)) {
-        throw new Error(
+        throw validationError(
           `exportMimeType is only supported for Google Workspace files; "${file.name}" is ${file.mimeType}. Omit exportMimeType to download it as-is.`,
+          'exportMimeType',
         );
       }
     }
 
-    const effectiveExportMimeType = exportMimeType ?? EXPORT_MIME_TYPES[file.mimeType];
+    const effectiveExportMimeType = trimmedExportMimeType || EXPORT_MIME_TYPES[file.mimeType];
 
     let buffer: Buffer;
     let mimeType: string;
