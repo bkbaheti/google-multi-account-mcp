@@ -166,6 +166,21 @@ Tests: empty array reuses current scopes; a legacy `scopeTier` key is rejected b
 
 ---
 
+### Task A6: Fix the flaky exponential-backoff assertion
+
+**Files:** Modify `tests/unit/retry.test.ts`
+
+`tests/unit/retry.test.ts` (~line 99) asserts `delays[1]/delays[0]` is `> 1.2` and `< 3`. Each delay carries independent jitter of ±25%, so the true ratio range is `[1.5/1.25, 2.5/0.75]` = `[1.2, 3.33]`. Both asserted bounds sit inside the legitimate range, so the test fails at random. It has done so three times in one working session, each time costing a re-run and a moment of doubt about whether real work broke.
+
+A flaky test in a suite used as a merge gate is worse than no test: it trains everyone to re-run rather than investigate.
+
+- [ ] **Step 1:** Derive the correct bounds from the jitter factor actually used in `src/utils/retry.ts` — read it, do not assume ±25%. State the derivation in a comment above the assertion so the next reader can check it rather than trust it.
+- [ ] **Step 2:** Assert the property that matters — that the second delay is meaningfully larger than the first (exponential growth happened) — within bounds that cannot fail for a correct implementation. Do not simply widen the numbers until it passes; the comment must show why the new bounds are exhaustive.
+- [ ] **Step 3:** Run the file 20 times in a row and confirm zero failures: `for i in $(seq 20); do pnpm vitest run tests/unit/retry.test.ts 2>&1 | grep -E "Tests +[0-9]+ (passed|failed)"; done`. Paste the output.
+- [ ] **Step 4:** Commit — `test(retry): fix jitter bounds that could fail for a correct implementation`
+
+---
+
 ## Part B — permission UX
 
 ### Task B1: Capability metadata table
