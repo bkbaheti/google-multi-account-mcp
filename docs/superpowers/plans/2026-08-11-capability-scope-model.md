@@ -524,8 +524,12 @@ Change only the call and its argument. Do not restructure tool bodies, rename va
 
 - [ ] **Step 4: Verify**
 
-Run: `pnpm test && pnpm typecheck`
-Expected: green. Gmail tool behaviour is unchanged for accounts that hold the equivalent scopes; only the vocabulary moved.
+Run: `pnpm test`
+Expected: green.
+
+**`pnpm typecheck` will FAIL here, and that is correct.** Changing the helper's parameter type on `registerDriveTools` / `registerCalendarTools` is incompatible with those files' own untouched call sites, which still pass tier strings — TypeScript's function-parameter contravariance means no signature satisfies both at once. Expect ~27 errors confined to `src/server/drive-tools.ts` and `src/server/calendar-tools.ts`. Zero errors anywhere else; if errors appear in `index.ts`, `gmail-tools.ts` or a test file, something is wrong.
+
+Those tools are also non-functional at runtime in this window — they pass tier strings to a gate that now only recognizes capabilities, so every call would be refused. Task 4 restores both, and nothing ships in between. Do not try to fix drive or calendar here.
 
 - [ ] **Step 5: Commit**
 
