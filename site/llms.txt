@@ -32,6 +32,58 @@ For Claude Desktop, add to claude_desktop_config.json:
 - **Security**: Local-first, zero telemetry. Tiered permission scopes (readonly, compose, full). OAuth tokens stored locally.
 - **Zero Config**: No Google Cloud project needed. Install and go.
 
+## Capabilities
+
+<!-- BEGIN GENERATED: capabilities -->
+mail:read (Read mail)
+  can: Read and search your email, and list your labels.
+  cannot: Cannot send, reply, label, archive or delete anything.
+  reach: Every message and label in the mailbox.
+  scopes: gmail.readonly
+
+mail:compose (Compose mail)
+  can: Write drafts and send email. Despite the name, this capability sends — it does not only compose.
+  cannot: Cannot read any message already in your mailbox, not even replies to what it sends.
+  reach: Drafts and messages this capability creates.
+  scopes: gmail.compose
+
+mail:modify (Full mail)
+  can: Read, send, and organise mail: labels, archive, trash. Includes everything mail:read and mail:compose do — you do not need to grant those as well.
+  cannot: Cannot manage filters or the vacation auto-reply.
+  reach: Every message and label in the mailbox.
+  scopes: gmail.modify, gmail.labels
+
+mail:settings (Mail settings)
+  can: Manage filters and the vacation auto-reply.
+  cannot: Cannot read or send mail.
+  reach: Mailbox-wide filter and vacation-responder settings.
+  scopes: gmail.settings.basic
+
+drive:read (Read Drive)
+  can: See and download every file in this Drive, read-only. Includes files other people shared with you, and every Shared Drive you belong to.
+  cannot: Cannot create, edit, move or share anything.
+  reach: Every file and Shared Drive the account can see.
+  scopes: drive.readonly
+
+drive:appfiles (App-created Drive files)
+  can: Create files and folders, and read, edit, share and delete the ones within its reach.
+  cannot: Cannot see anything else in your Drive — searches return an empty list rather than an error.
+  reach: Files this server created, plus files you explicitly opened with it.
+  scopes: drive.file
+
+calendar:read (Read calendar)
+  can: See your calendars, your events, and when you are free or busy. Required to list which calendars exist.
+  cannot: Cannot create or change events.
+  reach: Every calendar the account can see.
+  scopes: calendar.readonly
+
+calendar:write (Write calendar)
+  can: Create, edit, move, delete events, and RSVP.
+  cannot: Cannot list your calendars or check free/busy — grant calendar:read as well, or the agent can only reach the "primary" calendar.
+  reach: Events on calendars the account can write to.
+  scopes: calendar.events
+<!-- END GENERATED: capabilities -->
+
 ## MCP Tools (55+)
 
 ### Account Management

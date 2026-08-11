@@ -312,17 +312,18 @@ Claude: [Configures vacation responder with dates]
 
 When adding an account, Claude will ask which permissions you need:
 
-| Tier | What You Can Do | Best For |
-|------|-----------------|----------|
-| `mail_readonly` | Read and search emails | Checking email, research |
-| `mail_compose` | + Create drafts and send | Daily email use (recommended) |
-| `mail_full` | + Labels, archive, trash | Inbox organization |
-| `mail_settings` | + Filters, vacation responder | Email automation |
-| `drive_readonly` | Browse and download files | Reading documents |
-| `drive_full` | + Upload, share, organize | File management |
-| `calendar_readonly` | View events and calendars | Checking schedule |
-| `calendar_full` | + Create, update, delete events | Schedule management |
-| `all` | Everything above | Full control |
+<!-- BEGIN GENERATED: capabilities -->
+| Capability | Can do | Cannot do | Reach | Scopes |
+|---|---|---|---|---|
+| `mail:read` (Read mail) | Read and search your email, and list your labels. | Cannot send, reply, label, archive or delete anything. | Every message and label in the mailbox. | `gmail.readonly` |
+| `mail:compose` (Compose mail) | Write drafts and send email. Despite the name, this capability sends — it does not only compose. | Cannot read any message already in your mailbox, not even replies to what it sends. | Drafts and messages this capability creates. | `gmail.compose` |
+| `mail:modify` (Full mail) | Read, send, and organise mail: labels, archive, trash. Includes everything mail:read and mail:compose do — you do not need to grant those as well. | Cannot manage filters or the vacation auto-reply. | Every message and label in the mailbox. | `gmail.modify`, `gmail.labels` |
+| `mail:settings` (Mail settings) | Manage filters and the vacation auto-reply. | Cannot read or send mail. | Mailbox-wide filter and vacation-responder settings. | `gmail.settings.basic` |
+| `drive:read` (Read Drive) | See and download every file in this Drive, read-only. Includes files other people shared with you, and every Shared Drive you belong to. | Cannot create, edit, move or share anything. | Every file and Shared Drive the account can see. | `drive.readonly` |
+| `drive:appfiles` (App-created Drive files) | Create files and folders, and read, edit, share and delete the ones within its reach. | Cannot see anything else in your Drive — searches return an empty list rather than an error. | Files this server created, plus files you explicitly opened with it. | `drive.file` |
+| `calendar:read` (Read calendar) | See your calendars, your events, and when you are free or busy. Required to list which calendars exist. | Cannot create or change events. | Every calendar the account can see. | `calendar.readonly` |
+| `calendar:write` (Write calendar) | Create, edit, move, delete events, and RSVP. | Cannot list your calendars or check free/busy — grant calendar:read as well, or the agent can only reach the "primary" calendar. | Events on calendars the account can write to. | `calendar.events` |
+<!-- END GENERATED: capabilities -->
 
 **How it works:**
 - `readonly` → `compose` → `full` builds on each other

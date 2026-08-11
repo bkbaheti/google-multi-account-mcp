@@ -28,7 +28,8 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
-    "typecheck:e2e": "tsc -p tsconfig.e2e.json --noEmit"
+    "typecheck:e2e": "tsc -p tsconfig.e2e.json --noEmit",
+    "docs:capabilities": "tsx scripts/generate-capability-docs.ts"
   },
   "keywords": [
     "mcp",
