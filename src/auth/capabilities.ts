@@ -118,3 +118,44 @@ export function missingCapabilities(scopes: string[], required: Capability[]): C
   const held = new Set(capabilitiesOf(scopes));
   return required.filter((capability) => !held.has(capability));
 }
+
+/**
+ * An operation gate expressed as a record rather than a bare capability, for
+ * operations Google authorizes under more than one capability (e.g.
+ * events.list accepts either calendar.readonly or calendar.events).
+ *
+ * - `accept` mirrors the Google method's authorized-capability list.
+ * - `remedy` is the narrowest member of `accept` — the only one that ever
+ *   appears in the executable `google_reauth_account` line a gate failure
+ *   suggests. Suggesting a broader member here would let the error message
+ *   turn a read request into an unrequested write-scope escalation.
+ * - `escalation`, when present, is a broader member of `accept`, offered
+ *   separately together with the condition under which `remedy` alone will
+ *   not suffice.
+ */
+export interface CapabilityGate {
+  accept: Capability[];
+  remedy: Capability;
+  escalation?: Capability;
+}
+
+/**
+ * Normalize a bare Capability into the equivalent single-member gate, and
+ * assert the one invariant a hand-written CapabilityGate must satisfy:
+ * `remedy` has to be a member of `accept`. Violating it would let a gate
+ * suggest a capability that doesn't even satisfy the operation it guards -
+ * so this is a bug in the gate's definition, not a runtime/user condition,
+ * and fails fast with a thrown error rather than a soft validation result.
+ */
+export function normalizeGate(required: Capability | CapabilityGate): CapabilityGate {
+  const gate: CapabilityGate =
+    typeof required === 'string' ? { accept: [required], remedy: required } : required;
+
+  if (!gate.accept.includes(gate.remedy)) {
+    throw new Error(
+      `Invalid capability gate: remedy "${gate.remedy}" must be a member of accept [${gate.accept.join(', ')}].`,
+    );
+  }
+
+  return gate;
+}

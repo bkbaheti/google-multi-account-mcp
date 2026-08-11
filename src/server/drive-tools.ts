@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Capability } from '../auth/capabilities.js';
+import type { Capability, CapabilityGate } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
 import { DriveClient } from '../drive/index.js';
 import {
@@ -58,7 +58,7 @@ export function registerDriveTools(
   accountStore: AccountStore,
   validateAccountScope: (
     accountId: string,
-    required: Capability | Capability[],
+    required: Capability | CapabilityGate,
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // === Read tools (require drive:read) ===

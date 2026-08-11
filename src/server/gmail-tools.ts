@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Capability } from '../auth/capabilities.js';
+import type { Capability, CapabilityGate } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
 import {
   confirmationRequired,
@@ -19,7 +19,7 @@ export function registerGmailTools(
   accountStore: AccountStore,
   requireCapability: (
     accountId: string,
-    required: Capability | Capability[],
+    required: Capability | CapabilityGate,
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // gmail_search_messages - Search messages in Gmail

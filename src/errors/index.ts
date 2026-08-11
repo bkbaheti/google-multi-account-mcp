@@ -1,4 +1,4 @@
-import { type Capability, capabilitiesOf } from '../auth/capabilities.js';
+import { type Capability, type CapabilityGate, capabilitiesOf } from '../auth/capabilities.js';
 
 // Error codes following the pattern: CATEGORY_SPECIFIC
 export const ErrorCode = {
@@ -123,6 +123,69 @@ export function insufficientCapability(
       `to add ${missing.length === 1 ? 'it' : 'them'} without losing existing access.`,
     { accountRef, missing, currentCapabilities: current, suggestedCapabilities: suggested },
   );
+}
+
+/**
+ * Human-readable reason the escalation half of a gate might be needed,
+ * keyed by remedy then escalation capability. Each entry names the concrete
+ * condition under which the narrow remedy will not suffice, so the message
+ * explains why the broader grant might matter rather than just that it
+ * exists. Add an entry here whenever a new gate is given an `escalation`.
+ */
+const ESCALATION_CONDITIONS: Partial<Record<Capability, Partial<Record<Capability, string>>>> = {
+  'calendar:read': {
+    'calendar:write': 'this account will also need to create, update, RSVP to, or delete events, not just read them',
+  },
+};
+
+function escalationCondition(remedy: Capability, escalation: Capability): string {
+  return (
+    ESCALATION_CONDITIONS[remedy]?.[escalation] ??
+    `this account will also need ${escalation} for operations ${remedy} does not cover`
+  );
+}
+
+/**
+ * A gate refused because the account lacks a capability. Bare-capability
+ * callers are normalized to a single-member gate (see `normalizeGate`), so
+ * this always has a `remedy` and, sometimes, an `escalation`.
+ *
+ * The executable `google_reauth_account` line contains the account's current
+ * capabilities plus `gate.remedy` only — the narrowest capability that
+ * satisfies the operation — so following it can never over-grant. When the
+ * gate also has an `escalation` (a broader capability that satisfies the
+ * same operation, or ones like it), a second, separately executable line
+ * offers it, preceded by the condition under which the narrow remedy will
+ * not be enough.
+ */
+export function capabilityGateError(
+  accountRef: string,
+  gate: CapabilityGate,
+  currentScopes: string[],
+): McpToolError {
+  const current = capabilitiesOf(currentScopes);
+  const remedyCapabilities = Array.from(new Set([...current, gate.remedy]));
+
+  let message =
+    `Account "${accountRef}" is missing capability: ${gate.remedy}. ` +
+    `Use google_reauth_account accountId="${accountRef}" capabilities=${JSON.stringify(remedyCapabilities)} ` +
+    `to add it without losing existing access.`;
+
+  let escalationCapabilities: Capability[] | undefined;
+  if (gate.escalation) {
+    escalationCapabilities = Array.from(new Set([...current, gate.escalation]));
+    message +=
+      `\n\nIf ${escalationCondition(gate.remedy, gate.escalation)}, ${gate.remedy} alone will not be enough. ` +
+      `Use google_reauth_account accountId="${accountRef}" capabilities=${JSON.stringify(escalationCapabilities)} instead.`;
+  }
+
+  return new McpToolError(ErrorCode.CAPABILITY_INSUFFICIENT, message, {
+    accountRef,
+    missing: [gate.remedy],
+    currentCapabilities: current,
+    suggestedCapabilities: remedyCapabilities,
+    ...(gate.escalation && { escalation: gate.escalation, escalationCapabilities }),
+  });
 }
 
 export function confirmationRequired(operation: string, hint?: string): McpToolError {

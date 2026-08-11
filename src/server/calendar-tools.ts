@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Capability } from '../auth/capabilities.js';
+import type { Capability, CapabilityGate } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
 import { CalendarClient } from '../calendar/index.js';
 import {
@@ -11,12 +11,24 @@ import {
 } from '../errors/index.js';
 import { coerceArgs } from '../utils/index.js';
 
+// events.list, events.get, and events.search all accept either
+// calendar.readonly or calendar.events (verified against Google's
+// per-method scope reference), so calendar:read alone satisfies them and is
+// the narrowest capability to suggest. calendar:write also works but is
+// only relevant if the caller intends to modify events too, so it's offered
+// as an escalation rather than folded into the primary remedy.
+const CALENDAR_READ_OR_WRITE_GATE: CapabilityGate = {
+  accept: ['calendar:read', 'calendar:write'],
+  remedy: 'calendar:read',
+  escalation: 'calendar:write',
+};
+
 export function registerCalendarTools(
   server: McpServer,
   accountStore: AccountStore,
   validateAccountScope: (
     accountId: string,
-    required: Capability | Capability[],
+    required: Capability | CapabilityGate,
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // === Read tools (require calendar:read, unless noted) ===
@@ -71,7 +83,7 @@ export function registerCalendarTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, ['calendar:read', 'calendar:write']);
+      const validation = validateAccountScope(args.accountId, CALENDAR_READ_OR_WRITE_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -119,7 +131,7 @@ export function registerCalendarTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, ['calendar:read', 'calendar:write']);
+      const validation = validateAccountScope(args.accountId, CALENDAR_READ_OR_WRITE_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -153,7 +165,7 @@ export function registerCalendarTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, ['calendar:read', 'calendar:write']);
+      const validation = validateAccountScope(args.accountId, CALENDAR_READ_OR_WRITE_GATE);
       if ('error' in validation) return validation.error;
 
       try {

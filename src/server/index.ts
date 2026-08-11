@@ -8,19 +8,20 @@ import { capabilitiesRemovedBy } from '../auth/account-store.js';
 import {
   CAPABILITIES,
   type Capability,
+  type CapabilityGate,
   capabilitiesOf,
   hasAnyCapability,
-  hasCapability,
   isCapability,
+  normalizeGate,
 } from '../auth/capabilities.js';
 import type { TokenStorage } from '../auth/index.js';
 import { AccountStore } from '../auth/index.js';
 import {
   accountNotFound,
   aliasDuplicate,
+  capabilityGateError,
   confirmationRequired,
   errorResponse,
-  insufficientCapability,
   successResponse,
   toMcpError,
   validationError,
@@ -68,11 +69,14 @@ export function createServer(options: ServerOptions): McpServer {
   const accountStore = new AccountStore(options.tokenStorage);
 
   // Helper to validate account exists and holds the required capability.
-  // Accepts account ID, alias, or email address. An array of capabilities
-  // means any one of them suffices.
+  // Accepts account ID, alias, or email address. A CapabilityGate means any
+  // one of its `accept` members suffices; a bare Capability is normalized to
+  // a single-member gate. (A bare array is no longer accepted here — see
+  // CapabilityGate for why: an any-of gate must name its narrowest member as
+  // `remedy` so a failure never suggests over-granting.)
   function requireCapability(
     accountRef: string,
-    required: Capability | Capability[],
+    required: Capability | CapabilityGate,
   ):
     | { error: ReturnType<typeof errorResponse> }
     | { account: NonNullable<ReturnType<typeof accountStore.getAccount>> } {
@@ -81,16 +85,12 @@ export function createServer(options: ServerOptions): McpServer {
       return { error: errorResponse(accountNotFound(accountRef).toResponse()) };
     }
 
-    const satisfied = Array.isArray(required)
-      ? hasAnyCapability(account.scopes, required)
-      : hasCapability(account.scopes, required);
+    const gate = normalizeGate(required);
+    const satisfied = hasAnyCapability(account.scopes, gate.accept);
 
     if (!satisfied) {
-      const missing = Array.isArray(required) ? required : [required];
       return {
-        error: errorResponse(
-          insufficientCapability(accountRef, missing, account.scopes).toResponse(),
-        ),
+        error: errorResponse(capabilityGateError(accountRef, gate, account.scopes).toResponse()),
       };
     }
 

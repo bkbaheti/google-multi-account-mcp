@@ -7,6 +7,7 @@ import {
   hasCapability,
   isCapability,
   missingCapabilities,
+  normalizeGate,
   scopesFor,
 } from '../../src/auth/capabilities.js';
 
@@ -171,5 +172,30 @@ describe('hasAnyCapability', () => {
 
   it('rejects an empty requirement list', () => {
     expect(hasAnyCapability([CAL_EVENTS], [])).toBe(false);
+  });
+});
+
+describe('normalizeGate', () => {
+  it('wraps a bare capability into a single-member gate', () => {
+    expect(normalizeGate('drive:read')).toEqual({ accept: ['drive:read'], remedy: 'drive:read' });
+  });
+
+  it('passes a well-formed CapabilityGate through unchanged', () => {
+    const gate = {
+      accept: ['calendar:read', 'calendar:write'] as Capability[],
+      remedy: 'calendar:read' as Capability,
+      escalation: 'calendar:write' as Capability,
+    };
+    expect(normalizeGate(gate)).toBe(gate);
+  });
+
+  // The invariant a hand-written gate must satisfy: `remedy` has to be one
+  // of the capabilities the gate accepts, or the suggested remedy wouldn't
+  // even satisfy the operation it guards. This is a bug in the gate's
+  // definition, so it fails fast rather than silently misbehaving.
+  it('throws when remedy is not a member of accept', () => {
+    expect(() =>
+      normalizeGate({ accept: ['calendar:read'], remedy: 'calendar:write' }),
+    ).toThrow(/remedy "calendar:write" must be a member of accept/);
   });
 });

@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { describe, expect, it } from 'vitest';
-import type { Capability } from '../../src/auth/capabilities.js';
+import type { Capability, CapabilityGate } from '../../src/auth/capabilities.js';
 import type { AccountStore } from '../../src/auth/index.js';
 import { registerCalendarTools } from '../../src/server/calendar-tools.js';
 import { registerDriveTools } from '../../src/server/drive-tools.js';
@@ -20,8 +20,15 @@ function captureGates(
   const demanded: Record<string, string> = {};
   let current = '';
 
-  const gate = ((_accountRef: string, required: Capability | Capability[]) => {
-    demanded[current] = Array.isArray(required) ? [...required].sort().join('|') : required;
+  // A bare Capability records as itself. A CapabilityGate records its full
+  // accept set plus which member is the remedy (and, if any, the
+  // escalation) - so a test can catch not just "which capabilities satisfy
+  // this gate" but "which one the error message would actually suggest".
+  const gate = ((_accountRef: string, required: Capability | CapabilityGate) => {
+    demanded[current] =
+      typeof required === 'string'
+        ? required
+        : `${[...required.accept].sort().join('|')} remedy=${required.remedy} escalation=${required.escalation ?? 'none'}`;
     // Stop the handler before it touches the network.
     return { error: { isError: true, content: [] } };
   }) as never;
@@ -92,13 +99,15 @@ describe('Calendar gate mapping', () => {
     expect(gates[tool]).toBe('calendar:read');
   });
 
-  // events.list / events.get accept either scope, so these must be any-of.
+  // events.list / events.get accept either scope, so these must be any-of -
+  // but the remedy a failure suggests must still be the narrower one
+  // (calendar:read), with calendar:write offered only as an escalation.
   it.each([
     'calendar_list_events',
     'calendar_get_event',
     'calendar_search_events',
-  ])('%s accepts either calendar capability', (tool) => {
-    expect(gates[tool]).toBe('calendar:read|calendar:write');
+  ])('%s accepts either calendar capability, remedying to calendar:read', (tool) => {
+    expect(gates[tool]).toBe('calendar:read|calendar:write remedy=calendar:read escalation=calendar:write');
   });
 
   it.each([
