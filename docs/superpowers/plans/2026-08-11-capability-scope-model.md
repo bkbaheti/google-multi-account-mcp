@@ -461,7 +461,7 @@ export function insufficientCapability(
   const suggested = Array.from(new Set([...capabilitiesOf(currentScopes), ...missing]));
 
   return new McpError(
-    'INSUFFICIENT_CAPABILITY',
+    'CAPABILITY_INSUFFICIENT',
     `Account "${accountRef}" is missing capability ${missing.join(', ')}. ` +
       `Re-authorize with: google_reauth_account accountId="${accountRef}" ` +
       `capabilities=${JSON.stringify(suggested)}`,
@@ -768,6 +768,12 @@ git commit -m "feat!: replace scope tiers with capabilities across the tool surf
 - Modify: `CHANGELOG.md` (create if absent)
 - Modify: `CLAUDE.md`
 - Modify: `docs/ARCHITECTURE.md`
+
+- [ ] **Step 0: Rename the error code to match the file's convention**
+
+`src/errors/index.ts` line 3 states the convention is `CATEGORY_SPECIFIC`, and the sibling code is `SCOPE_INSUFFICIENT`. Task 2 introduced `INSUFFICIENT_CAPABILITY`, which inverts it. Rename the enum member and its one use site to `CAPABILITY_INSUFFICIENT`.
+
+Do this now, before 0.5.0 ships: error codes are public API surface, so renaming after release would itself be a breaking change. Verify with `grep -rn "INSUFFICIENT_CAPABILITY" src/ tests/` that no occurrence remains, then `pnpm test`.
 
 - [ ] **Step 1: Bump the version**
 
