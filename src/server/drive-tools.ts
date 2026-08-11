@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { CAPABILITY_INFO, hasCapability } from '../auth/capabilities.js';
 import type { Capability, CapabilityGate } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
 import { DriveClient } from '../drive/index.js';
@@ -74,6 +75,82 @@ const DRIVE_READ_OR_APPFILES_GATE: CapabilityGate = {
   remedy: 'drive:appfiles',
   escalation: 'drive:read',
 };
+
+// Reuse CAPABILITY_INFO's agreed-on wording for what drive:appfiles reaches,
+// rather than restating it here where it could drift out of sync.
+const APPFILES_INFO = CAPABILITY_INFO['drive:appfiles'];
+
+/**
+ * A drive:appfiles-only account never gets a permission error for files
+ * outside its reach - files.list/files.get/comments.list etc. all accept
+ * drive.file, so the call just succeeds against a narrower corpus (see
+ * DRIVE_READ_OR_APPFILES_GATE above). That means a search for a document
+ * that genuinely exists can come back empty, indistinguishable from "no
+ * such file" - the exact silent-partial-result bug this annotation exists
+ * to surface. See docs/superpowers/specs/2026-08-11-capability-correctness-
+ * and-ux-design.md, section B1.
+ */
+interface DriveCoverage {
+  scope: 'app-created-only';
+  explanation: string;
+}
+
+function driveCoverage(): DriveCoverage {
+  return {
+    scope: 'app-created-only',
+    explanation: `${APPFILES_INFO.reach} ${APPFILES_INFO.cannotDo}`,
+  };
+}
+
+// Read for a list/search response's `warning` key (see withDriveCoverage
+// below). Written for an AI-agent reader, not just a human one: it needs to
+// land as "my view here is partial, say so or try another account" rather
+// than as an incidental note that a human skims past and an agent ignores.
+// Applies regardless of whether the result on hand is empty or not - see
+// driveCoverage's doc comment for why "only warn when empty" is the wrong
+// shape.
+const DRIVE_COVERAGE_WARNING =
+  `Partial results, not a complete answer: ${APPFILES_INFO.reach} ${APPFILES_INFO.cannotDo} ` +
+  'This holds for every result below, whether the list is empty, short, or long - a file ' +
+  'missing from it may still exist outside this reach. Do not report an empty or short result ' +
+  'as "no such file" or "that\'s everything"; tell the user this view is partial, or retry with ' +
+  'an account that also holds drive:read.';
+
+/**
+ * Annotate a Drive response when the account's only Drive read access is
+ * drive:appfiles (drive.file), leaving accounts with drive:read (with or
+ * without drive:appfiles too) untouched - drive:read is what makes the view
+ * complete, so its presence is what turns this annotation off.
+ *
+ * Runs on every matching response, not only empty ones: an annotation that
+ * shows up only when a result is empty teaches "warning means zero
+ * results", so a three-of-four-thousand answer would still read as
+ * complete.
+ *
+ * `list: true` additionally puts a `warning` string as the literal first
+ * key of the response body, for MCP clients that truncate large tool
+ * results before a `coverage` block buried after hundreds of files would
+ * ever be read. That is a mitigation, not a guarantee - a client that
+ * truncates before even the first key, or that re-serializes the object
+ * with different key order, isn't helped by this.
+ */
+function withDriveCoverage<T extends object>(
+  scopes: string[],
+  data: T,
+  options: { list?: boolean } = {},
+): T & { coverage?: DriveCoverage; warning?: string } {
+  if (!hasCapability(scopes, 'drive:appfiles') || hasCapability(scopes, 'drive:read')) {
+    return data;
+  }
+
+  const coverage = driveCoverage();
+
+  if (options.list) {
+    return { warning: DRIVE_COVERAGE_WARNING, ...data, coverage };
+  }
+
+  return { ...data, coverage };
+}
 
 export function registerDriveTools(
   server: McpServer,
@@ -161,7 +238,7 @@ export function registerDriveTools(
         const normalizedQuery = normalizeDriveQuery(args.query);
         const result = await client.searchFiles(normalizedQuery, options);
 
-        return successResponse(result);
+        return successResponse(withDriveCoverage(validation.account.scopes, result, { list: true }));
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -200,7 +277,7 @@ export function registerDriveTools(
         }
         const result = await client.listFiles(args.folderId, options);
 
-        return successResponse(result);
+        return successResponse(withDriveCoverage(validation.account.scopes, result, { list: true }));
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -226,7 +303,7 @@ export function registerDriveTools(
         const client = new DriveClient(accountStore, args.accountId);
         const file = await client.getFile(args.fileId);
 
-        return successResponse(file);
+        return successResponse(withDriveCoverage(validation.account.scopes, file));
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -258,7 +335,7 @@ export function registerDriveTools(
         const maxChars = args.maxChars ?? DEFAULT_PREVIEW_MAX_CHARS;
         const result = await client.getFileContent(args.fileId, { maxChars });
 
-        return successResponse(result);
+        return successResponse(withDriveCoverage(validation.account.scopes, result));
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -284,7 +361,7 @@ export function registerDriveTools(
         const client = new DriveClient(accountStore, args.accountId);
         const result = await client.getFileContent(args.fileId);
 
-        return successResponse(result);
+        return successResponse(withDriveCoverage(validation.account.scopes, result));
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -332,7 +409,7 @@ export function registerDriveTools(
         }
         const result = await client.getComments(args.fileId, options);
 
-        return successResponse(result);
+        return successResponse(withDriveCoverage(validation.account.scopes, result, { list: true }));
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -372,7 +449,7 @@ export function registerDriveTools(
         }
         const result = await client.getCommentReplies(args.fileId, args.commentId, options);
 
-        return successResponse(result);
+        return successResponse(withDriveCoverage(validation.account.scopes, result, { list: true }));
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -418,7 +495,7 @@ export function registerDriveTools(
           args.exportMimeType,
         );
 
-        return successResponse(result);
+        return successResponse(withDriveCoverage(validation.account.scopes, result));
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
