@@ -18,7 +18,7 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `google_list_accounts` - list connected accounts
 - `google_add_account` - start OAuth flow (returns auth URL + session ID)
 - `google_check_pending_auth` - check/complete pending auth session
-- `google_reauth_account` - re-run OAuth on an existing account (preserves ID, alias, description, labels; optionally change scope tier)
+- `google_reauth_account` - re-run OAuth on an existing account (preserves ID, alias, description, labels; optionally change capabilities)
 - `google_remove_account` - delete account + tokens
 - `google_set_account_labels` - tag accounts
 - `google_set_account_alias` - set friendly alias (e.g., "work") for use in all tool calls
@@ -55,7 +55,7 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `drive_get_file` - get file metadata
 - `drive_get_file_content` - preview file content (truncated, default 10k chars)
 - `drive_get_full_file_content` - get complete file content (use sparingly)
-- `drive_get_comments` - read comments on a Doc/Sheet/Slide (author, quoted text, resolved flag, replies); needs `drive_readonly` tier
+- `drive_get_comments` - read comments on a Doc/Sheet/Slide (author, quoted text, resolved flag, replies); needs `drive:read` capability
 - `drive_get_comment_replies` - read replies to a single comment (only when a comment's inline replies are paginated)
 - `drive_download_file` - download file from Drive to local disk (supports `exportMimeType` to export Workspace files as `.docx`/`.pdf`/`.xlsx` instead of the default flat text)
 - `drive_upload_file` - upload a file (supports `filePath` for large files)
@@ -109,7 +109,7 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - Local-first stdio MCP server
 - Account isolation (tokens, cache, rate limits)
 - Draft-first + confirm gate for all sends
-- Tiered scopes with explicit upgrade (mail_readonly, mail_compose, mail_full, mail_settings, drive_readonly, drive_full, calendar_readonly, calendar_full, all)
+- Per-service capabilities with explicit upgrade (`mail:read`, `mail:compose`, `mail:modify`, `mail:settings`, `drive:read`, `drive:appfiles`, `calendar:read`, `calendar:write`). Capabilities are checked directly against required scopes — there is no tier-to-scope lookup. The only true implication is `mail:modify` ⇒ `mail:read` (Google documents `gmail.modify` as including read access). Deliberately no `drive:appfiles` ⇒ `drive:read` implication: `drive.file` (per-file, app-created access) and `drive.readonly` (read everything) are independent grants, neither contains the other — asserting otherwise previously defeated the scope gate on `drive_get_comments`. Same reasoning excludes any `calendar:write` ⇒ `calendar:read` implication (`calendar.events` doesn't authorize `calendarList.list` or `freebusy.query`).
 
 ---
 

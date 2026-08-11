@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.5.0 (August 2026) — BREAKING
+
+- **BREAKING:** Scope tiers (`mail_readonly`, `drive_full`, etc.) are replaced by eight per-service capabilities: `mail:read`, `mail:compose`, `mail:modify`, `mail:settings`, `drive:read`, `drive:appfiles`, `calendar:read`, `calendar:write`. `google_add_account` and `google_reauth_account` now take a `capabilities` array instead of a `scopeTier` string.
+
+  This is a fix, not just a rename. The old tier model asserted two implications about Google's OAuth scopes that are false:
+  - `drive.file` does **not** imply `drive.readonly` — `drive.file` grants per-file access to app-created files, `drive.readonly` reads everything, and neither contains the other. This defeated the scope gate on `drive_get_comments` for exactly the case it was built to protect, and made `drive_search_files` silently return an empty list instead of an error.
+  - `calendar.events` does **not** imply `calendar.readonly` — it authorizes neither `calendarList.list` nor `freebusy.query`. Accounts with only `calendar.events` passed the old gate on `calendar_list_calendars` and `calendar_freebusy` and then failed at Google.
+
+  Capabilities are checked directly against the scopes an operation actually needs, so there is no tier-to-scope lookup left to be wrong. The only real implication that exists in the new model is `mail:modify` ⇒ `mail:read` (Google documents `gmail.modify` as including read access).
+
+  **Migration:** no config migration is required — capabilities are derived from each account's already-stored scopes, so existing accounts keep working under their old tier's equivalent capabilities:
+
+  | Old tier | New capabilities |
+  |---|---|
+  | `mail_readonly` | `mail:read` |
+  | `mail_compose` | `mail:read`, `mail:compose` |
+  | `mail_full` | `mail:modify` |
+  | `mail_settings` | `mail:read`, `mail:settings` |
+  | `drive_readonly` | `drive:read` |
+  | `drive_full` | `drive:appfiles` |
+  | `calendar_readonly` | `calendar:read` |
+  | `calendar_full` | `calendar:write` |
+  | `all` | all eight |
+
+  One exception: an account holding only `drive.file` will now be correctly refused by the nine `drive:read` tools and must be re-authorized with `google_reauth_account` to add `drive:read`. That's the fix working as intended, not a regression — those tools never should have worked on a `drive.file`-only grant.
+
 ## v0.4.2 (May 2026)
 
 - **feat:** New `google_reauth_account` tool for re-running OAuth on an existing account. Use when a refresh token is invalidated (password change, revoked access, expired grant) or to upgrade/change scope tiers without losing the account ID, alias, description, or labels. Verifies the authorized Google account matches the existing email so reauth can't accidentally swap accounts.

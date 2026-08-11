@@ -14,7 +14,7 @@ export const ErrorCode = {
 
   // Scope/permission errors
   SCOPE_INSUFFICIENT: 'SCOPE_INSUFFICIENT',
-  INSUFFICIENT_CAPABILITY: 'INSUFFICIENT_CAPABILITY',
+  CAPABILITY_INSUFFICIENT: 'CAPABILITY_INSUFFICIENT',
 
   // Rate limiting
   RATE_LIMITED: 'RATE_LIMITED',
@@ -130,7 +130,7 @@ export function insufficientCapability(
   const suggested = Array.from(new Set([...current, ...missing]));
 
   return new McpToolError(
-    ErrorCode.INSUFFICIENT_CAPABILITY,
+    ErrorCode.CAPABILITY_INSUFFICIENT,
     `Account "${accountRef}" is missing capabilit${missing.length === 1 ? 'y' : 'ies'}: ${missing.join(', ')}. ` +
       `Use google_reauth_account accountId="${accountRef}" capabilities=${JSON.stringify(suggested)} ` +
       `to add ${missing.length === 1 ? 'it' : 'them'} without losing existing access.`,
