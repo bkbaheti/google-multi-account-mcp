@@ -962,12 +962,65 @@ git commit -m "test: pin every Drive and Calendar tool to its required capabilit
 
 ---
 
+### Task 9: Remove stale tier remnants
+
+**Files:**
+- Modify: `src/errors/index.ts`
+- Modify: `tests/unit/errors.test.ts`
+- Modify: `scripts/test-oauth.ts`
+
+**Why.** The Task 6 review found two orphans that predate this plan but are now actively wrong, and 0.5.0 should not ship with either.
+
+- [ ] **Step 1: Delete the dead `scopeInsufficient` error**
+
+`src/errors/index.ts` exports `scopeInsufficient(requiredTier, currentTier, accountId)`. It has zero call sites in `src/` — `insufficientCapability` replaced it — and its message reads:
+
+```
+Use google_add_account with scopeTier='...' to upgrade.
+```
+
+`scopeTier` no longer exists. Dead code that would hand a user an impossible instruction if it were ever reached.
+
+Delete the function. Delete `ErrorCode.SCOPE_INSUFFICIENT` if nothing else uses it — grep first. Delete the covering case in `tests/unit/errors.test.ts` (search `scopeInsufficient`) and its import. Do NOT delete `insufficientCapability` or `ErrorCode.CAPABILITY_INSUFFICIENT`, which are live.
+
+- [ ] **Step 2: Verify**
+
+Run: `grep -rn "scopeInsufficient\|SCOPE_INSUFFICIENT" src/ tests/`
+Expected: no output.
+
+- [ ] **Step 3: Fix `scripts/test-oauth.ts`**
+
+It calls `accountStore.addAccount(scopeTier)` with `'readonly' | 'compose' | 'full'` — names that were not valid even under the old tier model, so this has been broken since well before this plan. `scripts/utils.ts` points users at it when no accounts exist, so a broken script blocks the documented setup path.
+
+Change its CLI argument to a comma-separated capability list and pass a `Capability[]` through. Import `isCapability` and `CAPABILITIES` from `../src/auth/capabilities.js`. Reject unknown values by name, listing the valid ones. Update the usage comment at the top of the file and any usage string it prints. If `addAccount`'s current signature does not accept a capability array, read it and adapt the call rather than changing `AccountStore`.
+
+Default when no argument is given: `['mail:read']`, matching the old default of the narrowest tier.
+
+- [ ] **Step 4: Verify it runs**
+
+Run: `npx tsx scripts/test-oauth.ts` with no arguments.
+Expected: prints usage naming capabilities, exits without throwing. Do NOT run `add` — that starts a real OAuth flow against the user's Google account.
+
+Then: `npx tsx scripts/test-oauth.ts list`
+Expected: lists existing accounts without throwing.
+
+- [ ] **Step 5: Commit**
+
+```bash
+pnpm test && pnpm typecheck
+git add src/errors/index.ts tests/unit/errors.test.ts scripts/test-oauth.ts
+git commit -m "chore: remove dead scopeInsufficient error and fix test-oauth capability args"
+```
+
+---
+
 ## Done When
 
 - No file outside `scripts/e2e/` references `ScopeTier`, `SCOPE_TIERS`, `getScopeTier`, `hasSufficientScope`, `SCOPE_IMPLIES` or `OPERATION_SCOPE_REQUIREMENTS`.
 - `capabilitiesOf(['https://www.googleapis.com/auth/drive.file'])` returns exactly `['drive:appfiles']`.
 - `pnpm test`, `pnpm typecheck` and `pnpm biome check src` are green.
 - `package.json` reads 0.5.0 and the changelog carries the migration table.
+- No stale tier vocabulary remains in shipped code or dev scripts: `grep -rn "scopeTier\|scopeInsufficient" src/ scripts/` returns nothing outside `scripts/e2e/`.
 - Every Drive and Calendar gate is pinned by `tests/unit/gate-mapping.test.ts`, and that test has been shown to fail when a gate is deliberately mis-mapped.
 
 The E2E harness plan resumes afterwards, with Task 3's preflight rewritten against capabilities.
