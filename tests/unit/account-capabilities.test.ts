@@ -31,18 +31,19 @@ describe('capabilitiesRemovedBy', () => {
     expect(removed).toEqual([]);
   });
 
-  // mail:modify => mail:read is the only true implication in the model. Requesting
-  // mail:modify must not report mail:read as being removed, since scopesFor(['mail:modify'])
-  // grants gmail.modify, from which mail:read is derived.
+  // mail:modify implies both mail:read and mail:compose: both users.drafts.create
+  // and users.messages.send accept gmail.modify as a scope. Requesting mail:modify
+  // must not report mail:read (or mail:compose) as being removed, since
+  // scopesFor(['mail:modify']) grants gmail.modify, from which both are derived.
   it('does not flag mail:read as removed when re-requesting mail:modify', () => {
     const removed = capabilitiesRemovedBy([GMAIL_MODIFY, GMAIL_LABELS], ['mail:modify']);
 
     expect(removed).toEqual([]);
   });
 
-  it('flags mail:modify as removed when narrowing to mail:read alone', () => {
+  it('flags both mail:modify and mail:compose as removed when narrowing to mail:read alone', () => {
     const removed = capabilitiesRemovedBy([GMAIL_MODIFY, GMAIL_LABELS], ['mail:read']);
 
-    expect(removed).toEqual(['mail:modify']);
+    expect([...removed].sort()).toEqual(['mail:compose', 'mail:modify']);
   });
 });
