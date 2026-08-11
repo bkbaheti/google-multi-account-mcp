@@ -127,16 +127,16 @@ export function insufficientCapability(
 
 /**
  * Human-readable reason the escalation half of a gate might be needed,
- * keyed by remedy then escalation capability. Each entry names the concrete
- * condition under which the narrow remedy will not suffice, so the message
- * explains why the broader grant might matter rather than just that it
- * exists. Add an entry here whenever a new gate is given an `escalation`.
+ * keyed by remedy then escalation capability. Each entry must name a
+ * condition under which the narrow remedy is insufficient for the call
+ * being made right now — not a reason some other, future call might need
+ * more (see the `escalation` field's doc comment on CapabilityGate for why
+ * that distinction matters). Add an entry here whenever a new gate is given
+ * an `escalation`; there are none yet, since every gate this codebase
+ * defines today either has no escalation or falls back to the generic
+ * wording below.
  */
-const ESCALATION_CONDITIONS: Partial<Record<Capability, Partial<Record<Capability, string>>>> = {
-  'calendar:read': {
-    'calendar:write': 'this account will also need to create, update, RSVP to, or delete events, not just read them',
-  },
-};
+const ESCALATION_CONDITIONS: Partial<Record<Capability, Partial<Record<Capability, string>>>> = {};
 
 function escalationCondition(remedy: Capability, escalation: Capability): string {
   return (

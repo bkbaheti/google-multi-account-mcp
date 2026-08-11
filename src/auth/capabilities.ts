@@ -132,6 +132,18 @@ export function missingCapabilities(scopes: string[], required: Capability[]): C
  * - `escalation`, when present, is a broader member of `accept`, offered
  *   separately together with the condition under which `remedy` alone will
  *   not suffice.
+ *
+ *   `escalation` exists ONLY for cases where the narrow remedy may genuinely
+ *   be insufficient for the call being made right now - a property of THIS
+ *   call, not of some future one. The real case is Drive: `drive:appfiles`
+ *   authorizes `files.get`, but only reaches files this server created, so
+ *   a user granting the narrow remedy may still fail on a file a client
+ *   shared with them - that failure is about the file in front of them.
+ *   "You might want broader access for a different call later" is never a
+ *   valid `escalation` - that is an upsell, not a remedy, and a gate must
+ *   not carry one. (calendar:read genuinely satisfies every read call
+ *   calendar:write also would, so the calendar read gates below carry no
+ *   escalation at all.)
  */
 export interface CapabilityGate {
   accept: Capability[];

@@ -74,35 +74,32 @@ describe('capabilityGateError', () => {
     expect(message.split('\n\n')).toHaveLength(1);
   });
 
-  // Regression case for the bug this record replaces: a mail-only account
-  // hitting an any-of gate must be told to add only the narrow remedy, never
-  // the broader escalation, in the line it would actually execute.
+  // Regression case for the bug this record replaces: an account hitting an
+  // any-of gate must be told to add only the narrow remedy, never the
+  // broader escalation, in the line it would actually execute. Uses
+  // drive:appfiles/drive:read as the example pair: drive:appfiles only
+  // reaches files this server created, so a file someone else shared can
+  // genuinely make it insufficient for the call being made — see the
+  // `escalation` field's doc comment on CapabilityGate for why that's the
+  // one case this field exists for.
   it('never puts the escalation capability in the primary remedy line', () => {
     const message = capabilityGateError(
       'Personal',
-      {
-        accept: ['calendar:read', 'calendar:write'],
-        remedy: 'calendar:read',
-        escalation: 'calendar:write',
-      },
+      { accept: ['drive:appfiles', 'drive:read'], remedy: 'drive:appfiles', escalation: 'drive:read' },
       [GMAIL_MODIFY, GMAIL_LABELS],
     ).message;
 
     const [primaryLine] = message.split('\n\n');
-    expect(primaryLine).toContain('calendar:read');
-    expect(primaryLine).not.toContain('calendar:write');
+    expect(primaryLine).toContain('drive:appfiles');
+    expect(primaryLine).not.toContain('drive:read');
     expect(primaryLine).toContain('mail:modify');
   });
 
   it('adds a second, separately executable line offering the escalation, preceded by the condition it applies under', () => {
     const message = capabilityGateError(
       'Personal',
-      {
-        accept: ['calendar:read', 'calendar:write'],
-        remedy: 'calendar:read',
-        escalation: 'calendar:write',
-      },
-      [DRIVE_FILE],
+      { accept: ['drive:appfiles', 'drive:read'], remedy: 'drive:appfiles', escalation: 'drive:read' },
+      [GMAIL_MODIFY, GMAIL_LABELS],
     ).message;
 
     const lines = message.split('\n\n');
@@ -110,9 +107,26 @@ describe('capabilityGateError', () => {
     // Both lines are independently executable, and the account's existing
     // capabilities survive on the escalation line too.
     expect(message.match(/google_reauth_account/g)).toHaveLength(2);
-    expect(lines[1]).toContain('calendar:write');
-    expect(lines[1]).toContain('drive:appfiles');
+    expect(lines[1]).toContain('drive:read');
+    expect(lines[1]).toContain('mail:modify');
     // Explains why the broader grant might matter, not just that it exists.
     expect(lines[1]?.toLowerCase()).toContain('if ');
+  });
+
+  // The property this fix-round exists to pin: calendar:read genuinely
+  // satisfies every read call calendar:write also would (verified against
+  // Google's per-method scope reference), so the real calendar read-or-write
+  // gate carries no escalation, and a failure must never mention
+  // calendar:write anywhere — not even as an "if you also need to write"
+  // upsell.
+  it('never mentions calendar:write for the calendar read-or-write gate', () => {
+    const message = capabilityGateError(
+      'Personal',
+      { accept: ['calendar:read', 'calendar:write'], remedy: 'calendar:read' },
+      [],
+    ).message;
+
+    expect(message).not.toContain('calendar:write');
+    expect(message).toContain('calendar:read');
   });
 });

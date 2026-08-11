@@ -182,9 +182,9 @@ describe('normalizeGate', () => {
 
   it('passes a well-formed CapabilityGate through unchanged', () => {
     const gate = {
-      accept: ['calendar:read', 'calendar:write'] as Capability[],
-      remedy: 'calendar:read' as Capability,
-      escalation: 'calendar:write' as Capability,
+      accept: ['drive:appfiles', 'drive:read'] as Capability[],
+      remedy: 'drive:appfiles' as Capability,
+      escalation: 'drive:read' as Capability,
     };
     expect(normalizeGate(gate)).toBe(gate);
   });
@@ -195,7 +195,7 @@ describe('normalizeGate', () => {
   // definition, so it fails fast rather than silently misbehaving.
   it('throws when remedy is not a member of accept', () => {
     expect(() =>
-      normalizeGate({ accept: ['calendar:read'], remedy: 'calendar:write' }),
-    ).toThrow(/remedy "calendar:write" must be a member of accept/);
+      normalizeGate({ accept: ['drive:appfiles'], remedy: 'drive:read' }),
+    ).toThrow(/remedy "drive:read" must be a member of accept/);
   });
 });

@@ -101,13 +101,15 @@ describe('Calendar gate mapping', () => {
 
   // events.list / events.get accept either scope, so these must be any-of -
   // but the remedy a failure suggests must still be the narrower one
-  // (calendar:read), with calendar:write offered only as an escalation.
+  // (calendar:read). No escalation: calendar:read fully satisfies these
+  // read calls, so calendar:write must never appear in the gate at all -
+  // offering it here would be an unrequested write-scope upsell.
   it.each([
     'calendar_list_events',
     'calendar_get_event',
     'calendar_search_events',
-  ])('%s accepts either calendar capability, remedying to calendar:read', (tool) => {
-    expect(gates[tool]).toBe('calendar:read|calendar:write remedy=calendar:read escalation=calendar:write');
+  ])('%s accepts either calendar capability, remedying to calendar:read with no escalation', (tool) => {
+    expect(gates[tool]).toBe('calendar:read|calendar:write remedy=calendar:read escalation=none');
   });
 
   it.each([

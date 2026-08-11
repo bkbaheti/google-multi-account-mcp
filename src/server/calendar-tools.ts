@@ -13,14 +13,17 @@ import { coerceArgs } from '../utils/index.js';
 
 // events.list, events.get, and events.search all accept either
 // calendar.readonly or calendar.events (verified against Google's
-// per-method scope reference), so calendar:read alone satisfies them and is
-// the narrowest capability to suggest. calendar:write also works but is
-// only relevant if the caller intends to modify events too, so it's offered
-// as an escalation rather than folded into the primary remedy.
+// per-method scope reference), so calendar:read alone fully satisfies these
+// calls and is the narrowest capability to suggest. No escalation: unlike
+// Drive's drive:appfiles, there is no file/event this account can reach
+// with calendar:write that calendar:read can't reach for a read call, so
+// there is no condition under which calendar:read would be insufficient
+// for THIS call - offering calendar:write here would just be an upsell
+// toward write authority the caller never asked for. See the `escalation`
+// field's doc comment on CapabilityGate.
 const CALENDAR_READ_OR_WRITE_GATE: CapabilityGate = {
   accept: ['calendar:read', 'calendar:write'],
   remedy: 'calendar:read',
-  escalation: 'calendar:write',
 };
 
 export function registerCalendarTools(
