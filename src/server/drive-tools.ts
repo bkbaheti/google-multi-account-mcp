@@ -53,6 +53,28 @@ export function normalizeDriveQuery(query: string): string {
   return normalized;
 }
 
+// files.get, files.export, files.list, comments.list, and replies.list all
+// accept either drive.readonly or drive.file (verified against Google's
+// per-method scope reference), so drive:appfiles alone satisfies these
+// calls when they're made against files this server created. drives.list
+// does NOT accept drive.file (see drive_list_shared_drives below, which
+// keeps the bare drive:read gate instead of this one), so it is excluded
+// from this set.
+//
+// Escalation: drive:appfiles reaches only files this server created, via
+// drive.file's per-file grant. A file this account did not create through
+// this server - for example, one shared with it by another app or person -
+// can still make drive:appfiles insufficient for THIS call. That is a
+// property of the file in front of the caller right now, not a want for
+// some future one. See the `escalation` field's doc comment on
+// CapabilityGate for why that distinction is what makes this a valid
+// escalation rather than an upsell.
+const DRIVE_READ_OR_APPFILES_GATE: CapabilityGate = {
+  accept: ['drive:read', 'drive:appfiles'],
+  remedy: 'drive:appfiles',
+  escalation: 'drive:read',
+};
+
 export function registerDriveTools(
   server: McpServer,
   accountStore: AccountStore,
@@ -61,7 +83,8 @@ export function registerDriveTools(
     required: Capability | CapabilityGate,
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
-  // === Read tools (require drive:read) ===
+  // === Read tools (drive:appfiles or drive:read - see DRIVE_READ_OR_APPFILES_GATE above;
+  // drive_list_shared_drives is the one exception, requiring bare drive:read) ===
 
   // drive_list_shared_drives - List Shared Drives the user is a member of
   server.registerTool(
@@ -120,7 +143,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive:read');
+      const validation = validateAccountScope(args.accountId, DRIVE_READ_OR_APPFILES_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -163,7 +186,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive:read');
+      const validation = validateAccountScope(args.accountId, DRIVE_READ_OR_APPFILES_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -196,7 +219,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive:read');
+      const validation = validateAccountScope(args.accountId, DRIVE_READ_OR_APPFILES_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -227,7 +250,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxChars: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive:read');
+      const validation = validateAccountScope(args.accountId, DRIVE_READ_OR_APPFILES_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -254,7 +277,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive:read');
+      const validation = validateAccountScope(args.accountId, DRIVE_READ_OR_APPFILES_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -273,7 +296,7 @@ export function registerDriveTools(
     'drive_get_comments',
     {
       description:
-        'Read the comments on a Google Drive file (Doc, Sheet, Slide), including the document text each comment is anchored to, the author, timestamps, resolved status, and replies. Use this to review feedback left on a shared document. Requires the drive:read capability: an account holding only drive:appfiles (drive.file) cannot read comments on documents it did not create — re-authorize with google_reauth_account if you hit a permission error.',
+        'Read the comments on a Google Drive file (Doc, Sheet, Slide), including the document text each comment is anchored to, the author, timestamps, resolved status, and replies. Use this to review feedback left on a shared document. An account holding only drive:appfiles (drive.file) can read comments on files this server created, but not on files it did not create (e.g., shared with it by another app or person) — re-authorize with google_reauth_account to add drive:read if you hit a permission error on such a file.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The Drive file ID'),
@@ -292,7 +315,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { pageSize: 'number', includeResolved: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'drive:read');
+      const validation = validateAccountScope(args.accountId, DRIVE_READ_OR_APPFILES_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -335,7 +358,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { pageSize: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive:read');
+      const validation = validateAccountScope(args.accountId, DRIVE_READ_OR_APPFILES_GATE);
       if ('error' in validation) return validation.error;
 
       try {
@@ -383,7 +406,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive:read');
+      const validation = validateAccountScope(args.accountId, DRIVE_READ_OR_APPFILES_GATE);
       if ('error' in validation) return validation.error;
 
       try {

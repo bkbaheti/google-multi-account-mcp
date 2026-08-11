@@ -567,18 +567,26 @@ export function registerGmailTools(
 
   // === Phase 4: Inbox Management Tools ===
 
+  // users.labels.list accepts gmail.readonly (verified against Google's
+  // per-method scope reference), so mail:read alone satisfies this read
+  // call - it does not need mail:modify's write authority. No escalation:
+  // mail:read fully satisfies users.labels.list regardless of which labels
+  // exist, so there is no condition under which it would need mail:modify
+  // just to list them.
+  const LIST_LABELS_GATE: CapabilityGate = { accept: ['mail:read', 'mail:modify'], remedy: 'mail:read' };
+
   // gmail_list_labels - List all labels (system and custom)
   server.registerTool(
     'gmail_list_labels',
     {
       description:
-        'List all Gmail labels (system labels like INBOX, SENT, etc. and custom user labels). Requires full scope.',
+        'List all Gmail labels (system labels like INBOX, SENT, etc. and custom user labels). Requires readonly or full scope.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
       },
     },
     async (args) => {
-      const validation = requireCapability(args.accountId, 'mail:modify');
+      const validation = requireCapability(args.accountId, LIST_LABELS_GATE);
       if ('error' in validation) return validation.error;
 
       try {

@@ -55,16 +55,39 @@ function captureGates(
     }
   }
 
+  // A handler that never calls the gate callback leaves no entry in `demanded`
+  // and so is invisible to every `it.each` list below - a tool could be
+  // registered with no capability check at all and this suite would stay
+  // green. Fail closed: every registered handler must have recorded a gate.
+  const ungated = Object.keys(handlers).filter((name) => !(name in demanded));
+  if (ungated.length > 0) {
+    throw new Error(
+      `Tool(s) registered with no captured capability gate (handler never called the gate callback): ${ungated.join(', ')}`,
+    );
+  }
+
   return demanded;
 }
 
 describe('Drive gate mapping', () => {
   const gates = captureGates(registerDriveTools as never);
 
-  // drive.file does NOT grant drive.readonly. These nine must demand drive:read,
-  // or a drive.file-only account silently gets empty results instead of an error.
+  // drives.list does NOT accept drive.file (verified against Google's
+  // per-method scope reference), so this is the one Drive read tool that
+  // must demand bare drive:read rather than the any-of gate below.
+  it.each(['drive_list_shared_drives'])('%s requires drive:read', (tool) => {
+    expect(gates[tool]).toBe('drive:read');
+  });
+
+  // files.get, files.export, files.list, comments.list, and replies.list all
+  // accept either drive.readonly or drive.file, so these eight must be
+  // any-of gates remedying to the narrower drive:appfiles - demanding bare
+  // drive:read here is the regression this suite exists to catch: it would
+  // force a drive.file-only account (e.g. one that just uploaded a file) to
+  // grant read access to the user's entire Drive just to read its own
+  // upload back. The escalation to drive:read covers the one real gap:
+  // drive:appfiles only reaches files this server created.
   it.each([
-    'drive_list_shared_drives',
     'drive_search_files',
     'drive_list_files',
     'drive_get_file',
@@ -73,8 +96,10 @@ describe('Drive gate mapping', () => {
     'drive_get_comments',
     'drive_get_comment_replies',
     'drive_download_file',
-  ])('%s requires drive:read', (tool) => {
-    expect(gates[tool]).toBe('drive:read');
+  ])('%s accepts either drive capability, remedying to drive:appfiles with a drive:read escalation', (tool) => {
+    expect(gates[tool]).toBe(
+      'drive:appfiles|drive:read remedy=drive:appfiles escalation=drive:read',
+    );
   });
 
   it.each([
@@ -151,7 +176,6 @@ describe('Gmail gate mapping', () => {
   });
 
   it.each([
-    'gmail_list_labels',
     'gmail_create_label',
     'gmail_update_label',
     'gmail_delete_label',
@@ -164,6 +188,19 @@ describe('Gmail gate mapping', () => {
   ])('%s requires mail:modify', (tool) => {
     expect(gates[tool]).toBe('mail:modify');
   });
+
+  // users.labels.list accepts gmail.readonly, so this must be an any-of gate
+  // remedying to mail:read - demanding mail:modify here is the regression
+  // this suite exists to catch: it would force a read-only account to grant
+  // write access just to list labels. No escalation: mail:read fully
+  // satisfies users.labels.list, so mail:modify must never appear in a
+  // failure message for this tool.
+  it.each(['gmail_list_labels'])(
+    '%s accepts either mail capability, remedying to mail:read with no escalation',
+    (tool) => {
+      expect(gates[tool]).toBe('mail:modify|mail:read remedy=mail:read escalation=none');
+    },
+  );
 
   it.each([
     'gmail_list_filters',
