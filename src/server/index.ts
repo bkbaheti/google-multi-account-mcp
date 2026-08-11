@@ -90,8 +90,13 @@ export function createServer(options: ServerOptions): McpServer {
     const satisfied = hasAnyCapability(account.scopes, gate.accept);
 
     if (!satisfied) {
+      // Other configured accounts, for capabilityGateError's alternativeAccounts
+      // hint - the only recovery path that costs zero consent screens.
+      const otherAccounts = accountStore.listAccounts().filter((a) => a.id !== account.id);
       return {
-        error: errorResponse(capabilityGateError(accountRef, gate, account.scopes).toResponse()),
+        error: errorResponse(
+          capabilityGateError(accountRef, gate, account.scopes, otherAccounts).toResponse(),
+        ),
       };
     }
 

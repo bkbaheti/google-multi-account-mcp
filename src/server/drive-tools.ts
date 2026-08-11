@@ -8,6 +8,7 @@ import {
   confirmationRequired,
   errorResponse,
   successResponse,
+  toDriveMcpError,
   toMcpError,
   validationError,
 } from '../errors/index.js';
@@ -160,6 +161,21 @@ export function registerDriveTools(
     required: Capability | CapabilityGate,
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
+  // Build the DRIVE_FILE_NOT_VISIBLE-aware error response for a Drive read
+  // tool's catch block. `account` is the resolved account from
+  // validateAccountScope (drive:appfiles-or-drive:read), so its scopes are
+  // exactly what toDriveMcpError needs to tell "invisible to this grant"
+  // apart from "genuinely absent" - see toDriveMcpError's doc comment.
+  function driveReadErrorResponse(error: unknown, account: { id: string; scopes: string[] }, accountRef: string) {
+    return errorResponse(
+      toDriveMcpError(error, {
+        accountRef,
+        accountScopes: account.scopes,
+        otherAccounts: accountStore.listAccounts().filter((a) => a.id !== account.id),
+      }),
+    );
+  }
+
   // === Read tools (drive:appfiles or drive:read - see DRIVE_READ_OR_APPFILES_GATE above;
   // drive_list_shared_drives is the one exception, requiring bare drive:read) ===
 
@@ -240,7 +256,7 @@ export function registerDriveTools(
 
         return successResponse(withDriveCoverage(validation.account.scopes, result, { list: true }));
       } catch (error) {
-        return errorResponse(toMcpError(error));
+        return driveReadErrorResponse(error, validation.account, args.accountId);
       }
     },
   );
@@ -279,7 +295,7 @@ export function registerDriveTools(
 
         return successResponse(withDriveCoverage(validation.account.scopes, result, { list: true }));
       } catch (error) {
-        return errorResponse(toMcpError(error));
+        return driveReadErrorResponse(error, validation.account, args.accountId);
       }
     },
   );
@@ -305,7 +321,7 @@ export function registerDriveTools(
 
         return successResponse(withDriveCoverage(validation.account.scopes, file));
       } catch (error) {
-        return errorResponse(toMcpError(error));
+        return driveReadErrorResponse(error, validation.account, args.accountId);
       }
     },
   );
@@ -337,7 +353,7 @@ export function registerDriveTools(
 
         return successResponse(withDriveCoverage(validation.account.scopes, result));
       } catch (error) {
-        return errorResponse(toMcpError(error));
+        return driveReadErrorResponse(error, validation.account, args.accountId);
       }
     },
   );
@@ -363,7 +379,7 @@ export function registerDriveTools(
 
         return successResponse(withDriveCoverage(validation.account.scopes, result));
       } catch (error) {
-        return errorResponse(toMcpError(error));
+        return driveReadErrorResponse(error, validation.account, args.accountId);
       }
     },
   );
@@ -411,7 +427,7 @@ export function registerDriveTools(
 
         return successResponse(withDriveCoverage(validation.account.scopes, result, { list: true }));
       } catch (error) {
-        return errorResponse(toMcpError(error));
+        return driveReadErrorResponse(error, validation.account, args.accountId);
       }
     },
   );
@@ -451,7 +467,7 @@ export function registerDriveTools(
 
         return successResponse(withDriveCoverage(validation.account.scopes, result, { list: true }));
       } catch (error) {
-        return errorResponse(toMcpError(error));
+        return driveReadErrorResponse(error, validation.account, args.accountId);
       }
     },
   );
@@ -497,7 +513,7 @@ export function registerDriveTools(
 
         return successResponse(withDriveCoverage(validation.account.scopes, result));
       } catch (error) {
-        return errorResponse(toMcpError(error));
+        return driveReadErrorResponse(error, validation.account, args.accountId);
       }
     },
   );

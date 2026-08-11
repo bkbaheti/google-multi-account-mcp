@@ -1,9 +1,13 @@
 import {
+  CAPABILITY_INFO,
   type Capability,
   type CapabilityGate,
   capabilitiesOf,
+  hasAnyCapability,
+  hasCapability,
   LEGACY_SCOPE_TIER_CAPABILITIES,
 } from '../auth/capabilities.js';
+import type { Account } from '../types/index.js';
 
 // Error codes following the pattern: CATEGORY_SPECIFIC
 export const ErrorCode = {
@@ -36,6 +40,10 @@ export const ErrorCode = {
   FOLDER_NOT_FOUND: 'FOLDER_NOT_FOUND',
   DRIVE_API_ERROR: 'DRIVE_API_ERROR',
   DRIVE_QUOTA_EXCEEDED: 'DRIVE_QUOTA_EXCEEDED',
+  // A not-found/forbidden that is genuinely ambiguous because the account's
+  // only Drive read access is drive:appfiles (drive.file) - see
+  // driveFileNotVisible's doc comment below.
+  DRIVE_FILE_NOT_VISIBLE: 'DRIVE_FILE_NOT_VISIBLE',
 
   // Calendar resource errors
   EVENT_NOT_FOUND: 'EVENT_NOT_FOUND',
@@ -163,6 +171,31 @@ function escalationCondition(remedy: Capability, escalation: Capability): string
   );
 }
 
+/** An account named in a `alternativeAccounts` recovery hint - just enough to act on (id, and alias when set), not the full account record. */
+export interface AlternativeAccount {
+  id: string;
+  alias?: string;
+}
+
+/**
+ * Other configured accounts that already hold at least one of the given
+ * capabilities - the only recovery path from a permission error that costs
+ * the caller zero consent screens, and the reason a multi-account broker has
+ * an edge here over a single-account client. `otherAccounts` must already
+ * exclude the account the error is about; this function does not know which
+ * account that is, only what it's missing.
+ */
+function alternativeAccountsHolding(
+  capabilities: Capability[],
+  otherAccounts: Account[],
+): AlternativeAccount[] {
+  return otherAccounts
+    .filter((account) => hasAnyCapability(account.scopes, capabilities))
+    .map((account) =>
+      account.alias ? { id: account.id, alias: account.alias } : { id: account.id },
+    );
+}
+
 /**
  * A gate refused because the account lacks a capability. Bare-capability
  * callers are normalized to a single-member gate (see `normalizeGate`), so
@@ -175,14 +208,26 @@ function escalationCondition(remedy: Capability, escalation: Capability): string
  * same operation, or ones like it), a second, separately executable line
  * offers it, preceded by the condition under which the narrow remedy will
  * not be enough.
+ *
+ * `otherAccounts` (defaulting to none) must already exclude the account this
+ * error is about; any of them holding a member of `gate.accept` is surfaced
+ * as `alternativeAccounts` — see alternativeAccountsHolding's doc comment
+ * for why that's worth surfacing at all. The recovery-hint booleans are set
+ * for what a capability gate refusal actually is: reauth can fix it
+ * (`reauthHelps: true`), completing reauth needs a human at an OAuth
+ * consent screen (`requiresHumanApproval: true`), and simply retrying the
+ * same call again will not (`retryable: false`) — contrast `rateLimited`
+ * below, where retrying *is* the fix and reauth is not.
  */
 export function capabilityGateError(
   accountRef: string,
   gate: CapabilityGate,
   currentScopes: string[],
+  otherAccounts: Account[] = [],
 ): McpToolError {
   const current = capabilitiesOf(currentScopes);
   const remedyCapabilities = Array.from(new Set([...current, gate.remedy]));
+  const alternativeAccounts = alternativeAccountsHolding(gate.accept, otherAccounts);
 
   let message =
     `Account "${accountRef}" is missing capability: ${gate.remedy}. ` +
@@ -197,12 +242,23 @@ export function capabilityGateError(
       `Use google_reauth_account accountId="${accountRef}" capabilities=${JSON.stringify(escalationCapabilities)} instead.`;
   }
 
+  if (alternativeAccounts.length > 0) {
+    const names = alternativeAccounts.map((a) => a.alias ?? a.id).join(', ');
+    message +=
+      `\n\nAlternatively, these already-connected account(s) already hold ${gate.remedy} and could be ` +
+      `used for this call directly, at no cost of a new consent screen: ${names}.`;
+  }
+
   return new McpToolError(ErrorCode.CAPABILITY_INSUFFICIENT, message, {
     accountRef,
     missing: [gate.remedy],
     currentCapabilities: current,
     suggestedCapabilities: remedyCapabilities,
     ...(gate.escalation && { escalation: gate.escalation, escalationCapabilities }),
+    retryable: false,
+    reauthHelps: true,
+    requiresHumanApproval: true,
+    alternativeAccounts,
   });
 }
 
@@ -214,13 +270,23 @@ export function confirmationRequired(operation: string, hint?: string): McpToolE
   );
 }
 
+// The contrast case for capabilityGateError's recovery hints above: a rate
+// limit is the mirror image of a capability gate. Waiting and retrying the
+// same call again is the actual fix (`retryable: true`), no human needs to
+// touch an OAuth consent screen (`requiresHumanApproval: false`), and adding
+// capabilities via reauth does nothing for it (`reauthHelps: false`).
 export function rateLimited(retryAfterMs?: number): McpToolError {
   return new McpToolError(
     ErrorCode.RATE_LIMITED,
     retryAfterMs
       ? `Rate limited. Retry after ${Math.ceil(retryAfterMs / 1000)} seconds.`
       : 'Rate limited. Please try again later.',
-    retryAfterMs ? { retryAfterMs } : undefined,
+    {
+      ...(retryAfterMs !== undefined && { retryAfterMs }),
+      retryable: true,
+      reauthHelps: false,
+      requiresHumanApproval: false,
+    },
   );
 }
 
@@ -344,6 +410,63 @@ export function driveQuotaExceeded(): McpToolError {
   return new McpToolError(ErrorCode.DRIVE_QUOTA_EXCEEDED, 'Drive storage quota exceeded.');
 }
 
+/**
+ * A Drive not-found/forbidden that is genuinely ambiguous because the
+ * account's only Drive read access is drive:appfiles (drive.file): that
+ * scope's reach is per-file (see CAPABILITY_INFO['drive:appfiles'].reach),
+ * so a failure here means either "this file does not exist" or "this file
+ * exists but was never created by, or explicitly opened with, this server"
+ * — and Drive's API gives an appfiles-only caller no way to tell those
+ * apart. See toDriveMcpError below for where this gets selected instead of
+ * a plain not-found.
+ *
+ * Known false positive, accepted deliberately: a genuinely mistyped or
+ * already-deleted file ID fails identically, so this will sometimes point
+ * an account at a reauth it doesn't actually need. That trade is
+ * intentional — a spurious reauth hint is visible, cheap, and reversible;
+ * a confident "that file/document doesn't exist" about something a client
+ * actually shared is none of those, and is the exact failure mode this
+ * whole feature exists to prevent (see the design doc, section B2). The
+ * message below is worded to match: it never asserts the file exists, only
+ * that its absence is unproven.
+ */
+export function driveFileNotVisible(
+  accountRef: string,
+  currentScopes: string[],
+  otherAccounts: Account[] = [],
+): McpToolError {
+  const current = capabilitiesOf(currentScopes);
+  const suggested = Array.from(new Set<Capability>([...current, 'drive:read']));
+  const alternativeAccounts = alternativeAccountsHolding(['drive:read'], otherAccounts);
+  const reach = CAPABILITY_INFO['drive:appfiles'].reach;
+
+  let message =
+    `Account "${accountRef}" holds only drive:appfiles for Drive, which reaches ${reach.toLowerCase()} ` +
+    `This call failed, but that does NOT mean the file does not exist — it may exist and simply sit ` +
+    `outside this grant's reach. Do not report it as missing or nonexistent; say the view from this ` +
+    `account is inconclusive. Use google_reauth_account accountId="${accountRef}" ` +
+    `capabilities=${JSON.stringify(suggested)} to add drive:read, which can see every file the account ` +
+    `can see, and check again.`;
+
+  if (alternativeAccounts.length > 0) {
+    const names = alternativeAccounts.map((a) => a.alias ?? a.id).join(', ');
+    message +=
+      `\n\nAlternatively, these already-connected account(s) already hold drive:read and may be able ` +
+      `to see this file directly, at no cost of a new consent screen: ${names}.`;
+  }
+
+  return new McpToolError(ErrorCode.DRIVE_FILE_NOT_VISIBLE, message, {
+    accountRef,
+    ambiguous: true,
+    currentCapabilities: current,
+    suggestedCapabilities: suggested,
+    retryable: false,
+    reauthHelps: true,
+    requiresHumanApproval: true,
+    alternativeAccounts,
+  });
+}
+
 export function eventNotFound(eventId: string): McpToolError {
   return new McpToolError(ErrorCode.EVENT_NOT_FOUND, `Event not found: ${eventId}`, { eventId });
 }
@@ -417,6 +540,74 @@ export function toMcpError(error: unknown): McpError {
     code: ErrorCode.UNKNOWN_ERROR,
     message: String(error),
   };
+}
+
+/** Context a Drive read tool has on hand at its catch block, needed to tell an invisible-to-this-grant failure apart from a genuine one. */
+export interface DriveReadErrorContext {
+  /** The accountId/alias/email as the caller passed it, reused verbatim in the executable google_reauth_account line. */
+  accountRef: string;
+  /** Scopes currently granted to the account the failing call was made against. */
+  accountScopes: string[];
+  /** Every other configured account, already including (or excluding, doesn't matter) the failing one — alternativeAccountsHolding only needs it to look up capabilities, and the failing account's own capabilities are already known not to satisfy the gate that let this call through drive:appfiles. */
+  otherAccounts: Account[];
+}
+
+/**
+ * Same conversion as toMcpError, with one retype: on an account whose only
+ * Drive read access is drive:appfiles (not drive:read), a not-found/
+ * forbidden is genuinely ambiguous (see driveFileNotVisible's doc comment)
+ * and becomes DRIVE_FILE_NOT_VISIBLE with `ambiguous: true` instead of a
+ * bare not-found. An account holding drive:read gets the ordinary
+ * classification, now tagged `ambiguous: false` — for that account a
+ * not-found is real information, and `false` (not just the field's
+ * absence) licenses an agent to actually rely on that and stop looking.
+ *
+ * UNVERIFIED, read before touching this branch: the design doc's working
+ * assumption is that Drive hides existence and returns 404 for a file
+ * outside the drive.file corpus, but that could not be confirmed against
+ * documentation — it needs a live drive:appfiles-only token, which is what
+ * the (still in progress) E2E harness exists to provide. So this checks
+ * for EITHER 404 or 403 rather than only 404. Getting this wrong in the
+ * permissive direction (treating a 403 as ambiguous when Drive never
+ * actually sends one here) costs an occasionally-unneeded reauth hint.
+ * Getting it wrong in the strict direction (404-only, when Drive actually
+ * 403s) would silently disable this entire feature for the exact case it
+ * was built for. Handling both is the deliberately cheaper mistake.
+ */
+export function toDriveMcpError(error: unknown, context: DriveReadErrorContext): McpError {
+  if (error instanceof McpToolError) {
+    return error.toResponse();
+  }
+
+  const appfilesOnly =
+    hasCapability(context.accountScopes, 'drive:appfiles') &&
+    !hasCapability(context.accountScopes, 'drive:read');
+
+  if (appfilesOnly && error instanceof Error) {
+    const message = error.message;
+    const looksNotFoundOrForbidden =
+      message.includes('404') ||
+      message.includes('not found') ||
+      message.includes('403') ||
+      message.includes('forbidden');
+
+    if (looksNotFoundOrForbidden) {
+      return driveFileNotVisible(
+        context.accountRef,
+        context.accountScopes,
+        context.otherAccounts,
+      ).toResponse();
+    }
+  }
+
+  const result = toMcpError(error);
+  if (
+    result.code === ErrorCode.MESSAGE_NOT_FOUND ||
+    result.code === ErrorCode.CAPABILITY_INSUFFICIENT
+  ) {
+    return { ...result, details: { ...result.details, ambiguous: false } };
+  }
+  return result;
 }
 
 // Helper to create MCP tool error response content
