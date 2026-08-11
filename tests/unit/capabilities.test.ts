@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CAPABILITIES,
+  CAPABILITY_INFO,
+  CAPABILITY_SCOPES,
   type Capability,
   capabilitiesOf,
   hasAnyCapability,
@@ -194,8 +196,46 @@ describe('normalizeGate', () => {
   // even satisfy the operation it guards. This is a bug in the gate's
   // definition, so it fails fast rather than silently misbehaving.
   it('throws when remedy is not a member of accept', () => {
-    expect(() =>
-      normalizeGate({ accept: ['drive:appfiles'], remedy: 'drive:read' }),
-    ).toThrow(/remedy "drive:read" must be a member of accept/);
+    expect(() => normalizeGate({ accept: ['drive:appfiles'], remedy: 'drive:read' })).toThrow(
+      /remedy "drive:read" must be a member of accept/,
+    );
+  });
+});
+
+describe('CAPABILITY_INFO', () => {
+  it('has an entry for every documented capability', () => {
+    for (const capability of CAPABILITIES) {
+      expect(CAPABILITY_INFO[capability]).toBeDefined();
+    }
+  });
+
+  it('leaves no field empty on any entry', () => {
+    for (const capability of CAPABILITIES) {
+      const info = CAPABILITY_INFO[capability];
+      expect(info.name.trim()).not.toBe('');
+      expect(info.canDo.trim()).not.toBe('');
+      expect(info.cannotDo.trim()).not.toBe('');
+      expect(info.reach.trim()).not.toBe('');
+      expect(info.scopes.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('lists exactly the scopes CAPABILITY_SCOPES requests for that capability', () => {
+    for (const capability of CAPABILITIES) {
+      expect([...CAPABILITY_INFO[capability].scopes]).toEqual([...CAPABILITY_SCOPES[capability]]);
+    }
+  });
+
+  // The two caveats users most often get wrong, per the design spec: mail:modify
+  // genuinely includes send, and calendar:write genuinely cannot list calendars.
+  // Later tasks render these straight into the OAuth picker copy.
+  it('states that mail:modify covers sending, not just reading and organising', () => {
+    expect(CAPABILITY_INFO['mail:modify'].canDo.toLowerCase()).toContain('send');
+  });
+
+  it('states that calendar:write cannot list calendars', () => {
+    const info = CAPABILITY_INFO['calendar:write'];
+    expect(info.cannotDo.toLowerCase()).toContain('list');
+    expect(info.cannotDo.toLowerCase()).toContain('calendar');
   });
 });

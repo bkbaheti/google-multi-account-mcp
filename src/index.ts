@@ -6,8 +6,10 @@ export {
 } from './auth/index.js';
 export {
   CAPABILITIES,
+  CAPABILITY_INFO,
   type Capability,
   type CapabilityGate,
+  type CapabilityInfo,
   capabilitiesOf,
   isCapability,
   scopesFor,

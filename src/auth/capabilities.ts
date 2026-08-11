@@ -36,6 +36,98 @@ export const CAPABILITY_SCOPES: Record<Capability, readonly string[]> = {
   'calendar:write': ['https://www.googleapis.com/auth/calendar.events'],
 };
 
+/** Human-facing description of a capability, for every surface a person or agent reads before granting or using it. */
+export interface CapabilityInfo {
+  /** A short human label. */
+  name: string;
+  /** What the capability permits, in plain language a non-developer can act on. */
+  canDo: string;
+  /** The limits, stated positively rather than as a list of missing scopes. */
+  cannotDo: string;
+  /** Which files/messages/events the capability applies to. */
+  reach: string;
+  /** The Google scopes requested for this capability. Checked in tests against CAPABILITY_SCOPES. */
+  scopes: readonly string[];
+}
+
+/**
+ * The single source of truth for every human-facing description of a capability.
+ * The picker copy, README table, llms.txt and tool-description trailers are all
+ * generated from this table — see docs/superpowers/specs/2026-08-11-capability-
+ * correctness-and-ux-design.md, section B3.
+ *
+ * Two entries below encode facts verified against Google's per-method scope
+ * reference and are easy to "correct" wrongly — do not:
+ * - mail:modify genuinely includes compose/send: users.drafts.create and
+ *   users.messages.send both accept gmail.modify.
+ * - calendar:write genuinely cannot list calendars: calendarList.list and
+ *   freebusy.query accept calendar.readonly but NOT calendar.events.
+ */
+export const CAPABILITY_INFO: Record<Capability, CapabilityInfo> = {
+  'mail:read': {
+    name: 'Read mail',
+    canDo: 'Read and search your email, and list your labels.',
+    cannotDo: 'Cannot send, reply, label, archive or delete anything.',
+    reach: 'Every message and label in the mailbox.',
+    scopes: CAPABILITY_SCOPES['mail:read'],
+  },
+  'mail:compose': {
+    name: 'Compose mail',
+    canDo:
+      'Write drafts and send email. Despite the name, this capability sends — it does not only compose.',
+    cannotDo: 'Cannot read any message already in your mailbox, not even replies to what it sends.',
+    reach: 'Drafts and messages this capability creates.',
+    scopes: CAPABILITY_SCOPES['mail:compose'],
+  },
+  'mail:modify': {
+    name: 'Full mail',
+    canDo:
+      'Read, send, and organise mail: labels, archive, trash. Includes everything mail:read and mail:compose do — you do not need to grant those as well.',
+    cannotDo: 'Cannot manage filters or the vacation auto-reply.',
+    reach: 'Every message and label in the mailbox.',
+    scopes: CAPABILITY_SCOPES['mail:modify'],
+  },
+  'mail:settings': {
+    name: 'Mail settings',
+    canDo: 'Manage filters and the vacation auto-reply.',
+    cannotDo: 'Cannot read or send mail.',
+    reach: 'Mailbox-wide filter and vacation-responder settings.',
+    scopes: CAPABILITY_SCOPES['mail:settings'],
+  },
+  'drive:read': {
+    name: 'Read Drive',
+    canDo:
+      'See and download every file in this Drive, read-only. Includes files other people shared with you, and every Shared Drive you belong to.',
+    cannotDo: 'Cannot create, edit, move or share anything.',
+    reach: 'Every file and Shared Drive the account can see.',
+    scopes: CAPABILITY_SCOPES['drive:read'],
+  },
+  'drive:appfiles': {
+    name: 'App-created Drive files',
+    canDo: 'Create files and folders, and read, edit, share and delete the ones within its reach.',
+    cannotDo:
+      'Cannot see anything else in your Drive — searches return an empty list rather than an error.',
+    reach: 'Files this server created, plus files you explicitly opened with it.',
+    scopes: CAPABILITY_SCOPES['drive:appfiles'],
+  },
+  'calendar:read': {
+    name: 'Read calendar',
+    canDo:
+      'See your calendars, your events, and when you are free or busy. Required to list which calendars exist.',
+    cannotDo: 'Cannot create or change events.',
+    reach: 'Every calendar the account can see.',
+    scopes: CAPABILITY_SCOPES['calendar:read'],
+  },
+  'calendar:write': {
+    name: 'Write calendar',
+    canDo: 'Create, edit, move, delete events, and RSVP.',
+    cannotDo:
+      'Cannot list your calendars or check free/busy — grant calendar:read as well, or the agent can only reach the "primary" calendar.',
+    reach: 'Events on calendars the account can write to.',
+    scopes: CAPABILITY_SCOPES['calendar:write'],
+  },
+};
+
 /**
  * The implications that are actually true of Google's scopes, each checked against
  * a method-level scope list in Google's API reference:
