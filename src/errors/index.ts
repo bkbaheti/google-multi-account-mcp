@@ -1,3 +1,5 @@
+import { type Capability, capabilitiesOf } from '../auth/capabilities.js';
+
 // Error codes following the pattern: CATEGORY_SPECIFIC
 export const ErrorCode = {
   // Authentication errors
@@ -12,6 +14,7 @@ export const ErrorCode = {
 
   // Scope/permission errors
   SCOPE_INSUFFICIENT: 'SCOPE_INSUFFICIENT',
+  INSUFFICIENT_CAPABILITY: 'INSUFFICIENT_CAPABILITY',
 
   // Rate limiting
   RATE_LIMITED: 'RATE_LIMITED',
@@ -110,6 +113,28 @@ export function scopeInsufficient(
     ErrorCode.SCOPE_INSUFFICIENT,
     `This operation requires '${requiredTier}' scope. Current account has '${currentTier}'. Use google_add_account with scopeTier='${requiredTier}' to upgrade.`,
     { requiredTier, currentTier, accountId },
+  );
+}
+
+/**
+ * A gate refused because the account lacks a capability. The suggested remedy is
+ * the account's current capabilities plus the missing ones, so following it never
+ * narrows the account — reauth replaces the scope set rather than adding to it.
+ */
+export function insufficientCapability(
+  accountRef: string,
+  missing: Capability[],
+  currentScopes: string[],
+): McpToolError {
+  const current = capabilitiesOf(currentScopes);
+  const suggested = Array.from(new Set([...current, ...missing]));
+
+  return new McpToolError(
+    ErrorCode.INSUFFICIENT_CAPABILITY,
+    `Account "${accountRef}" is missing capabilit${missing.length === 1 ? 'y' : 'ies'}: ${missing.join(', ')}. ` +
+      `Use google_reauth_account accountId="${accountRef}" capabilities=${JSON.stringify(suggested)} ` +
+      `to add ${missing.length === 1 ? 'it' : 'them'} without losing existing access.`,
+    { accountRef, missing, currentCapabilities: current, suggestedCapabilities: suggested },
   );
 }
 
