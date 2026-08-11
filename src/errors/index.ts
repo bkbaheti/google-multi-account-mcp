@@ -13,7 +13,6 @@ export const ErrorCode = {
   ALIAS_DUPLICATE: 'ALIAS_DUPLICATE',
 
   // Scope/permission errors
-  SCOPE_INSUFFICIENT: 'SCOPE_INSUFFICIENT',
   CAPABILITY_INSUFFICIENT: 'CAPABILITY_INSUFFICIENT',
 
   // Rate limiting
@@ -101,18 +100,6 @@ export function authNotConfigured(accountId: string): McpToolError {
     ErrorCode.AUTH_NOT_CONFIGURED,
     `OAuth authentication failed. Try re-adding the account with google_add_account.`,
     { accountId },
-  );
-}
-
-export function scopeInsufficient(
-  requiredTier: string,
-  currentTier: string,
-  accountId: string,
-): McpToolError {
-  return new McpToolError(
-    ErrorCode.SCOPE_INSUFFICIENT,
-    `This operation requires '${requiredTier}' scope. Current account has '${currentTier}'. Use google_add_account with scopeTier='${requiredTier}' to upgrade.`,
-    { requiredTier, currentTier, accountId },
   );
 }
 
@@ -267,8 +254,8 @@ export function toMcpError(error: unknown): McpError {
 
     if (message.includes('403') || message.includes('forbidden')) {
       return {
-        code: ErrorCode.SCOPE_INSUFFICIENT,
-        message: 'Permission denied. The account may need additional scopes.',
+        code: ErrorCode.CAPABILITY_INSUFFICIENT,
+        message: 'Permission denied. The account may need additional capabilities.',
         details: { originalError: message },
       };
     }

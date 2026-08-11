@@ -8,13 +8,18 @@
  * or add oauth.clientId / oauth.clientSecret to ~/.config/mcp-google/config.json.
  *
  * Usage:
- *   npx tsx scripts/test-oauth.ts add [readonly|compose|full]
+ *   npx tsx scripts/test-oauth.ts add [capability,capability,...]
  *   npx tsx scripts/test-oauth.ts list
  *   npx tsx scripts/test-oauth.ts remove <accountId>
+ *
+ * Capabilities: mail:read, mail:compose, mail:modify, mail:settings,
+ * drive:read, drive:appfiles, calendar:read, calendar:write.
+ * Defaults to mail:read when omitted.
  */
 
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { CAPABILITIES, type Capability, isCapability } from '../src/auth/capabilities.js';
 import { resolveOAuthConfig } from '../src/config/index.js';
 import { AccountStore, createTokenStorage } from '../src/index.js';
 
@@ -64,17 +69,24 @@ async function main() {
     }
 
     case 'add': {
-      const scopeTier = (process.argv[3] as 'readonly' | 'compose' | 'full') || 'readonly';
-      if (!['readonly', 'compose', 'full'].includes(scopeTier)) {
-        console.error('Invalid scope tier. Use: readonly, compose, or full');
+      const arg = process.argv[3];
+      const requested = arg ? arg.split(',').map((c) => c.trim()) : ['mail:read'];
+
+      const unknown = requested.filter((c) => !isCapability(c));
+      if (unknown.length > 0) {
+        console.error(
+          `Unknown capabilit${unknown.length === 1 ? 'y' : 'ies'}: ${unknown.join(', ')}`,
+        );
+        console.error(`Valid capabilities: ${CAPABILITIES.join(', ')}`);
         process.exit(1);
       }
+      const capabilities = requested as Capability[];
 
-      console.log(`Adding account with scope tier: ${scopeTier}`);
+      console.log(`Adding account with capabilities: ${capabilities.join(', ')}`);
       console.log('A browser window will open for authorization...\n');
 
       try {
-        const account = await accountStore.addAccount(scopeTier);
+        const account = await accountStore.addAccount(capabilities);
         console.log('\nSuccess!');
         console.log(`  Email: ${account.email}`);
         console.log(`  Account ID: ${account.id}`);
@@ -106,7 +118,9 @@ async function main() {
     default:
       console.log('Usage:');
       console.log('  npx tsx scripts/test-oauth.ts list');
-      console.log('  npx tsx scripts/test-oauth.ts add [readonly|compose|full]');
+      console.log('  npx tsx scripts/test-oauth.ts add [capability,capability,...]');
+      console.log(`    Capabilities: ${CAPABILITIES.join(', ')}`);
+      console.log('    Defaults to mail:read when omitted.');
       console.log('  npx tsx scripts/test-oauth.ts remove <accountId>');
   }
 }

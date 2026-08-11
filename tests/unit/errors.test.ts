@@ -11,7 +11,6 @@ import {
   McpToolError,
   messageNotFound,
   rateLimited,
-  scopeInsufficient,
   successResponse,
   threadNotFound,
   toMcpError,
@@ -73,19 +72,6 @@ describe('Error Model', () => {
       expect(error.code).toBe('AUTH_NOT_CONFIGURED');
       expect(error.message).toContain('OAuth');
       expect(error.details).toEqual({ accountId: 'acc-123' });
-    });
-
-    it('scopeInsufficient creates correct error with upgrade hint', () => {
-      const error = scopeInsufficient('compose', 'readonly', 'acc-123');
-      expect(error.code).toBe('SCOPE_INSUFFICIENT');
-      expect(error.message).toContain("'compose' scope");
-      expect(error.message).toContain("'readonly'");
-      expect(error.message).toContain('google_add_account');
-      expect(error.details).toEqual({
-        requiredTier: 'compose',
-        currentTier: 'readonly',
-        accountId: 'acc-123',
-      });
     });
 
     it('confirmationRequired creates correct error', () => {
@@ -174,11 +160,11 @@ describe('Error Model', () => {
       expect(result.code).toBe('AUTH_EXPIRED');
     });
 
-    it('converts 403 errors to SCOPE_INSUFFICIENT', () => {
+    it('converts 403 errors to CAPABILITY_INSUFFICIENT', () => {
       const error = new Error('403 forbidden - insufficient permissions');
       const result = toMcpError(error);
 
-      expect(result.code).toBe('SCOPE_INSUFFICIENT');
+      expect(result.code).toBe('CAPABILITY_INSUFFICIENT');
     });
 
     it('converts 429 errors to RATE_LIMITED', () => {

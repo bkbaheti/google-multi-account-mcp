@@ -75,4 +75,4 @@ Decision: [TBD during Phase 2]
 - Personal-Drive users see no behavioral change — the flags are no-ops when no Shared Drives are involved.
 - An optional `driveId` arg on `drive_search_files` narrows to a single Shared Drive (`corpora: 'drive'`); omitting it searches My Drive + all Shared Drives the user is a member of.
 - `drive_list_shared_drives` (wrapping `drives.list`) exists so agents can discover Shared Drive IDs to pass as `folderId` (browse top level) or `driveId` (scoped search).
-- The existing `drive_readonly` / `drive_full` OAuth scopes already cover Shared Drive access; no new consent step needed.
+- The existing `drive:read` (reading Shared Drive content) and `drive:appfiles` (writing to it) capabilities already cover Shared Drive access; no new consent step needed.
