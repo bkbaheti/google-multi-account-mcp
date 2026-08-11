@@ -73,6 +73,7 @@ import {
   CAPABILITIES,
   type Capability,
   capabilitiesOf,
+  hasAnyCapability,
   hasCapability,
   isCapability,
   missingCapabilities,
@@ -361,7 +362,7 @@ export function missingCapabilities(scopes: string[], required: Capability[]): C
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run tests/unit/capabilities.test.ts`
-Expected: PASS, 20 tests.
+Expected: PASS, 25 tests.
 
 - [ ] **Step 5: Typecheck, lint, commit**
 
