@@ -45,6 +45,31 @@ export interface StartAuthOptions {
   existingEmail?: string;
 }
 
+/**
+ * The scopes Google actually granted, read from the token response's
+ * `scope` field (a space-delimited string) rather than the scopes that were
+ * requested. With Google's granular consent screen, a user can uncheck an
+ * individual scope on the OAuth consent page and still complete the flow -
+ * persisting the requested array instead would let the account record claim
+ * a capability it doesn't hold, which is exactly what the capability gate
+ * (see ../auth/capabilities.ts) trusts account.scopes to reflect. Silently
+ * trusting the request here is precisely the gate bypass the capability
+ * model exists to prevent.
+ */
+export function grantedScopes(tokens: { scope?: string }, requested: string[]): string[] {
+  if (tokens.scope) {
+    return tokens.scope.split(' ').filter(Boolean);
+  }
+  // Fallback: per OAuth 2.0 (RFC 6749 §5.1), the token response MAY omit
+  // `scope` when the granted scope matches what was requested, so a missing
+  // field isn't necessarily a sign anything was narrowed. Google's token
+  // endpoint includes `scope` in practice, but this path is a defensive
+  // fallback for a response shape this code hasn't observed, not a
+  // documented guarantee - so it's read from the request rather than
+  // treated as "granted everything" by assumption.
+  return requested;
+}
+
 // Store pending auth sessions (in-memory, cleared on restart)
 const pendingAuthSessions = new Map<string, PendingAuthSession>();
 
@@ -213,19 +238,20 @@ export class GoogleOAuth {
           );
         }
         const accountId = session.existingAccountId ?? crypto.randomUUID();
+        const granted = grantedScopes(tokens, scopes);
 
         // Store tokens
         const tokenData: TokenData = {
           accessToken: tokens.access_token ?? '',
           refreshToken: tokens.refresh_token,
           expiresAt: tokens.expiry_date ?? Date.now() + 3600 * 1000,
-          scopes,
+          scopes: granted,
         };
 
         await this.tokenStorage.save(accountId, tokenData);
 
         session.status = 'completed';
-        session.result = { accountId, email, scopes };
+        session.result = { accountId, email, scopes: granted };
 
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(`
@@ -317,13 +343,14 @@ export class GoogleOAuth {
 
     // Generate account ID
     const accountId = crypto.randomUUID();
+    const granted = grantedScopes(tokens, scopes);
 
     // Store tokens
     const tokenData: TokenData = {
       accessToken: tokens.access_token ?? '',
       refreshToken: tokens.refresh_token,
       expiresAt: tokens.expiry_date ?? Date.now() + 3600 * 1000,
-      scopes,
+      scopes: granted,
     };
 
     await this.tokenStorage.save(accountId, tokenData);
@@ -331,7 +358,7 @@ export class GoogleOAuth {
     return {
       accountId,
       email,
-      scopes,
+      scopes: granted,
     };
   }
 

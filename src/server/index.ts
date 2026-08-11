@@ -22,6 +22,7 @@ import {
   capabilityGateError,
   confirmationRequired,
   errorResponse,
+  rejectUnknownArgs,
   successResponse,
   toMcpError,
   validationError,
@@ -181,16 +182,25 @@ export function createServer(options: ServerOptions): McpServer {
     {
       description:
         'Add a new Google account via OAuth. Returns an authorization URL that you must show to the user. The user opens this URL in their browser to authorize. After authorization, use google_check_pending_auth to complete the process.',
-      inputSchema: {
-        capabilities: z
-          .array(z.string())
-          .optional()
-          .describe(
-            'Capabilities to authorize, as service:level strings. Valid values: mail:read, mail:compose, mail:modify, mail:settings, drive:read, drive:appfiles, calendar:read, calendar:write. Note drive:read (read all files) and drive:appfiles (per-file access to files this app created) are independent — grant both for full Drive access.',
-          ),
-      },
+      // .passthrough() (rather than the raw-shape shorthand used elsewhere)
+      // is required so an unknown key like the removed `scopeTier` survives
+      // into `args` for rejectUnknownArgs to see below - see the comment on
+      // rejectUnknownArgs in ../errors/index.ts for why this matters.
+      inputSchema: z
+        .object({
+          capabilities: z
+            .array(z.string())
+            .optional()
+            .describe(
+              'Capabilities to authorize, as service:level strings. Valid values: mail:read, mail:compose, mail:modify, mail:settings, drive:read, drive:appfiles, calendar:read, calendar:write. Note drive:read (read all files) and drive:appfiles (per-file access to files this app created) are independent — grant both for full Drive access.',
+            ),
+        })
+        .passthrough(),
     },
     async (args) => {
+      const unknownArgs = rejectUnknownArgs(args, ['capabilities']);
+      if (unknownArgs) return errorResponse(unknownArgs.toResponse());
+
       // If no capabilities specified, prompt for selection
       if (!args.capabilities || args.capabilities.length === 0) {
         return successResponse({
@@ -314,23 +324,31 @@ export function createServer(options: ServerOptions): McpServer {
     {
       description:
         "Re-authenticate an existing Google account. Use this when a refresh token is invalidated (e.g., password change, revoked access, expired grant) or when you need to add/change capabilities without losing the account ID, alias, description, or labels. Returns an authorization URL. After the user authorizes, call google_check_pending_auth with the sessionId. If no capabilities are given, the account's current capabilities are reused. Reauth REPLACES the capability set rather than adding to it, so dropping a capability the account currently holds requires confirm: true. The authorized Google account must match the existing email; otherwise the reauth fails.",
-      inputSchema: {
-        accountId: z
-          .string()
-          .describe('The account ID, alias, or email of the account to re-authenticate'),
-        capabilities: z
-          .array(z.string())
-          .optional()
-          .describe(
-            "Capabilities to authorize, as service:level strings. Valid values: mail:read, mail:compose, mail:modify, mail:settings, drive:read, drive:appfiles, calendar:read, calendar:write. Note drive:read (read all files) and drive:appfiles (per-file access to files this app created) are independent — grant both for full Drive access. Omit to reuse the account's current capabilities.",
-          ),
-        confirm: z
-          .boolean()
-          .optional()
-          .describe('Set to true to confirm when the new capabilities would drop existing ones'),
-      },
+      // .passthrough() so a removed `scopeTier`/`scopeTiers` argument survives
+      // into `args` for rejectUnknownArgs to see below, instead of the SDK's
+      // default zod parsing silently stripping it before the handler runs.
+      inputSchema: z
+        .object({
+          accountId: z
+            .string()
+            .describe('The account ID, alias, or email of the account to re-authenticate'),
+          capabilities: z
+            .array(z.string())
+            .optional()
+            .describe(
+              "Capabilities to authorize, as service:level strings. Valid values: mail:read, mail:compose, mail:modify, mail:settings, drive:read, drive:appfiles, calendar:read, calendar:write. Note drive:read (read all files) and drive:appfiles (per-file access to files this app created) are independent — grant both for full Drive access. Omit to reuse the account's current capabilities.",
+            ),
+          confirm: z
+            .boolean()
+            .optional()
+            .describe('Set to true to confirm when the new capabilities would drop existing ones'),
+        })
+        .passthrough(),
     },
     async (rawArgs) => {
+      const unknownArgs = rejectUnknownArgs(rawArgs, ['accountId', 'capabilities', 'confirm']);
+      if (unknownArgs) return errorResponse(unknownArgs.toResponse());
+
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
       const account = accountStore.resolveAccount(args.accountId);
       if (!account) {
@@ -338,7 +356,12 @@ export function createServer(options: ServerOptions): McpServer {
       }
 
       let capabilities: Capability[] | undefined;
-      if (args.capabilities) {
+      // An empty array means "unspecified," same as omitting the field
+      // entirely (matches google_add_account and AccountStore.startReauthAccount
+      // below) - otherwise capabilitiesRemovedBy would report every capability
+      // the account holds as "removed" and demand confirm: true for a reauth
+      // that, once it reaches the store, actually changes nothing.
+      if (args.capabilities && args.capabilities.length > 0) {
         const validated = validateCapabilities(args.capabilities);
         if ('error' in validated) return validated.error;
         capabilities = validated.capabilities;

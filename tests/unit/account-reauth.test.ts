@@ -72,6 +72,10 @@ describe('AccountStore reauth', () => {
             existingEmail: options?.existingEmail,
           };
         }
+        async startAuthFlow(scopes: string[]) {
+          lastStartAuthFlowArgs = { scopes };
+          return { accountId: 'uuid-blocking', email: 'blocking@example.com', scopes };
+        }
         getPendingSession() {
           return mockPendingSession;
         }
@@ -151,6 +155,51 @@ describe('AccountStore reauth', () => {
       const scopes = lastStartAuthFlowArgs?.scopes ?? [];
       expect(scopes).toContain('https://www.googleapis.com/auth/gmail.readonly');
       expect(scopes).toContain('https://www.googleapis.com/auth/drive.readonly');
+    });
+
+    // Regression: `capabilities ? scopesFor(capabilities) : [...account.scopes]`
+    // treats [] the same as a real request, since [] is truthy in JS.
+    // scopesFor([]) grants only the baseline userinfo.email scope, so a
+    // caller (or a client bug) passing capabilities: [] would silently strip
+    // the account to zero usable capabilities with no way back except a
+    // full reauth. [] must be treated exactly like omitting the argument.
+    it('treats an empty capabilities array as unspecified and reuses existing scopes', async () => {
+      const store = await getAccountStore();
+      store.startReauthAccount('uuid-1', []);
+      expect(lastStartAuthFlowArgs?.scopes).toEqual([
+        'https://www.googleapis.com/auth/gmail.readonly',
+      ]);
+    });
+  });
+
+  describe('startAddAccount', () => {
+    it('defaults to mail:read when capabilities is omitted', async () => {
+      const store = await getAccountStore();
+      store.startAddAccount();
+      expect(lastStartAuthFlowArgs?.scopes).toContain(
+        'https://www.googleapis.com/auth/gmail.readonly',
+      );
+    });
+
+    // Same regression as startReauthAccount above, but for a fresh add:
+    // capabilities: [] must fall back to the default (mail:read), not to
+    // scopesFor([]) (userinfo.email only).
+    it('treats an empty capabilities array as unspecified and defaults to mail:read', async () => {
+      const store = await getAccountStore();
+      store.startAddAccount([]);
+      expect(lastStartAuthFlowArgs?.scopes).toContain(
+        'https://www.googleapis.com/auth/gmail.readonly',
+      );
+    });
+  });
+
+  describe('addAccount (blocking flow)', () => {
+    it('treats an empty capabilities array as unspecified and defaults to mail:read', async () => {
+      const store = await getAccountStore();
+      await store.addAccount([]);
+      expect(lastStartAuthFlowArgs?.scopes).toContain(
+        'https://www.googleapis.com/auth/gmail.readonly',
+      );
     });
   });
 

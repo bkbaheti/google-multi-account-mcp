@@ -11,6 +11,7 @@ import {
   McpToolError,
   messageNotFound,
   rateLimited,
+  rejectUnknownArgs,
   successResponse,
   threadNotFound,
   toMcpError,
@@ -133,6 +134,72 @@ describe('Error Model', () => {
       const error = internalError('Unexpected failure');
       expect(error.code).toBe('INTERNAL_ERROR');
       expect(error.message).toBe('Unexpected failure');
+    });
+  });
+
+  describe('rejectUnknownArgs', () => {
+    const KNOWN = ['accountId', 'capabilities', 'confirm'];
+
+    it('returns null when every argument is known', () => {
+      expect(rejectUnknownArgs({ accountId: 'a1', capabilities: ['mail:read'] }, KNOWN)).toBeNull();
+    });
+
+    it('returns null for an empty args object', () => {
+      expect(rejectUnknownArgs({}, KNOWN)).toBeNull();
+    });
+
+    it('rejects a plain unknown key by name, listing the valid arguments', () => {
+      const error = rejectUnknownArgs({ accountId: 'a1', foo: 'bar' }, KNOWN);
+      expect(error).not.toBeNull();
+      expect(error?.code).toBe('VALIDATION_ERROR');
+      expect(error?.message).toContain('foo');
+      expect(error?.message).toContain('accountId, capabilities, confirm');
+      expect(error?.details).toEqual({ unknownArgs: ['foo'] });
+    });
+
+    // The scenario defect 2 exists for: a legacy scopeTier argument must be
+    // rejected by name, not silently stripped by the SDK's zod parsing -
+    // and the error must tell the caller exactly what to write instead.
+    it('rejects a legacy scopeTier key and maps it to its capabilities equivalent', () => {
+      const error = rejectUnknownArgs({ accountId: 'a1', scopeTier: 'drive_full' }, KNOWN);
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain('capabilities');
+      expect(error?.message).toContain('0.5.0');
+      expect(error?.message).toContain('drive_full');
+      expect(error?.message).toContain('drive:appfiles');
+    });
+
+    it('rejects a legacy scopeTiers array and maps every tier it contains', () => {
+      const error = rejectUnknownArgs({ scopeTiers: ['mail_full', 'calendar_readonly'] }, KNOWN);
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain('mail:modify');
+      expect(error?.message).toContain('calendar:read');
+    });
+
+    it('maps a legacy short alias tier name (pre-namespacing) too', () => {
+      const error = rejectUnknownArgs({ scopeTier: 'readonly' }, KNOWN);
+      expect(error?.message).toContain('mail:read');
+    });
+
+    it('maps the "all" tier to every capability it used to grant', () => {
+      const error = rejectUnknownArgs({ scopeTier: 'all' }, KNOWN);
+      expect(error?.message).toContain(
+        JSON.stringify([
+          'mail:modify',
+          'mail:settings',
+          'drive:read',
+          'drive:appfiles',
+          'calendar:read',
+          'calendar:write',
+        ]),
+      );
+    });
+
+    it('names an unrecognized tier value without crashing', () => {
+      const error = rejectUnknownArgs({ scopeTier: 'not-a-real-tier' }, KNOWN);
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain('not-a-real-tier');
+      expect(error?.message).toContain('not a recognized scope tier');
     });
   });
 

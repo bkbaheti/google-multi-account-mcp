@@ -10,6 +10,18 @@ import {
 } from './oauth.js';
 import type { TokenStorage } from './token-storage.js';
 
+/**
+ * Fallback capabilities when none are meaningfully specified. Applies both
+ * when the `capabilities` parameter is omitted (default parameter value)
+ * and when it is passed as an empty array. `[]` is truthy in JS, so a bare
+ * `capabilities ? scopesFor(capabilities) : ...` check treats "explicitly
+ * asked for nothing" the same as "asked for a real set" and calls
+ * `scopesFor([])`, which grants only the baseline userinfo.email scope -
+ * silently stripping an account (or a fresh add) down to zero usable
+ * capabilities. Treat both as unspecified instead.
+ */
+const DEFAULT_CAPABILITIES: Capability[] = ['mail:read'];
+
 export class AccountStore {
   private readonly tokenStorage: TokenStorage;
   private oauth: GoogleOAuth | null = null;
@@ -89,8 +101,8 @@ export class AccountStore {
    * Start adding an account asynchronously - returns auth URL immediately.
    * Use checkPendingAuth to poll for completion.
    */
-  startAddAccount(capabilities: Capability[] = ['mail:read']): PendingAuthSession {
-    const scopes = scopesFor(capabilities);
+  startAddAccount(capabilities: Capability[] = DEFAULT_CAPABILITIES): PendingAuthSession {
+    const scopes = scopesFor(capabilities.length > 0 ? capabilities : DEFAULT_CAPABILITIES);
     const oauth = this.getOAuth();
     return oauth.startAuthFlowAsync(scopes);
   }
@@ -98,8 +110,8 @@ export class AccountStore {
   /**
    * Start re-authenticating an existing account. Preserves the account ID
    * (and therefore alias, description, labels). On completion, tokens and
-   * scopes on the existing account record are updated. If capabilities
-   * is omitted, the account's current scopes are reused.
+   * scopes on the existing account record are updated. If capabilities is
+   * omitted OR empty, the account's current scopes are reused.
    *
    * Returns { session } on success or { error } if the account is unknown.
    */
@@ -112,8 +124,10 @@ export class AccountStore {
       return { error: `Account not found: ${accountIdOrAlias}` };
     }
 
-    // Default to the account's existing scopes if no capabilities specified.
-    const scopes = capabilities ? scopesFor(capabilities) : [...account.scopes];
+    // Default to the account's existing scopes if no capabilities specified
+    // (or an empty array was given - see DEFAULT_CAPABILITIES above).
+    const scopes =
+      capabilities && capabilities.length > 0 ? scopesFor(capabilities) : [...account.scopes];
 
     const oauth = this.getOAuth();
     const session = oauth.startAuthFlowAsync(scopes, {
@@ -187,10 +201,10 @@ export class AccountStore {
    * Original blocking addAccount method for backwards compatibility
    */
   async addAccount(
-    capabilities: Capability[] = ['mail:read'],
+    capabilities: Capability[] = DEFAULT_CAPABILITIES,
     options?: AuthFlowOptions,
   ): Promise<Account> {
-    const scopes = scopesFor(capabilities);
+    const scopes = scopesFor(capabilities.length > 0 ? capabilities : DEFAULT_CAPABILITIES);
     const oauth = this.getOAuth();
     const result = await oauth.startAuthFlow(scopes, options);
 

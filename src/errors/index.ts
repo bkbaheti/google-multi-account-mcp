@@ -1,4 +1,9 @@
-import { type Capability, type CapabilityGate, capabilitiesOf } from '../auth/capabilities.js';
+import {
+  type Capability,
+  type CapabilityGate,
+  capabilitiesOf,
+  LEGACY_SCOPE_TIER_CAPABILITIES,
+} from '../auth/capabilities.js';
 
 // Error codes following the pattern: CATEGORY_SPECIFIC
 export const ErrorCode = {
@@ -244,6 +249,64 @@ export function draftNotFound(draftId: string): McpToolError {
 
 export function validationError(message: string, field?: string): McpToolError {
   return new McpToolError(ErrorCode.VALIDATION_ERROR, message, field ? { field } : undefined);
+}
+
+/**
+ * Reject arguments a tool's schema doesn't declare. The MCP SDK's default
+ * (non-strict) zod object parsing silently STRIPS unknown keys before a
+ * handler ever runs - harmless for a stray typo, but dangerous for
+ * `scopeTier` / `scopeTiers`, the pre-0.5.0 google_add_account /
+ * google_reauth_account arguments removed in commit 6387f1c: a saved
+ * workflow, an older client with a cached tool schema, or a user following
+ * the still-current README calls the tool with `scopeTier`, the key is
+ * stripped, and (for reauth) the account is silently re-granted its
+ * *existing* scopes - a completed OAuth round trip and a success message
+ * for a call that changed nothing.
+ *
+ * For this to see anything, the tool's inputSchema must be built with
+ * `.passthrough()` - a plain raw-shape schema (the object-literal shorthand
+ * used elsewhere in this file) strips unknown keys before the handler is
+ * even invoked, so there would be nothing left here to check. A `.strict()`
+ * schema was considered instead: it does make the SDK reject the call, but
+ * only with a generic "Unrecognized key" message thrown before the handler
+ * runs, in the SDK's own error envelope rather than this codebase's
+ * `{code, message, details}` shape - and it cannot name which capabilities
+ * a given legacy tier string maps to, which is the whole point here.
+ */
+export function rejectUnknownArgs(
+  rawArgs: Record<string, unknown>,
+  knownKeys: readonly string[],
+): McpToolError | null {
+  const unknown = Object.keys(rawArgs).filter((key) => !knownKeys.includes(key));
+  if (unknown.length === 0) return null;
+
+  const legacyTierKeys = unknown.filter((key) => key === 'scopeTier' || key === 'scopeTiers');
+  if (legacyTierKeys.length > 0) {
+    const hints = legacyTierKeys.flatMap((key) => {
+      const raw = rawArgs[key];
+      const tiers = (Array.isArray(raw) ? raw : [raw]).filter(
+        (value): value is string => typeof value === 'string',
+      );
+      return tiers.map((tier) => {
+        const mapped = LEGACY_SCOPE_TIER_CAPABILITIES[tier];
+        return mapped
+          ? `"${tier}" -> capabilities: ${JSON.stringify(mapped)}`
+          : `"${tier}" is not a recognized scope tier`;
+      });
+    });
+    return new McpToolError(
+      ErrorCode.VALIDATION_ERROR,
+      `${legacyTierKeys.join('/')} ${legacyTierKeys.length === 1 ? 'was' : 'were'} removed in 0.5.0. Use capabilities instead.` +
+        (hints.length > 0 ? ` ${hints.join('; ')}.` : ''),
+      { unknownArgs: unknown },
+    );
+  }
+
+  return new McpToolError(
+    ErrorCode.VALIDATION_ERROR,
+    `Unknown argument(s): ${unknown.join(', ')}. Valid arguments are: ${knownKeys.join(', ')}.`,
+    { unknownArgs: unknown },
+  );
 }
 
 export function filterNotFound(filterId: string): McpToolError {

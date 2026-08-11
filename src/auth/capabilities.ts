@@ -66,6 +66,37 @@ export function isCapability(value: string): value is Capability {
   return (CAPABILITIES as readonly string[]).includes(value);
 }
 
+/**
+ * Old scope-tier names (removed in 0.5.0, commit 6387f1c) mapped to their
+ * capability-model equivalent, derived from the scopes each tier used to
+ * request (see SCOPE_TIERS as it stood at 6387f1c^:src/types/index.ts).
+ * Used only to build an actionable error when a legacy `scopeTier` /
+ * `scopeTiers` argument reaches google_add_account or google_reauth_account -
+ * see rejectUnknownArgs in ../errors/index.ts.
+ */
+export const LEGACY_SCOPE_TIER_CAPABILITIES: Record<string, Capability[]> = {
+  mail_readonly: ['mail:read'],
+  readonly: ['mail:read'], // legacy short alias for mail_readonly
+  mail_compose: ['mail:read', 'mail:compose'],
+  compose: ['mail:read', 'mail:compose'], // legacy short alias for mail_compose
+  mail_full: ['mail:modify'],
+  full: ['mail:modify'], // legacy short alias for mail_full
+  mail_settings: ['mail:read', 'mail:settings'],
+  settings: ['mail:read', 'mail:settings'], // legacy short alias for mail_settings
+  drive_readonly: ['drive:read'],
+  drive_full: ['drive:appfiles'],
+  calendar_readonly: ['calendar:read'],
+  calendar_full: ['calendar:write'],
+  all: [
+    'mail:modify',
+    'mail:settings',
+    'drive:read',
+    'drive:appfiles',
+    'calendar:read',
+    'calendar:write',
+  ],
+};
+
 /** Google scopes to request for a set of capabilities. Always includes userinfo.email. */
 export function scopesFor(capabilities: Capability[]): string[] {
   const scopes = new Set<string>([USERINFO_EMAIL_SCOPE]);
