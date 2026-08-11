@@ -4,17 +4,18 @@ import { fileURLToPath } from 'node:url';
 import open from 'open';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { type Capability, hasAnyCapability, hasCapability } from '../auth/capabilities.js';
 import type { TokenStorage } from '../auth/index.js';
 import { AccountStore } from '../auth/index.js';
 import {
   accountNotFound,
   aliasDuplicate,
   errorResponse,
-  scopeInsufficient,
+  insufficientCapability,
   successResponse,
   toMcpError,
 } from '../errors/index.js';
-import { getScopeTier, hasSufficientScope, SCOPE_TIERS, type ScopeTier } from '../types/index.js';
+import { getScopeTier, SCOPE_TIERS, type ScopeTier } from '../types/index.js';
 import { cache, coerceArgs } from '../utils/index.js';
 import { registerCalendarTools } from './calendar-tools.js';
 import { registerDriveTools } from './drive-tools.js';
@@ -57,23 +58,30 @@ export function createServer(options: ServerOptions): McpServer {
 
   const accountStore = new AccountStore(options.tokenStorage);
 
-  // Helper to validate account exists and has sufficient scope.
-  // Accepts account ID, alias, or email address.
-  function validateAccountScope(
-    accountIdOrAlias: string,
-    requiredTier: ScopeTier,
+  // Helper to validate account exists and holds the required capability.
+  // Accepts account ID, alias, or email address. An array of capabilities
+  // means any one of them suffices.
+  function requireCapability(
+    accountRef: string,
+    required: Capability | Capability[],
   ):
     | { error: ReturnType<typeof errorResponse> }
     | { account: NonNullable<ReturnType<typeof accountStore.getAccount>> } {
-    const account = accountStore.resolveAccount(accountIdOrAlias);
+    const account = accountStore.resolveAccount(accountRef);
     if (!account) {
-      return { error: errorResponse(accountNotFound(accountIdOrAlias).toResponse()) };
+      return { error: errorResponse(accountNotFound(accountRef).toResponse()) };
     }
 
-    if (!hasSufficientScope(account.scopes, requiredTier)) {
-      const currentTier = getScopeTier(account.scopes);
+    const satisfied = Array.isArray(required)
+      ? hasAnyCapability(account.scopes, required)
+      : hasCapability(account.scopes, required);
+
+    if (!satisfied) {
+      const missing = Array.isArray(required) ? required : [required];
       return {
-        error: errorResponse(scopeInsufficient(requiredTier, currentTier, account.id).toResponse()),
+        error: errorResponse(
+          insufficientCapability(accountRef, missing, account.scopes).toResponse(),
+        ),
       };
     }
 
@@ -524,13 +532,13 @@ export function createServer(options: ServerOptions): McpServer {
   );
 
   // Register all Gmail tools (gmail_search_messages, gmail_get_message, etc.)
-  registerGmailTools(server, accountStore, validateAccountScope);
+  registerGmailTools(server, accountStore, requireCapability);
 
   // Register all Drive tools (drive_search_files, drive_get_file, etc.)
-  registerDriveTools(server, accountStore, validateAccountScope);
+  registerDriveTools(server, accountStore, requireCapability);
 
   // Register all Calendar tools (calendar_list_calendars, calendar_create_event, etc.)
-  registerCalendarTools(server, accountStore, validateAccountScope);
+  registerCalendarTools(server, accountStore, requireCapability);
 
   // === MCP Prompts for Safe Email Workflows ===
 

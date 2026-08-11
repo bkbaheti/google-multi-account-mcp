@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import type { Capability } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
 import {
   confirmationRequired,
@@ -11,15 +12,14 @@ import {
   validationError,
 } from '../errors/index.js';
 import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
-import type { ScopeTier } from '../types/index.js';
 import { coerceArgs, GMAIL_MAX_ATTACHMENT_BYTES, readFileAsBase64 } from '../utils/index.js';
 
 export function registerGmailTools(
   server: McpServer,
   accountStore: AccountStore,
-  validateAccountScope: (
+  requireCapability: (
     accountId: string,
-    requiredTier: ScopeTier,
+    required: Capability | Capability[],
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // gmail_search_messages - Search messages in Gmail
@@ -37,7 +37,7 @@ export function registerGmailTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, 'mail_readonly');
+      const validation = requireCapability(args.accountId, 'mail:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -73,7 +73,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_readonly');
+      const validation = requireCapability(args.accountId, 'mail:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -116,7 +116,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_readonly');
+      const validation = requireCapability(args.accountId, 'mail:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -179,7 +179,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_readonly');
+      const validation = requireCapability(args.accountId, 'mail:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -235,7 +235,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_compose');
+      const validation = requireCapability(args.accountId, 'mail:compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -295,7 +295,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_compose');
+      const validation = requireCapability(args.accountId, 'mail:compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -340,7 +340,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_compose');
+      const validation = requireCapability(args.accountId, 'mail:compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -399,7 +399,7 @@ export function registerGmailTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'mail_compose');
+      const validation = requireCapability(args.accountId, 'mail:compose');
       if ('error' in validation) return validation.error;
 
       // Safety gate: require explicit confirmation
@@ -442,7 +442,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_compose');
+      const validation = requireCapability(args.accountId, 'mail:compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -493,7 +493,7 @@ export function registerGmailTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { sendImmediately: 'boolean', confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'mail_compose');
+      const validation = requireCapability(args.accountId, 'mail:compose');
       if ('error' in validation) return validation.error;
 
       try {
@@ -578,7 +578,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       try {
@@ -615,7 +615,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       try {
@@ -663,7 +663,7 @@ export function registerGmailTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       // Require confirmation for large operations
@@ -718,7 +718,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       try {
@@ -768,7 +768,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       try {
@@ -810,7 +810,7 @@ export function registerGmailTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       if (!args.confirm) {
@@ -851,7 +851,7 @@ export function registerGmailTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { markAsRead: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       try {
@@ -889,7 +889,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       try {
@@ -923,7 +923,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       try {
@@ -956,7 +956,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_full');
+      const validation = requireCapability(args.accountId, 'mail:modify');
       if ('error' in validation) return validation.error;
 
       try {
@@ -992,7 +992,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_readonly');
+      const validation = requireCapability(args.accountId, 'mail:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1025,7 +1025,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_readonly');
+      const validation = requireCapability(args.accountId, 'mail:read');
       if ('error' in validation) return validation.error;
 
       const outputDir = args.outputDir;
@@ -1120,7 +1120,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_compose');
+      const validation = requireCapability(args.accountId, 'mail:compose');
       if ('error' in validation) return validation.error;
 
       // Resolve attachments: convert filePath entries to base64 data
@@ -1203,7 +1203,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_settings');
+      const validation = requireCapability(args.accountId, 'mail:settings');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1273,7 +1273,7 @@ export function registerGmailTools(
           size: 'number',
         });
       }
-      const validation = validateAccountScope(args.accountId, 'mail_settings');
+      const validation = requireCapability(args.accountId, 'mail:settings');
       if ('error' in validation) return validation.error;
 
       if (args.confirm !== true) {
@@ -1338,7 +1338,7 @@ export function registerGmailTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'mail_settings');
+      const validation = requireCapability(args.accountId, 'mail:settings');
       if ('error' in validation) return validation.error;
 
       if (args.confirm !== true) {
@@ -1376,7 +1376,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_settings');
+      const validation = requireCapability(args.accountId, 'mail:settings');
       if ('error' in validation) return validation.error;
 
       try {
@@ -1435,7 +1435,7 @@ export function registerGmailTools(
         endTime: 'number',
         confirm: 'boolean',
       });
-      const validation = validateAccountScope(args.accountId, 'mail_settings');
+      const validation = requireCapability(args.accountId, 'mail:settings');
       if ('error' in validation) return validation.error;
 
       // Confirmation required only when enabling
@@ -1503,7 +1503,7 @@ export function registerGmailTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'mail_readonly');
+      const validation = requireCapability(args.accountId, 'mail:read');
       if ('error' in validation) return validation.error;
 
       // Validate messageIds is not empty

@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import type { Capability } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
 import { DriveClient } from '../drive/index.js';
 import {
@@ -9,7 +10,6 @@ import {
   toMcpError,
   validationError,
 } from '../errors/index.js';
-import type { ScopeTier } from '../types/index.js';
 import { DRIVE_MAX_UPLOAD_BYTES, coerceArgs, readFileAsBase64 } from '../utils/index.js';
 
 /** Default character limit for drive_get_file_content preview */
@@ -58,7 +58,7 @@ export function registerDriveTools(
   accountStore: AccountStore,
   validateAccountScope: (
     accountId: string,
-    requiredTier: ScopeTier,
+    required: Capability | Capability[],
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // === Read tools (require drive_readonly) ===

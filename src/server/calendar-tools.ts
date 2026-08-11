@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import type { Capability } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
 import { CalendarClient } from '../calendar/index.js';
 import {
@@ -8,7 +9,6 @@ import {
   successResponse,
   toMcpError,
 } from '../errors/index.js';
-import type { ScopeTier } from '../types/index.js';
 import { coerceArgs } from '../utils/index.js';
 
 export function registerCalendarTools(
@@ -16,7 +16,7 @@ export function registerCalendarTools(
   accountStore: AccountStore,
   validateAccountScope: (
     accountId: string,
-    requiredTier: ScopeTier,
+    required: Capability | Capability[],
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
   // === Read tools (require calendar_readonly) ===
