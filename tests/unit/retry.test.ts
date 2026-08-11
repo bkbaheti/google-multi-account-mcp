@@ -98,9 +98,28 @@ describe('Retry utilities', () => {
 
       // Verify exponential growth (with jitter tolerance)
       expect(delays).toHaveLength(2);
-      // Second delay should be roughly double the first (±25% jitter)
-      expect(delays[1]! / delays[0]!).toBeGreaterThan(1.2);
-      expect(delays[1]! / delays[0]!).toBeLessThan(3);
+
+      // Derivation of safe ratio bounds (see calculateDelay in src/utils/retry.ts):
+      //   base_i = initialDelayMs * backoffMultiplier ** i, uncapped here since maxDelayMs
+      //   defaults to 32000 and neither base is anywhere near it.
+      //     base0 = 10 * 2**0 = 10
+      //     base1 = 10 * 2**1 = 20
+      //   Each delay independently gets jitter = delay * 0.25 * (Math.random() * 2 - 1),
+      //   i.e. a value in [-0.25 * base, +0.25 * base), then Math.round is applied. So:
+      //     delays[0] in [0.75 * 10, 1.25 * 10] = [7.5, 12.5]
+      //     delays[1] in [0.75 * 20, 1.25 * 20] = [15, 25]
+      //   The two jitter draws are independent, so the ratio delays[1]/delays[0] is
+      //   minimized when delays[1] is at its floor and delays[0] at its ceiling, and
+      //   maximized in reverse:
+      //     min ratio = 15 / 12.5 = 1.2
+      //     max ratio = 25 / 7.5  = 10/3 (~3.333)
+      //   These are the true closed-interval extremes a correct implementation can
+      //   produce (Math.round only narrows the achievable range further), so bounds
+      //   must be inclusive: the previous strict `toBeGreaterThan(1.2)` /
+      //   `toBeLessThan(3)` sat exactly on (1.2) or inside (3 < 10/3) this range and
+      //   could fail against a perfectly correct implementation.
+      expect(delays[1]! / delays[0]!).toBeGreaterThanOrEqual(1.2);
+      expect(delays[1]! / delays[0]!).toBeLessThanOrEqual(10 / 3);
     });
 
     it('caps delay at maxDelayMs', async () => {
