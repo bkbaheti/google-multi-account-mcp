@@ -25,7 +25,7 @@
 
 ## Part A — correctness
 
-### Task A1: Add the `mail:modify ⇒ mail:compose` implication
+### Task 1: [A1] Add the `mail:modify ⇒ mail:compose` implication
 
 **Files:** Modify `src/auth/capabilities.ts`; Test `tests/unit/capabilities.test.ts`
 
@@ -65,7 +65,7 @@ Update the block comment above it to cite both method pages (`users.drafts.creat
 
 ---
 
-### Task A2: Gate records with a narrow remedy
+### Task 2: [A2] Gate records with a narrow remedy
 
 **Files:** Modify `src/server/index.ts`, `src/errors/index.ts`; Test `tests/unit/capability-gate.test.ts`
 
@@ -113,7 +113,7 @@ it('preserves capabilities the account already holds in the remedy', () => {
 
 ---
 
-### Task A3: Apply the corrected gates
+### Task 3: [A3] Apply the corrected gates
 
 **Files:** Modify `src/server/drive-tools.ts`, `src/server/gmail-tools.ts`; Test `tests/unit/gate-mapping.test.ts`
 
@@ -137,7 +137,7 @@ Run the suite and confirm it still passes — proving no tool is currently ungat
 
 ---
 
-### Task A4: Reauth and scope-storage bugs
+### Task 4: [A4] Reauth and scope-storage bugs
 
 **Files:** Modify `src/auth/account-store.ts`, `src/auth/oauth.ts`, `src/server/index.ts`; Test `tests/unit/account-capabilities.test.ts`
 
@@ -153,7 +153,7 @@ Tests: empty array reuses current scopes; a legacy `scopeTier` key is rejected b
 
 ---
 
-### Task A5: Drive export and barrel-export bugs
+### Task 5: [A5] Drive export and barrel-export bugs
 
 **Files:** Modify `src/drive/client.ts`, `src/index.ts`; Test `tests/unit/drive-content.test.ts`, `tests/unit/drive-export-format.test.ts`
 
@@ -166,7 +166,7 @@ Tests: empty array reuses current scopes; a legacy `scopeTier` key is rejected b
 
 ---
 
-### Task A6: Fix the flaky exponential-backoff assertion
+### Task 6: [A6] Fix the flaky exponential-backoff assertion
 
 **Files:** Modify `tests/unit/retry.test.ts`
 
@@ -183,7 +183,7 @@ A flaky test in a suite used as a merge gate is worse than no test: it trains ev
 
 ## Part B — permission UX
 
-### Task B1: Capability metadata table
+### Task 7: [B1] Capability metadata table
 
 **Files:** Modify `src/auth/capabilities.ts`; Test `tests/unit/capabilities.test.ts`
 
@@ -193,7 +193,7 @@ Add `CAPABILITY_INFO: Record<Capability, { name: string; canDo: string; cannotDo
 
 ---
 
-### Task B2: Coverage annotation on Drive responses
+### Task 8: [B2] Coverage annotation on Drive responses
 
 **Files:** Modify `src/server/drive-tools.ts`; Test `tests/unit/drive-coverage.test.ts` (new)
 
@@ -203,7 +203,7 @@ When an account holds `drive:appfiles` but not `drive:read`, every Drive respons
 
 ---
 
-### Task B3: Error taxonomy
+### Task 9: [B3] Error taxonomy
 
 **Files:** Modify `src/errors/index.ts`, `src/server/drive-tools.ts`; Test `tests/unit/errors.test.ts`
 
@@ -215,7 +215,7 @@ Message must not assert the file exists. Document the known false positive (a mi
 
 ---
 
-### Task B4: Presets and widening confirmation
+### Task 10: [B4] Presets and widening confirmation
 
 **Files:** Modify `src/server/index.ts`; Test `tests/unit/capability-presets.test.ts` (new)
 
@@ -229,7 +229,7 @@ Widening into `drive:read` requires `confirm: true` and states it grants read of
 
 ## Part C — documentation surface
 
-### Task C1: Generate docs from the metadata table
+### Task 11: [C1] Generate docs from the metadata table
 
 **Files:** Create `scripts/generate-capability-docs.ts`; Modify `package.json`; Test `tests/unit/capability-docs.test.ts` (new)
 
@@ -239,7 +239,7 @@ Generate the capability table for `README.md` and the permission line in `site/l
 
 ---
 
-### Task C2: Update every user-facing surface
+### Task 12: [C2] Update every user-facing surface
 
 **Files:** Modify `README.md`, `site/index.html`, `site/llms.txt`, `docs/SPEC.md`, `docs/demo-video-scripts.md`, `docs/ARCHITECTURE.md`, `CHANGELOG.md`, `package.json`
 
