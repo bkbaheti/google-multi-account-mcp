@@ -61,7 +61,7 @@ export function registerDriveTools(
     required: Capability | Capability[],
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
-  // === Read tools (require drive_readonly) ===
+  // === Read tools (require drive:read) ===
 
   // drive_list_shared_drives - List Shared Drives the user is a member of
   server.registerTool(
@@ -80,7 +80,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { pageSize: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -120,7 +120,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -163,7 +163,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -196,7 +196,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -227,7 +227,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxChars: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -254,7 +254,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -273,7 +273,7 @@ export function registerDriveTools(
     'drive_get_comments',
     {
       description:
-        'Read the comments on a Google Drive file (Doc, Sheet, Slide), including the document text each comment is anchored to, the author, timestamps, resolved status, and replies. Use this to review feedback left on a shared document. Requires the drive_readonly scope tier: an account authorized only at drive_full (drive.file) cannot read comments on documents it did not create — re-authorize with google_reauth_account if you hit a permission error.',
+        'Read the comments on a Google Drive file (Doc, Sheet, Slide), including the document text each comment is anchored to, the author, timestamps, resolved status, and replies. Use this to review feedback left on a shared document. Requires the drive:read capability: an account holding only drive:appfiles (drive.file) cannot read comments on documents it did not create — re-authorize with google_reauth_account if you hit a permission error.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         fileId: z.string().describe('The Drive file ID'),
@@ -292,7 +292,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { pageSize: 'number', includeResolved: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -335,7 +335,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { pageSize: 'number' });
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -383,7 +383,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive_readonly');
+      const validation = validateAccountScope(args.accountId, 'drive:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -402,7 +402,7 @@ export function registerDriveTools(
     },
   );
 
-  // === Write tools (require drive_full) ===
+  // === Write tools (require drive:appfiles) ===
 
   // drive_upload_file - Upload a file
   server.registerTool(
@@ -435,7 +435,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { isBase64: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'drive_full');
+      const validation = validateAccountScope(args.accountId, 'drive:appfiles');
       if ('error' in validation) return validation.error;
 
       // Validate mutual exclusivity of content vs filePath
@@ -505,7 +505,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive_full');
+      const validation = validateAccountScope(args.accountId, 'drive:appfiles');
       if ('error' in validation) return validation.error;
 
       try {
@@ -531,7 +531,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive_full');
+      const validation = validateAccountScope(args.accountId, 'drive:appfiles');
       if ('error' in validation) return validation.error;
 
       try {
@@ -561,7 +561,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive_full');
+      const validation = validateAccountScope(args.accountId, 'drive:appfiles');
       if ('error' in validation) return validation.error;
 
       try {
@@ -587,7 +587,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive_full');
+      const validation = validateAccountScope(args.accountId, 'drive:appfiles');
       if ('error' in validation) return validation.error;
 
       try {
@@ -612,7 +612,7 @@ export function registerDriveTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'drive_full');
+      const validation = validateAccountScope(args.accountId, 'drive:appfiles');
       if ('error' in validation) return validation.error;
 
       try {
@@ -626,7 +626,7 @@ export function registerDriveTools(
     },
   );
 
-  // === Write tools with confirm gate (require drive_full) ===
+  // === Write tools with confirm gate (require drive:appfiles) ===
 
   // drive_share_file - Share file (requires confirm: true)
   server.registerTool(
@@ -655,7 +655,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { sendNotification: 'boolean', confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'drive_full');
+      const validation = validateAccountScope(args.accountId, 'drive:appfiles');
       if ('error' in validation) return validation.error;
 
       // Safety gate: require explicit confirmation
@@ -716,7 +716,7 @@ export function registerDriveTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'drive_full');
+      const validation = validateAccountScope(args.accountId, 'drive:appfiles');
       if ('error' in validation) return validation.error;
 
       // Safety gate: require explicit confirmation

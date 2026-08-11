@@ -19,7 +19,7 @@ export function registerCalendarTools(
     required: Capability | Capability[],
   ) => { error: ReturnType<typeof errorResponse> } | { account: any },
 ): void {
-  // === Read tools (require calendar_readonly) ===
+  // === Read tools (require calendar:read, unless noted) ===
 
   // calendar_list_calendars - List all calendars
   server.registerTool(
@@ -31,7 +31,7 @@ export function registerCalendarTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'calendar_readonly');
+      const validation = validateAccountScope(args.accountId, 'calendar:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -71,7 +71,7 @@ export function registerCalendarTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, 'calendar_readonly');
+      const validation = validateAccountScope(args.accountId, ['calendar:read', 'calendar:write']);
       if ('error' in validation) return validation.error;
 
       try {
@@ -119,7 +119,7 @@ export function registerCalendarTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'calendar_readonly');
+      const validation = validateAccountScope(args.accountId, ['calendar:read', 'calendar:write']);
       if ('error' in validation) return validation.error;
 
       try {
@@ -153,7 +153,7 @@ export function registerCalendarTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { maxResults: 'number' });
-      const validation = validateAccountScope(args.accountId, 'calendar_readonly');
+      const validation = validateAccountScope(args.accountId, ['calendar:read', 'calendar:write']);
       if ('error' in validation) return validation.error;
 
       try {
@@ -201,7 +201,7 @@ export function registerCalendarTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'calendar_readonly');
+      const validation = validateAccountScope(args.accountId, 'calendar:read');
       if ('error' in validation) return validation.error;
 
       try {
@@ -226,7 +226,7 @@ export function registerCalendarTools(
     },
   );
 
-  // === Write tools (require calendar_full) ===
+  // === Write tools (require calendar:write) ===
 
   // calendar_create_event - Create event (confirm required if attendees present)
   server.registerTool(
@@ -267,7 +267,7 @@ export function registerCalendarTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'calendar_full');
+      const validation = validateAccountScope(args.accountId, 'calendar:write');
       if ('error' in validation) return validation.error;
 
       // Conditional confirm gate: only if attendees present
@@ -369,7 +369,7 @@ export function registerCalendarTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'calendar_full');
+      const validation = validateAccountScope(args.accountId, 'calendar:write');
       if ('error' in validation) return validation.error;
 
       try {
@@ -471,7 +471,7 @@ export function registerCalendarTools(
     },
     async (rawArgs) => {
       const args = coerceArgs(rawArgs, { confirm: 'boolean' });
-      const validation = validateAccountScope(args.accountId, 'calendar_full');
+      const validation = validateAccountScope(args.accountId, 'calendar:write');
       if ('error' in validation) return validation.error;
 
       try {
@@ -513,7 +513,7 @@ export function registerCalendarTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'calendar_full');
+      const validation = validateAccountScope(args.accountId, 'calendar:write');
       if ('error' in validation) return validation.error;
 
       try {
@@ -540,7 +540,7 @@ export function registerCalendarTools(
       },
     },
     async (args) => {
-      const validation = validateAccountScope(args.accountId, 'calendar_full');
+      const validation = validateAccountScope(args.accountId, 'calendar:write');
       if ('error' in validation) return validation.error;
 
       try {
