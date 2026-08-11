@@ -1004,11 +1004,17 @@ Expected: prints usage naming capabilities, exits without throwing. Do NOT run `
 Then: `npx tsx scripts/test-oauth.ts list`
 Expected: lists existing accounts without throwing.
 
+- [ ] **Step 4b: Fix the stale tier reference in ARCHITECTURE.md**
+
+`docs/ARCHITECTURE.md` around line 78, in the "Shared Drive Support" section, still says the existing `drive_readonly` / `drive_full` OAuth scopes cover Shared Drive access. Those names no longer exist. Rewrite that sentence in capability vocabulary — `drive:read` for reading Shared Drive content, `drive:appfiles` for writing — leaving the rest of that section alone.
+
+Then grep the file for any other stale tier token (`drive_readonly`, `drive_full`, `mail_readonly`, `mail_compose`, `mail_full`, `mail_settings`, `calendar_readonly`, `calendar_full`, `ScopeTier`) and fix any live claim you find. Entries explicitly marked as superseded history stay as they are.
+
 - [ ] **Step 5: Commit**
 
 ```bash
 pnpm test && pnpm typecheck
-git add src/errors/index.ts tests/unit/errors.test.ts scripts/test-oauth.ts
+git add src/errors/index.ts tests/unit/errors.test.ts scripts/test-oauth.ts docs/ARCHITECTURE.md
 git commit -m "chore: remove dead scopeInsufficient error and fix test-oauth capability args"
 ```
 
