@@ -148,9 +148,30 @@ Every user-facing surface still teaches the deleted vocabulary. Two audiences: t
 - Requesting Google's broad `drive` scope.
 - Incremental authorization (adding one scope without re-consenting to the rest).
 
+## Verified 2026-08-12 (was "still unverified")
+
+1. **`comments.list` returns 404, not 403, for a file outside the `drive.file` corpus. RESOLVED.**
+   Probed with a real `drive:appfiles`-only token (`Personal`) against a Doc in another account's
+   Drive that had never been shared with it:
+
+   ```
+   files.get      HTTP 404 — File not found: <id>
+   comments.list  HTTP 404 — File not found: <id>
+   files.list     HTTP 200 — 0 file(s) visible   (silently empty)
+   ```
+
+   So `DRIVE_FILE_NOT_VISIBLE` fires as designed for the motivating client-shared-Doc case. The
+   taxonomy still handles 403 as well; that branch is now belt-and-braces rather than a hedge
+   against not knowing, and can stay.
+
+   The third line is the coverage annotation's justification, observed live: a search of a Drive
+   provably containing four matching fixtures returned **HTTP 200 with zero results** — no error, no
+   signal, indistinguishable from "no such file". That is the silent wrong answer the annotation
+   exists to prevent, and it confirms annotating only empty responses would have been the wrong
+   design.
+
 ## Still unverified
 
-1. **Does `comments.list` return 404 or 403 for a file outside the `drive.file` corpus?** This is the motivating scenario. If it 403s, `DRIVE_FILE_NOT_VISIBLE` never fires for `drive_get_comments` and the remedy text points the wrong way. Cannot be settled from documentation — needs a real `appfiles`-only token, which the E2E harness was being built to provide.
-2. `users.drafts.get`, `users.settings.getVacation`, `users.settings.filters.list` — if any accepts `gmail.readonly`, those gates are over-demanding in the same family as A1/A3.
+1. `users.drafts.get`, `users.settings.getVacation`, `users.settings.filters.list` — if any accepts `gmail.readonly`, those gates are over-demanding in the same family as A1/A3.
 3. `users.labels.create/patch/delete` — determines whether `mail:modify` still needs `gmail.labels`, and whether `mail:labels` is worth adding.
 4. Whether MCP clients surface a top-level `warning` key equivalently, and which truncate large results.
