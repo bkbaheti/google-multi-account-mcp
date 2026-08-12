@@ -29,7 +29,8 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "typecheck:e2e": "tsc -p tsconfig.e2e.json --noEmit",
-    "docs:capabilities": "tsx scripts/generate-capability-docs.ts"
+    "docs:capabilities": "tsx scripts/generate-capability-docs.ts",
+    "e2e:seed": "tsx scripts/e2e/seed-fixtures.ts"
   },
   "keywords": [
     "mcp",
