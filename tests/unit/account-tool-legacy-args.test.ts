@@ -10,6 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // is the only way to prove the .passthrough() schema + handler check are
 // wired together correctly.
 
+// These tests invoke the REAL account tool handlers, which call open(session.authUrl)
+// to launch the consent page. Without this mock the suite opens a real browser tab on
+// every run.
+vi.mock('open', () => ({ default: vi.fn(() => Promise.resolve()) }));
+
 vi.mock('../../src/config/index.js', () => ({
   loadConfig: () => ({ version: 1, accounts: [] }),
   saveConfig: vi.fn(),
