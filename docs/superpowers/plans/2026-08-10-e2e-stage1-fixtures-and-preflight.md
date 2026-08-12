@@ -264,190 +264,59 @@ git commit -m "feat(e2e): add config module for fixture IDs and account aliases"
 
 ---
 
-### Task 3: Preflight scope matrix
+### Task 3: Preflight capability matrix
+
+> **Rewritten 2026-08-12.** The original version of this task was written against the scope-tier
+> model, which no longer exists. Its output is parked at
+> `.superpowers/sdd/2026-08-10-e2e-stage1-fixtures-and-preflight/parked-e2e-superseded/` for
+> reference only — do not restore it; it imports `hasSufficientScope` and `ScopeTier`, both deleted.
 
 **Files:**
 - Create: `scripts/e2e/preflight.ts`
 - Test: `tests/unit/e2e-preflight.test.ts`
 
 **Interfaces:**
-- Consumes: `hasSufficientScope`, `ScopeTier` from `src/types/index.ts`.
+- Consumes: `Capability`, `CapabilityGate`, `hasCapability`, `hasAnyCapability` from `src/auth/capabilities.js`.
 - Produces:
-  - `interface ScopeRequirement { group: string; tier: ScopeTier }`
-  - `interface PreflightResult { account: string; group: string; status: 'ok' | 'skip'; reason?: string }`
-  - `REQUIRED_SCOPES: ScopeRequirement[]`
-  - `checkAccount(alias: string, scopes: string[], requirements?: ScopeRequirement[]): PreflightResult[]`
-  - `formatPreflight(results: PreflightResult[]): string`
+  - `interface GroupRequirement { group: string; requires: Capability | CapabilityGate }`
+  - `REQUIRED_CAPABILITIES: GroupRequirement[]`
+  - `checkAccount(alias, scopes, requirements?): PreflightResult[]`
+  - `formatPreflight(results): string`
 
-The point of this module: an account missing a scope produces `skip`, never `fail`. "Could not test" and "is broken" must never look alike.
+**The point of this module:** a missing capability yields status `skip`, never `fail`. "Could not test this" and "this is broken" must never look alike in the report — that distinction is the whole reason the preflight exists.
 
-- [ ] **Step 1: Write the failing test**
+**The requirement matrix must mirror the real gates**, which were corrected on the capability branch. Reuse `CapabilityGate` and the same satisfaction logic (`hasAnyCapability` for a gate, `hasCapability` for a bare capability) rather than reimplementing — reimplementation is how the two drift.
 
-Create `tests/unit/e2e-preflight.test.ts`:
+| Group | Requires | Why |
+|---|---|---|
+| `mail-read` | `'mail:read'` | |
+| `mail-compose` | `'mail:compose'` | `mail:modify` implies it |
+| `mail-modify` | `'mail:modify'` | |
+| `mail-settings` | `'mail:settings'` | |
+| `drive-read` | gate: accept `['drive:read','drive:appfiles']` | mirrors the eight loosened read tools |
+| `drive-comments` | gate: accept `['drive:read','drive:appfiles']` | `comments.list` / `replies.list` accept `drive.file` |
+| `drive-shared-drives` | `'drive:read'` | `drives.list` rejects `drive.file` — the one Drive read tool that did not loosen |
+| `drive-write` | `'drive:appfiles'` | |
+| `calendar-read` | `'calendar:read'` | `calendarList.list` / `freebusy.query` reject `calendar.events` |
+| `calendar-events-read` | gate: accept `['calendar:read','calendar:write']` | `events.list` / `events.get` accept either |
+| `calendar-write` | `'calendar:write'` | |
 
-```typescript
-import { describe, expect, it } from 'vitest';
-import { REQUIRED_SCOPES, checkAccount, formatPreflight } from '../../scripts/e2e/preflight.js';
+**The negative fixture moved — this is the substantive change.** Under the old model, `Personal` (holding only `drive.file`) was the negative fixture for **comments**: it could not read them. That is no longer true — `drive:appfiles` satisfies the comments gate now, because Google authorizes `comments.list` under `drive.file`. `Personal` is instead the negative fixture for **`drive-shared-drives`**, the one Drive group it genuinely cannot do. Encode that, and do not carry the old assertion forward.
 
-const DRIVE_READONLY = 'https://www.googleapis.com/auth/drive.readonly';
-const DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
-const EMAIL = 'https://www.googleapis.com/auth/userinfo.email';
-const GMAIL_MODIFY = 'https://www.googleapis.com/auth/gmail.modify';
+- [ ] **Step 1: Write the failing test** — `tests/unit/e2e-preflight.test.ts`. Cover:
+  - a granted capability yields `ok`
+  - a missing one yields `skip`, and no result ever has status `fail`
+  - the skip reason names the capability needed
+  - a gate requirement is satisfied by EITHER member (an account with only `drive:appfiles` passes `drive-read`)
+  - `Personal`'s exact scopes (`drive.file` + `userinfo.email`) yield `skip` for `drive-shared-drives` but `ok` for `drive-read` and `drive-comments` — the corrected behaviour
+  - `gmail.modify` satisfies `mail-read` AND `mail-compose` via the implication
+  - every requirement is checked, not just the first failure
+  - `formatPreflight` names each skipped group and its reason
 
-describe('e2e preflight', () => {
-  it('marks a group ok when the account satisfies the tier', () => {
-    const results = checkAccount('Procedure', [DRIVE_READONLY, EMAIL], [
-      { group: 'drive-read', tier: 'drive_readonly' },
-    ]);
-
-    expect(results).toEqual([{ account: 'Procedure', group: 'drive-read', status: 'ok' }]);
-  });
-
-  it('marks a group skip — never fail — when a scope is missing', () => {
-    const results = checkAccount('Personal', [DRIVE_FILE, EMAIL], [
-      { group: 'drive-read', tier: 'drive_readonly' },
-    ]);
-
-    expect(results[0]?.status).toBe('skip');
-    expect(results.some((r) => r.status === ('fail' as string))).toBe(false);
-  });
-
-  it('names the missing tier in the skip reason', () => {
-    const results = checkAccount('Personal', [DRIVE_FILE, EMAIL], [
-      { group: 'drive-read', tier: 'drive_readonly' },
-    ]);
-
-    expect(results[0]?.reason).toContain('drive_readonly');
-  });
-
-  it('honours the implied-scope hierarchy so gmail.modify satisfies mail_readonly', () => {
-    const results = checkAccount('Personal', [GMAIL_MODIFY, EMAIL], [
-      { group: 'mail-read', tier: 'mail_readonly' },
-    ]);
-
-    expect(results[0]?.status).toBe('ok');
-  });
-
-  it('checks every requirement, not just the first failing one', () => {
-    const results = checkAccount('Personal', [DRIVE_FILE, EMAIL], [
-      { group: 'drive-read', tier: 'drive_readonly' },
-      { group: 'drive-write', tier: 'drive_full' },
-    ]);
-
-    expect(results).toHaveLength(2);
-    expect(results.map((r) => r.status)).toEqual(['skip', 'ok']);
-  });
-
-  it('requires drive_readonly for the comments group', () => {
-    const comments = REQUIRED_SCOPES.find((r) => r.group === 'drive-comments');
-
-    expect(comments?.tier).toBe('drive_readonly');
-  });
-
-  it('renders a summary naming each skipped group', () => {
-    const output = formatPreflight([
-      { account: 'Procedure', group: 'drive-comments', status: 'ok' },
-      { account: 'Personal', group: 'drive-comments', status: 'skip', reason: 'needs drive_readonly' },
-    ]);
-
-    expect(output).toContain('Personal');
-    expect(output).toContain('drive-comments');
-    expect(output).toContain('needs drive_readonly');
-  });
-});
-```
-
-- [ ] **Step 2: Run the test to verify it fails**
-
-Run: `pnpm vitest run tests/unit/e2e-preflight.test.ts`
-Expected: FAIL — cannot resolve `../../scripts/e2e/preflight.js`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `scripts/e2e/preflight.ts`:
-
-```typescript
-import { type ScopeTier, hasSufficientScope } from '../../src/types/index.js';
-
-export interface ScopeRequirement {
-  group: string;
-  tier: ScopeTier;
-}
-
-export interface PreflightResult {
-  account: string;
-  group: string;
-  status: 'ok' | 'skip';
-  reason?: string;
-}
-
-/**
- * Which scope tier each test group needs. drive-comments sits on drive_readonly
- * deliberately: drive.file only covers app-created files, so it cannot read
- * comments on a Doc shared by a third party.
- */
-export const REQUIRED_SCOPES: ScopeRequirement[] = [
-  { group: 'mail-read', tier: 'mail_readonly' },
-  { group: 'mail-compose', tier: 'mail_compose' },
-  { group: 'mail-modify', tier: 'mail_full' },
-  { group: 'mail-settings', tier: 'mail_settings' },
-  { group: 'drive-read', tier: 'drive_readonly' },
-  { group: 'drive-comments', tier: 'drive_readonly' },
-  { group: 'drive-write', tier: 'drive_full' },
-  { group: 'calendar-read', tier: 'calendar_readonly' },
-  { group: 'calendar-write', tier: 'calendar_full' },
-];
-
-export function checkAccount(
-  alias: string,
-  scopes: string[],
-  requirements: ScopeRequirement[] = REQUIRED_SCOPES,
-): PreflightResult[] {
-  return requirements.map((requirement) => {
-    if (hasSufficientScope(scopes, requirement.tier)) {
-      return { account: alias, group: requirement.group, status: 'ok' };
-    }
-
-    return {
-      account: alias,
-      group: requirement.group,
-      status: 'skip',
-      reason: `needs ${requirement.tier} — re-authorize with google_reauth_account`,
-    };
-  });
-}
-
-export function formatPreflight(results: PreflightResult[]): string {
-  const skipped = results.filter((r) => r.status === 'skip');
-
-  const lines = [
-    `Preflight: ${results.length - skipped.length}/${results.length} groups available`,
-  ];
-
-  for (const result of skipped) {
-    lines.push(`  SKIP  ${result.account}  ${result.group}  ${result.reason ?? ''}`.trimEnd());
-  }
-
-  return lines.join('\n');
-}
-```
-
-- [ ] **Step 4: Run the test to verify it passes**
-
-Run: `pnpm vitest run tests/unit/e2e-preflight.test.ts`
-Expected: PASS, 7 tests.
-
-- [ ] **Step 5: Typecheck, lint, and confirm the full suite is still green**
-
-Run: `pnpm typecheck:e2e && pnpm biome check scripts/e2e tests/unit/e2e-preflight.test.ts && pnpm test`
-Expected: all exit 0; the full suite is green.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add scripts/e2e/preflight.ts tests/unit/e2e-preflight.test.ts
-git commit -m "feat(e2e): add scope preflight that skips rather than fails on missing scopes"
-```
+- [ ] **Step 2: Run, confirm it fails** — `pnpm vitest run tests/unit/e2e-preflight.test.ts`
+- [ ] **Step 3: Implement** `scripts/e2e/preflight.ts`.
+- [ ] **Step 4: Verify** — `pnpm test`, `pnpm typecheck`, `pnpm typecheck:e2e`, `pnpm biome check scripts/e2e tests/unit/e2e-preflight.test.ts`
+- [ ] **Step 5: Commit** — `feat(e2e): add capability preflight that skips rather than fails`
 
 ---
 
