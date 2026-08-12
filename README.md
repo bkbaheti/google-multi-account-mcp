@@ -191,7 +191,7 @@ Or add to `~/.config/mcp-google/config.json`:
    "Add my Gmail account"
    ```
    Claude will:
-   - Ask which permissions you need (readonly, compose, full, etc.)
+   - Ask which capabilities you need — pick a preset (`read-only`, `inbox-assistant`, `scheduler`) or choose individual capabilities like `mail:read` or `drive:appfiles`
    - Show you an authorization URL to open in your browser
    - After you complete OAuth in the browser, Claude will confirm the account was added
 
@@ -254,13 +254,12 @@ Claude: [Updates the messages]
 
 ```
 You: "Add my work Gmail account"
-Claude: Which permissions would you like?
-        - readonly: Read and search only
-        - compose: Also send emails (recommended)
-        - full: Also manage labels, archive, trash
-        ...
+Claude: Which capabilities would you like?
+        - read-only: Read mail, Drive, and calendar (preset)
+        - inbox-assistant: Read, send, and organize mail (preset)
+        - Or pick individual capabilities: mail:read, mail:compose, mail:modify, ...
 
-You: "Compose, please"
+You: "inbox-assistant, please"
 Claude: [Opens OAuth flow for work account]
 
 You: "Label my work account as 'work' and my personal as 'personal'"
@@ -308,9 +307,9 @@ You: "Just say I'm on holiday and will respond when I return"
 Claude: [Configures vacation responder with dates]
 ```
 
-### Scope Tiers
+### Capabilities
 
-When adding an account, Claude will ask which permissions you need:
+When adding an account, Claude will ask which capabilities you need. Each capability is an independent, per-service grant — pick only what you actually need:
 
 <!-- BEGIN GENERATED: capabilities -->
 | Capability | Can do | Cannot do | Reach | Scopes |
@@ -326,22 +325,28 @@ When adding an account, Claude will ask which permissions you need:
 <!-- END GENERATED: capabilities -->
 
 **How it works:**
-- `readonly` → `compose` → `full` builds on each other
-- `settings` is separate (for filters/vacation only)
-- You can combine them: "I want inbox management AND filters" → `full` + `settings`
+- Capabilities are independent per service — grant any combination you like.
+- The one exception: `mail:modify` already includes everything `mail:read` and `mail:compose` do, so you never need to grant those alongside it.
+- `drive:read` and `drive:appfiles` are deliberately independent, not tiers of each other — `drive:read` sees everything in the Drive read-only, `drive:appfiles` can create/edit/delete but only within files this app touched. Grant both if you want broad read plus app-created writes.
+- For the common cases, start from a preset instead of picking capabilities one by one:
+  - `read-only` → `mail:read`, `drive:read`, `calendar:read`
+  - `inbox-assistant` → `mail:modify` (read, send, and organize mail)
+  - `scheduler` → `calendar:read` + `calendar:write`
+- Presets are just a shortcut — they expand to the same capabilities above before anything is stored, and you can still add more on top.
 
 **Examples:**
 ```
 You: "Add my Gmail account"
-Claude: Which permissions would you like?
+Claude: Which capabilities would you like? Pick a preset (read-only,
+        inbox-assistant, scheduler) or choose individually.
         [Shows options]
 
 You: "I just want to read emails"
-Claude: [Adds with readonly scope]
+Claude: [Adds with mail:read]
 
 You: "Actually, I need to send emails too"
-Claude: You'll need to remove and re-add with compose permissions.
-        Want me to do that?
+Claude: I'll reauth this account to add mail:compose — your account ID,
+        alias, and labels all stay the same. Want me to do that?
 ```
 
 ## Available Tools
@@ -355,11 +360,11 @@ You don't need to memorize tool names - just describe what you want. Here's what
 | "Show my Google accounts" | Lists all connected accounts |
 | "Add my Gmail account" | Starts OAuth flow to add account |
 | "Reconnect my work account" | Re-runs OAuth, keeps alias/labels/ID |
-| "Upgrade my account to drive_full" | Reauths with new scope tier |
+| "Give my account Drive read access" | Reauths with `drive:read` added |
 | "Remove my work account" | Disconnects account and revokes tokens |
 | "Label this account as 'personal'" | Tags account for easy reference |
 
-### Reading Email (readonly scope)
+### Reading Email (`mail:read`)
 
 | Just Say... | What Happens |
 |-------------|--------------|
@@ -378,7 +383,7 @@ You don't need to memorize tool names - just describe what you want. Here's what
 - `newer_than:7d` - Last 7 days
 - `label:important` - Has specific label
 
-### Composing Email (compose scope)
+### Composing Email (`mail:compose`)
 
 | Just Say... | What Happens |
 |-------------|--------------|
@@ -392,7 +397,7 @@ You don't need to memorize tool names - just describe what you want. Here's what
 
 **Safety feature:** All emails go through a draft-first workflow. Claude will always show you the draft and ask for confirmation before sending.
 
-### Inbox Management (full scope)
+### Inbox Management (`mail:modify`)
 
 | Just Say... | What Happens |
 |-------------|--------------|
@@ -407,7 +412,7 @@ You don't need to memorize tool names - just describe what you want. Here's what
 | "Delete this email" | Moves to trash |
 | "Restore from trash" | Recovers deleted message |
 
-### Filters & Vacation (settings scope)
+### Filters & Vacation (`mail:settings`)
 
 | Just Say... | What Happens |
 |-------------|--------------|
@@ -515,18 +520,18 @@ If the OS keychain is unavailable, set `MCP_GOOGLE_PASSPHRASE`:
 
 Tokens will be encrypted with AES-256-GCM using this passphrase.
 
-### "Scope insufficient" errors
+### "Capability insufficient" errors
 
-You're trying to do something that requires more permissions than the account has.
+You're trying to do something that requires a capability the account doesn't have.
 
 ```
 You: "Archive this email"
-Claude: This account only has readonly permissions. You need 'full' scope
-        to archive emails. Would you like me to remove and re-add the
-        account with higher permissions?
+Claude: This account only has mail:read. Archiving needs mail:modify.
+        Want me to reauth this account to add it? Your account ID,
+        alias, and labels all stay the same.
 ```
 
-**Fix:** Say "Remove my account and add it back with full permissions"
+**Fix:** Say "Reauth this account and add mail:modify" — no need to remove and re-add; `google_reauth_account` preserves the account ID, alias, description, and labels while updating its capabilities.
 
 ### MCP server not connecting
 

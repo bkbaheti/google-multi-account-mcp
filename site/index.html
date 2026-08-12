@@ -53,7 +53,7 @@
       "Google Calendar events, scheduling, RSVP",
       "Multi-account support with aliases",
       "Local-first — tokens never leave your machine",
-      "Tiered permission scopes",
+      "Per-service capability grants — mail, Drive, and calendar are authorized independently",
       "57+ MCP tools"
     ]
   }
@@ -195,8 +195,8 @@
 
         <div class="feature-card animate-in delay-5">
           <span class="card-icon">&#9881;</span>
-          <h3>Tiered Scopes</h3>
-          <p>Start with read-only access. Upgrade to compose or full permissions only when you need them. You control what the AI can do.</p>
+          <h3>Granular Capabilities</h3>
+          <p>Grant read, compose, or manage access to mail, Drive, and calendar independently — pick a preset like read-only, or choose exactly the capabilities you need. You control what the AI can do.</p>
         </div>
       </div>
     </section>
@@ -236,8 +236,21 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.4.3</span>
+            <span class="release-version">v0.5.1</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">August 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type fix">fix</span> The per-service capability gates introduced in v0.5.0 were too strict and refused calls Google actually authorizes. Eight of the nine Drive read tools now accept <code>drive:appfiles</code> as well as <code>drive:read</code>; <code>mail:modify</code> now implies <code>mail:compose</code>; <code>gmail_list_labels</code> no longer demands write access</li>
+            <li><span class="change-type feat">feat</span> Capability presets — <code>read-only</code>, <code>inbox-assistant</code>, <code>scheduler</code> — for one-step account setup instead of picking every capability individually</li>
+            <li><span class="change-type feat">feat</span> Widening an account's Drive access on reauth now requires <code>confirm: true</code>, mirroring the existing confirmation for narrowing</li>
+            <li><span class="change-type fix">fix</span> Errors now suggest the narrowest capability that would fix them, instead of the full set of alternatives; Drive responses on a <code>drive:appfiles</code>-only account carry a coverage note when the view is partial instead of failing silently incomplete</li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.4.3</span>
             <span class="release-date">May 2026</span>
           </div>
           <ul class="release-changes">

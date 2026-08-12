@@ -72,15 +72,12 @@
     - OS keychain preferred (Windows Credential Manager / macOS Keychain / libsecret)
     - Fallback: local encrypted file with user-supplied passphrase
 
-- Scope tiers
-  - Tier 1 (read/search)
-    - Gmail read-only/search scopes
-  - Tier 2 (compose/send)
-    - Draft + send scopes
-  - Tier 3 (modify)
-    - Labels, archive, mark read/unread, etc.
+- Capabilities (see `src/auth/capabilities.ts` for the source of truth)
+  - Eight independent per-service capabilities, not tiers: `mail:read`, `mail:compose`, `mail:modify`, `mail:settings`, `drive:read`, `drive:appfiles`, `calendar:read`, `calendar:write`. Each maps to the Google OAuth scope(s) it requests, and operation gates check required capabilities directly — there is no tier-to-scope lookup table to be wrong.
+  - The only true implication: `mail:modify` includes `mail:read` and `mail:compose` (Google documents `gmail.modify` as including read and send access), so granting it alone is enough.
+  - Named presets (`read-only`, `inbox-assistant`, `scheduler`) are a front door onto the same capabilities, expanded to primitives before anything is stored — never a second vocabulary.
   - Incremental consent
-    - Upgrade only when tool requiring higher tier is invoked
+    - Reauth with a different capability set (`google_reauth_account`) when a tool needs one the account doesn't have; the account ID, alias, description, and labels are preserved. Reauth replaces the capability set, so narrowing it or widening into `drive:read` both require `confirm: true`.
 
 - Workspace constraints
   - Note that work/school domains may block OAuth apps or restricted scopes.
@@ -97,12 +94,12 @@
   - `google_list_accounts`
     - Returns: array of { accountId, email, labels[], scopesGranted[], lastUsedAt }
   - `google_add_account`
-    - Inputs: { label?: string, scopesTier?: 1|2|3 }
-    - Behavior: launches OAuth flow, stores account entry
+    - Inputs: { capabilities?: Capability[], presets?: PresetName[] }
+    - Behavior: launches OAuth flow, stores account entry. `capabilities` and `presets` compose (deduplicated); presets (`read-only`, `inbox-assistant`, `scheduler`) are expanded to primitive capabilities before anything is stored, so a preset name never reaches the account record. Omitting both prompts the caller to choose.
     - Returns: { accountId, email }
   - `google_reauth_account`
-    - Inputs: { accountId, scopeTier?, scopeTiers? }
-    - Behavior: launches OAuth flow against an existing account; preserves accountId, alias, description, labels; verifies authorized email matches; refreshes tokens (and scopes if a tier is specified)
+    - Inputs: { accountId, capabilities?: Capability[], confirm?: boolean }
+    - Behavior: launches OAuth flow against an existing account; preserves accountId, alias, description, labels; verifies authorized email matches; refreshes tokens (and capabilities if given — reauth *replaces* the capability set rather than adding to it). Omitting `capabilities` reuses the account's current set. `confirm: true` is required whenever the new set would drop a capability the account currently holds (narrowing), or would add `drive:read` (widening into "read every file in this Drive" is a real permission increase). If both apply at once, one `confirm: true` covers both.
     - Returns: { sessionId, authUrl } (poll via `google_check_pending_auth`)
   - `google_remove_account`
     - Inputs: { accountId }
@@ -351,8 +348,8 @@
   - No direct "send raw message" tool without preview.
 
 - Scope discipline
-  - Scopes are tiered and incrementally requested.
-  - Tools must fail with explicit errors if required scopes are missing (no silent escalation).
+  - Scopes are requested per independent capability, not bundled into tiers, and granted incrementally as needed.
+  - Tools must fail with explicit errors if a required capability is missing (no silent escalation).
 
 - State ownership
   - MCP tools remain stateless; all durable state lives in the server.
@@ -366,7 +363,7 @@
 
 ## 11) Open questions (parked)
 
-- Exact scopes list per tier (map to Google OAuth scope strings)
+- ~~Exact scopes list per tier~~ — resolved: see `CAPABILITY_SCOPES` in `src/auth/capabilities.ts`
 - Preferred token encryption backend across Windows/macOS/Linux
 - Whether to ship a tiny local webserver for OAuth callback or use device flow fallback
 - How to represent HTML bodies safely (sanitize vs raw)

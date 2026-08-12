@@ -130,7 +130,7 @@ Users can also revoke access from their Google Account Permissions page."
 
 ## Video 2: Claude Desktop (Recommended: 4-5 minutes)
 
-**Focus:** Calendar (all scopes), multi-account, scope tiers
+**Focus:** Calendar (all scopes), multi-account, capabilities
 
 ### Pre-recording Setup
 - Claude Desktop installed with MCP server configured in `claude_desktop_config.json`:
@@ -211,15 +211,17 @@ When attendees are involved, the server requires explicit confirmation
 before sending invitations."
 ```
 
-#### Scene 5: Scope Tiers (30 sec)
+#### Scene 5: Capabilities (30 sec)
 ```
-NARRATION: "Scopes are requested incrementally. Users start with read-only
-access and upgrade only when needed."
+NARRATION: "Permissions are requested as independent, per-service capabilities,
+not bundled tiers. Users can pick a preset — read-only, inbox-assistant,
+scheduler — or choose exactly the capabilities they need, like calendar:read
+without calendar:write."
 
-TYPE: "What scope tier am I using for my personal account?"
-ACTION: Show account details with scope tier
+TYPE: "What capabilities does my personal account have?"
+ACTION: Show account details with its capability list
 
-NARRATION: "This minimizes the permissions requested from each user."
+NARRATION: "This keeps each account limited to exactly the access it needs."
 ```
 
 #### Scene 6: Privacy & Security Summary (30 sec)
