@@ -21,6 +21,7 @@ import {
   FIXTURE_FOLDER_NAME,
   findChildByName,
   findOrCreateFolder,
+  hasAnchoredComment,
   QUOTED_SENTENCE,
   readBackQuotedText,
   SHEET_CSV,
@@ -57,6 +58,16 @@ async function main(): Promise<void> {
   let docId = await findChildByName(drive, folder.id, CONTRACT_DOC_NAME);
   if (docId) {
     console.log(`  doc       reused   ${docId}`);
+
+    // The Doc existing doesn't mean the comment does — verify it directly
+    // rather than carrying forward a value from a previous run, which would
+    // go stale and couldn't detect a comment added by hand afterward.
+    fixtures.anchoredCommentSupported = await hasAnchoredComment(drive, docId, QUOTED_SENTENCE);
+    console.log(
+      fixtures.anchoredCommentSupported
+        ? '  comment   verified anchored, quotedText confirmed'
+        : '  comment   MISSING  no anchored comment found',
+    );
   } else {
     docId = await createNativeDoc(drive, folder.id, CONTRACT_DOC_NAME, CONTRACT_DOC_TEXT);
     console.log(`  doc       created  ${docId}`);

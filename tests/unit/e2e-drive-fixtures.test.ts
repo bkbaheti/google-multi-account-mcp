@@ -8,6 +8,7 @@ import {
   findChildByName,
   findFolderByName,
   findOrCreateFolder,
+  hasAnchoredComment,
   QUOTED_SENTENCE,
   readBackQuotedText,
   seedAnchoredComment,
@@ -142,6 +143,28 @@ describe('doc and comment seeding', () => {
     mockCommentsList.mockResolvedValueOnce({ data: { comments: [{ id: 'c1' }] } });
 
     expect(await readBackQuotedText(fakeDrive(), 'doc-1', 'c1')).toBeUndefined();
+  });
+
+  it('finds an anchored comment on the reuse path without needing a comment id', async () => {
+    mockCommentsList.mockResolvedValueOnce({
+      data: { comments: [{ quotedFileContent: { value: 'unlimited liability' } }] },
+    });
+
+    expect(await hasAnchoredComment(fakeDrive(), 'doc-1', 'unlimited liability')).toBe(true);
+  });
+
+  it('reports false when no comment quotes the expected text', async () => {
+    mockCommentsList.mockResolvedValueOnce({
+      data: { comments: [{ quotedFileContent: { value: 'something else' } }] },
+    });
+
+    expect(await hasAnchoredComment(fakeDrive(), 'doc-1', 'unlimited liability')).toBe(false);
+  });
+
+  it('reports false when the Doc has no comments at all', async () => {
+    mockCommentsList.mockResolvedValueOnce({ data: { comments: [] } });
+
+    expect(await hasAnchoredComment(fakeDrive(), 'doc-1', 'unlimited liability')).toBe(false);
   });
 });
 

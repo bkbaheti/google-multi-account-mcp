@@ -152,6 +152,29 @@ export async function readBackQuotedText(
   return match?.quotedFileContent?.value ?? undefined;
 }
 
+/**
+ * Verify (rather than assume) that a file already carries an anchored comment
+ * quoting the given text — used on the reuse path, where the seeder has no
+ * comment id to look up because it didn't just create the comment itself.
+ * This also lets a comment added by hand (the ACTION NEEDED fallback) be
+ * picked up on the next run, the same way findOrCreateFolder picks up a
+ * folder someone created outside the seeder.
+ */
+export async function hasAnchoredComment(
+  drive: drive_v3.Drive,
+  fileId: string,
+  quoted: string,
+): Promise<boolean> {
+  const response = await drive.comments.list({
+    fileId,
+    fields: 'comments(quotedFileContent(value))',
+    includeDeleted: false,
+    pageSize: 100,
+  });
+
+  return (response.data.comments ?? []).some((c) => c.quotedFileContent?.value === quoted);
+}
+
 export const SHEET_NAME = 'e2e-fixture-sheet';
 export const DRAWING_NAME = 'e2e-fixture-drawing';
 
