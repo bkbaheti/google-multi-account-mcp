@@ -103,12 +103,27 @@ The folder name is deliberately shouty so it reads as off-limits when browsing D
 
 Scope: `Procedure` holds `drive.file`, and the fixtures are app-created, so `drive.file` covers both creating and commenting on them.
 
-### Known unknowns, to resolve by spike during implementation
+### Spike outcomes — RESOLVED 2026-08-12 against a real account
 
-1. **Anchored comments.** Unanchored file-level comments will work. Whether an API-created `anchor` reliably populates `quotedFileContent.value` — the field the whole feature exists to surface — is unverified. Spike: seed one anchored comment, read it back, check `quotedText`. If it does not survive, fall back to unanchored comments, assert `quotedText` as present-or-absent, and record the gap here.
-2. **Blank Drawing creation.** Whether `files.create` with `application/vnd.google-apps.drawing` and no media produces a usable Drawing is unverified. If not, the `.png` default-export assertion is dropped and the gap recorded.
+Both were resolved by running the seeder against `Procedure`. Both went the good way, so neither
+fallback is needed.
 
-Neither blocks the rest of the harness.
+1. **Anchored comments — RESOLVED: they work.** An API-created comment carrying an `anchor` and
+   `quotedFileContent` does come back with `quotedFileContent.value` intact. Confirmed by reading it
+   back after creation rather than trusting the create call, and re-confirmed on a later run via
+   `hasAnchoredComment`. The harness can therefore assert on `quotedText` — the field the whole
+   Drive-comments feature exists to surface. The manual fallback (a human adding one comment by
+   hand) is not required, though the seeder still detects one if it is ever added.
+
+2. **Blank Drawing creation — RESOLVED: it works.** `files.create` with
+   `application/vnd.google-apps.drawing` and no media produces a usable Drawing. The binary
+   `image/png` default-export path therefore has a real fixture. That path silently corrupted every
+   Drawing download for the entire life of Drive support in this project, and no mocked test could
+   have caught it.
+
+Fixture IDs live in the gitignored `e2e.config.json`; the folder is
+`__MCP-E2E-FIXTURES — DO NOT DELETE__` in `Procedure`'s My Drive. Re-running the seeder reuses all
+four fixtures with identical IDs — verified empirically, twice.
 
 ### What the fixtures do not prove
 
