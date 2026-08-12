@@ -1,6 +1,6 @@
 # Design: capability gate correctness, permission UX, and the documentation surface
 
-**Status:** Approved design, not yet implemented
+**Status:** Implemented 2026-08-11/12, shipped as 0.5.1 (all 12 plan tasks). Open items are the owner decisions in the handoff, not implementation work.
 **Date:** 2026-08-11
 **Area:** Auth / errors / docs / site
 **Supersedes parts of:** `2026-08-11-capability-scope-model-design.md`
