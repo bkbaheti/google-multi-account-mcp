@@ -1,12 +1,12 @@
 # Design: End-to-end test harness for the MCP
 
-**Status:** Approved design, not yet implemented
+**Status:** Stage 1 implemented (2026-08-12). Fixtures seeded and verified against a real account.
 **Date:** 2026-08-10
 **Area:** Testing / tooling
 
 ## Problem
 
-The unit suite (397 tests) mocks `googleapis` entirely. It cannot catch:
+The unit suite (513 tests as of 2026-08-12) mocks `googleapis` entirely. It cannot catch:
 
 - A tool that fails to register, or registers with a broken input schema
 - A tool description that misleads the caller
@@ -129,7 +129,7 @@ four fixtures with identical IDs — verified empirically, twice.
 
 A fixture Doc we create is app-created, so it is reachable under `drive.file`. It therefore does **not** reproduce the condition that motivated the comments feature: a Doc shared with the user by a third party, which `drive.file` cannot reach.
 
-Reproducing that properly needs `Personal` to create and share a commented Doc with `Procedure`. Deferred for now; until then the scope caveat is covered only by the negative test below.
+Reproducing that properly needs `Personal` to create and share a commented Doc with `Procedure`. Still deferred.
 
 ## Accounts and scope preflight
 
@@ -138,11 +138,20 @@ Two accounts under test:
 | Alias | Email | Drive tier | Role |
 |---|---|---|---|
 | `Procedure` | braj.b@… | `drive.readonly` + `drive.file` | primary — full coverage |
-| `Personal` | bahetibraj@… | `drive.file` only | secondary + **negative fixture** |
+| `Personal` | bahetibraj@… | `drive:appfiles` only | secondary + **negative fixture for `drive_list_shared_drives`** |
 
-`Personal` lacking `drive.readonly` is useful, not a problem: the suite asserts that `drive_get_comments` against `Personal` fails with a clear scope error rather than returning an empty list. That is the caveat documented in the comments requirement doc, verified against a real account.
+**Corrected 2026-08-12 — the negative fixture moved.** This spec originally claimed `Personal` was
+the negative fixture for reading comments, on the belief that `drive.file` could not reach them. That
+was wrong: Google authorizes `comments.list` under `drive.file`, and the gate was corrected on the
+capability branch to accept `drive:appfiles`. So `Personal` now succeeds at `drive-read` and
+`drive-comments`.
 
-Preflight compares stored scopes against a required matrix using the project's own `hasSufficientScope`. Insufficient scope marks affected groups **SKIPPED, never FAILED** — "could not test" and "is broken" must not look alike in the report.
+`Personal` is instead the negative fixture for **`drive_list_shared_drives`** — `drives.list` genuinely
+rejects `drive.file`, making it the one Drive read tool that does not accept `drive:appfiles`.
+
+Preflight compares an account's capabilities against a required matrix using the project's own
+`hasCapability` / `hasAnyCapability`. A missing capability marks affected groups **SKIPPED, never
+FAILED** — "could not test" and "is broken" must not look alike in the report.
 
 OAuth needs a browser, so it is never triggered silently. When preflight finds a gap, phase 2 can drive re-auth interactively: `google_reauth_account`, hand the URL to the user, poll `google_check_pending_auth`.
 
