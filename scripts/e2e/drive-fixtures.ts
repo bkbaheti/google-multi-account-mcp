@@ -62,3 +62,92 @@ export async function findChildByName(
 
   return response.data.files?.[0]?.id ?? null;
 }
+
+export const CONTRACT_DOC_NAME = 'e2e-fixture-contract';
+
+/** The sentence a seeded comment anchors to. Must appear verbatim in CONTRACT_DOC_TEXT. */
+export const QUOTED_SENTENCE = 'unlimited liability';
+
+export const CONTRACT_DOC_TEXT = [
+  'STATEMENT OF WORK (E2E FIXTURE — DO NOT EDIT)',
+  '',
+  '1. Scope. Supplier will deliver the services described in Schedule A.',
+  `2. Liability. Supplier accepts ${QUOTED_SENTENCE} for any loss arising from the services.`,
+  '3. Term. This agreement runs for twelve months from the effective date.',
+  '',
+  'This document exists only to exercise the MCP end-to-end suite.',
+].join('\n');
+
+/**
+ * Create a native Google Doc. Drive converts on upload only when the target type
+ * (requestBody.mimeType) differs from the uploaded media type — which is exactly
+ * what drive_upload_file cannot express today.
+ */
+export async function createNativeDoc(
+  drive: drive_v3.Drive,
+  folderId: string,
+  name: string,
+  text: string,
+): Promise<string> {
+  const response = await drive.files.create({
+    requestBody: {
+      name,
+      parents: [folderId],
+      mimeType: 'application/vnd.google-apps.document',
+    },
+    media: { mimeType: 'text/plain', body: text },
+    fields: 'id',
+  });
+
+  const id = response.data.id;
+  if (!id) {
+    throw new Error(`Drive returned no id when creating Doc "${name}"`);
+  }
+
+  return id;
+}
+
+/**
+ * Attempt an anchored comment. Whether Drive honours an API-supplied anchor and
+ * returns quotedFileContent is the open question this fixture resolves — always
+ * confirm with readBackQuotedText rather than trusting the create call.
+ */
+export async function seedAnchoredComment(
+  drive: drive_v3.Drive,
+  fileId: string,
+  quoted: string,
+  body: string,
+): Promise<string> {
+  const response = await drive.comments.create({
+    fileId,
+    fields: 'id, quotedFileContent(value)',
+    requestBody: {
+      content: body,
+      anchor: JSON.stringify({ r: 'head', a: [{ txt: { o: 0, l: quoted.length } }] }),
+      quotedFileContent: { mimeType: 'text/plain', value: quoted },
+    },
+  });
+
+  const id = response.data.id;
+  if (!id) {
+    throw new Error(`Drive returned no id when creating a comment on ${fileId}`);
+  }
+
+  return id;
+}
+
+export async function readBackQuotedText(
+  drive: drive_v3.Drive,
+  fileId: string,
+  commentId: string,
+): Promise<string | undefined> {
+  const response = await drive.comments.list({
+    fileId,
+    fields: 'comments(id,quotedFileContent(value))',
+    includeDeleted: false,
+    pageSize: 100,
+  });
+
+  const match = response.data.comments?.find((c) => c.id === commentId);
+  return match?.quotedFileContent?.value ?? undefined;
+}

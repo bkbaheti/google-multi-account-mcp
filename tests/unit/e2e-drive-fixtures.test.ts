@@ -1,18 +1,26 @@
 import type { drive_v3 } from 'googleapis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CONTRACT_DOC_TEXT,
+  createNativeDoc,
   FIXTURE_FOLDER_NAME,
   findChildByName,
   findFolderByName,
   findOrCreateFolder,
+  QUOTED_SENTENCE,
+  readBackQuotedText,
+  seedAnchoredComment,
 } from '../../scripts/e2e/drive-fixtures.js';
 
 const mockFilesList = vi.fn();
 const mockFilesCreate = vi.fn();
+const mockCommentsCreate = vi.fn();
+const mockCommentsList = vi.fn();
 
 function fakeDrive(): drive_v3.Drive {
   return {
     files: { list: mockFilesList, create: mockFilesCreate },
+    comments: { create: mockCommentsCreate, list: mockCommentsList },
   } as unknown as drive_v3.Drive;
 }
 
@@ -80,5 +88,57 @@ describe('e2e drive fixtures', () => {
 
     expect(id).toBe('doc-1');
     expect(mockFilesList.mock.calls[0][0].q as string).toContain("'fold-1' in parents");
+  });
+});
+
+describe('doc and comment seeding', () => {
+  it('creates a native Google Doc by converting uploaded plain text', async () => {
+    mockFilesCreate.mockResolvedValueOnce({ data: { id: 'doc-1' } });
+
+    const id = await createNativeDoc(fakeDrive(), 'fold-1', 'e2e-fixture-contract', 'body text');
+
+    expect(id).toBe('doc-1');
+    const params = mockFilesCreate.mock.calls[0][0];
+    // The conversion only happens when the two MIME types differ.
+    expect(params.requestBody.mimeType).toBe('application/vnd.google-apps.document');
+    expect(params.media.mimeType).toBe('text/plain');
+    expect(params.requestBody.parents).toEqual(['fold-1']);
+  });
+
+  it('quotes a sentence that actually appears in the fixture body', () => {
+    expect(CONTRACT_DOC_TEXT).toContain(QUOTED_SENTENCE);
+  });
+
+  it('sends both an anchor and quotedFileContent when seeding a comment', async () => {
+    mockCommentsCreate.mockResolvedValueOnce({ data: { id: 'c1' } });
+
+    const id = await seedAnchoredComment(fakeDrive(), 'doc-1', 'unlimited liability', 'Too broad.');
+
+    expect(id).toBe('c1');
+    const params = mockCommentsCreate.mock.calls[0][0];
+    expect(params.fileId).toBe('doc-1');
+    expect(params.requestBody.content).toBe('Too broad.');
+    expect(params.requestBody.quotedFileContent.value).toBe('unlimited liability');
+    expect(params.requestBody.anchor).toBeTypeOf('string');
+    expect(params.fields).toContain('id');
+  });
+
+  it('reads back the quoted text Drive actually stored', async () => {
+    mockCommentsList.mockResolvedValueOnce({
+      data: {
+        comments: [{ id: 'c1', quotedFileContent: { value: 'unlimited liability' } }],
+      },
+    });
+
+    const quoted = await readBackQuotedText(fakeDrive(), 'doc-1', 'c1');
+
+    expect(quoted).toBe('unlimited liability');
+    expect(mockCommentsList.mock.calls[0][0].fields).toContain('quotedFileContent');
+  });
+
+  it('reports undefined when Drive dropped the quoted text', async () => {
+    mockCommentsList.mockResolvedValueOnce({ data: { comments: [{ id: 'c1' }] } });
+
+    expect(await readBackQuotedText(fakeDrive(), 'doc-1', 'c1')).toBeUndefined();
   });
 });
