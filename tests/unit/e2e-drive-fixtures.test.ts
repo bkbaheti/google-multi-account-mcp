@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CONTRACT_DOC_TEXT,
   createNativeDoc,
+  createNativeSheet,
   FIXTURE_FOLDER_NAME,
   findChildByName,
   findFolderByName,
@@ -10,6 +11,7 @@ import {
   QUOTED_SENTENCE,
   readBackQuotedText,
   seedAnchoredComment,
+  tryCreateDrawing,
 } from '../../scripts/e2e/drive-fixtures.js';
 
 const mockFilesList = vi.fn();
@@ -140,5 +142,39 @@ describe('doc and comment seeding', () => {
     mockCommentsList.mockResolvedValueOnce({ data: { comments: [{ id: 'c1' }] } });
 
     expect(await readBackQuotedText(fakeDrive(), 'doc-1', 'c1')).toBeUndefined();
+  });
+});
+
+describe('sheet and drawing fixtures', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('creates a native Sheet by converting uploaded CSV', async () => {
+    mockFilesCreate.mockResolvedValueOnce({ data: { id: 'sheet-1' } });
+
+    const id = await createNativeSheet(fakeDrive(), 'fold-1', 'e2e-fixture-sheet', 'a,b\n1,2');
+
+    expect(id).toBe('sheet-1');
+    const params = mockFilesCreate.mock.calls[0][0];
+    expect(params.requestBody.mimeType).toBe('application/vnd.google-apps.spreadsheet');
+    expect(params.media.mimeType).toBe('text/csv');
+  });
+
+  it('creates a blank Drawing with no media body', async () => {
+    mockFilesCreate.mockResolvedValueOnce({ data: { id: 'draw-1' } });
+
+    const id = await tryCreateDrawing(fakeDrive(), 'fold-1', 'e2e-fixture-drawing');
+
+    expect(id).toBe('draw-1');
+    const params = mockFilesCreate.mock.calls[0][0];
+    expect(params.requestBody.mimeType).toBe('application/vnd.google-apps.drawing');
+    expect(params.media).toBeUndefined();
+  });
+
+  it('returns null instead of throwing when Drive refuses to create a Drawing', async () => {
+    mockFilesCreate.mockRejectedValueOnce(new Error('Bad Request'));
+
+    expect(await tryCreateDrawing(fakeDrive(), 'fold-1', 'e2e-fixture-drawing')).toBeNull();
   });
 });

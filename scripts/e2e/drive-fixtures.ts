@@ -151,3 +151,64 @@ export async function readBackQuotedText(
   const match = response.data.comments?.find((c) => c.id === commentId);
   return match?.quotedFileContent?.value ?? undefined;
 }
+
+export const SHEET_NAME = 'e2e-fixture-sheet';
+export const DRAWING_NAME = 'e2e-fixture-drawing';
+
+export const SHEET_CSV = 'item,qty,unit_price\nwidget,4,25\ngadget,2,60\n';
+
+export async function createNativeSheet(
+  drive: drive_v3.Drive,
+  folderId: string,
+  name: string,
+  csv: string,
+): Promise<string> {
+  const response = await drive.files.create({
+    requestBody: {
+      name,
+      parents: [folderId],
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+    },
+    media: { mimeType: 'text/csv', body: csv },
+    fields: 'id',
+  });
+
+  const id = response.data.id;
+  if (!id) {
+    throw new Error(`Drive returned no id when creating Sheet "${name}"`);
+  }
+
+  return id;
+}
+
+/**
+ * A Drawing exports to image/png by default, making it the only fixture that
+ * exercises the binary export path. Whether Drive will create a blank one via the
+ * API is unverified — return null on refusal so the caller can fall back to asking
+ * the user to create it by hand once.
+ */
+export async function tryCreateDrawing(
+  drive: drive_v3.Drive,
+  folderId: string,
+  name: string,
+): Promise<string | null> {
+  try {
+    const response = await drive.files.create({
+      requestBody: {
+        name,
+        parents: [folderId],
+        mimeType: 'application/vnd.google-apps.drawing',
+      },
+      fields: 'id',
+    });
+
+    return response.data.id ?? null;
+  } catch (error) {
+    // Surface why Drive refused — swallowing it silently would leave the
+    // operator with "FAILED" and no way to tell a scope problem from an
+    // unsupported operation.
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn(`  drawing   Drive refused to create a blank Drawing: ${detail}`);
+    return null;
+  }
+}
