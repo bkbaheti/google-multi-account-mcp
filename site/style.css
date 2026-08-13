@@ -722,6 +722,15 @@ footer {
   gap: 0.5rem;
 }
 
+/* The li is a flex container, so EVERY child element becomes its own flex item —
+   including inline <code>. Without this wrapper a note containing inline code is
+   shredded into one narrow column per code tag and text run. Keep the prose of every
+   release item inside .change-text so the li always has exactly two flex items. */
+.release-changes li .change-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .change-type {
   flex-shrink: 0;
   font-size: 0.65rem;

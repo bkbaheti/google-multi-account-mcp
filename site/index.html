@@ -241,10 +241,10 @@
             <span class="release-date">August 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type fix">fix</span> The per-service capability gates introduced in v0.5.0 were too strict and refused calls Google actually authorizes. Eight of the nine Drive read tools now accept <code>drive:appfiles</code> as well as <code>drive:read</code>; <code>mail:modify</code> now implies <code>mail:compose</code>; <code>gmail_list_labels</code> no longer demands write access</li>
-            <li><span class="change-type feat">feat</span> Capability presets — <code>read-only</code>, <code>inbox-assistant</code>, <code>scheduler</code> — for one-step account setup instead of picking every capability individually</li>
-            <li><span class="change-type feat">feat</span> Widening an account's Drive access on reauth now requires <code>confirm: true</code>, mirroring the existing confirmation for narrowing</li>
-            <li><span class="change-type fix">fix</span> Errors now suggest the narrowest capability that would fix them, instead of the full set of alternatives; Drive responses on a <code>drive:appfiles</code>-only account carry a coverage note when the view is partial instead of failing silently incomplete</li>
+            <li><span class="change-type fix">fix</span><span class="change-text">The per-service capability gates introduced in v0.5.0 were too strict and refused calls Google actually authorizes. Eight of the nine Drive read tools now accept <code>drive:appfiles</code> as well as <code>drive:read</code>; <code>mail:modify</code> now implies <code>mail:compose</code>; <code>gmail_list_labels</code> no longer demands write access</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Capability presets — <code>read-only</code>, <code>inbox-assistant</code>, <code>scheduler</code> — for one-step account setup instead of picking every capability individually</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Widening an account's Drive access on reauth now requires <code>confirm: true</code>, mirroring the existing confirmation for narrowing</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text">Errors now suggest the narrowest capability that would fix them, instead of the full set of alternatives; Drive responses on a <code>drive:appfiles</code>-only account carry a coverage note when the view is partial instead of failing silently incomplete</span></li>
           </ul>
         </div>
 
@@ -254,9 +254,9 @@
             <span class="release-date">May 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type feat">feat</span> Shared Drive (Team Drive) support — <code>drive_search_files</code>, <code>drive_list_files</code>, file content/download, upload, and permission tools now find and act on Shared Drive items (previously returned empty results or "File not found")</li>
-            <li><span class="change-type feat">feat</span> New <code>drive_list_shared_drives</code> tool to discover the Shared Drives an account is a member of</li>
-            <li><span class="change-type feat">feat</span> New optional <code>driveId</code> parameter on <code>drive_search_files</code> to scope a search to a single Shared Drive</li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Shared Drive (Team Drive) support — <code>drive_search_files</code>, <code>drive_list_files</code>, file content/download, upload, and permission tools now find and act on Shared Drive items (previously returned empty results or "File not found")</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">New <code>drive_list_shared_drives</code> tool to discover the Shared Drives an account is a member of</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">New optional <code>driveId</code> parameter on <code>drive_search_files</code> to scope a search to a single Shared Drive</span></li>
           </ul>
         </div>
 
@@ -266,8 +266,8 @@
             <span class="release-date">May 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type feat">feat</span> New <code>google_reauth_account</code> tool — re-run OAuth on an existing account when a refresh token is invalidated, or to upgrade scope tiers, without losing the account ID, alias, description, or labels</li>
-            <li><span class="change-type feat">feat</span> Reauth verifies the authorized Google account matches the existing email, preventing accidental account swaps</li>
+            <li><span class="change-type feat">feat</span><span class="change-text">New <code>google_reauth_account</code> tool — re-run OAuth on an existing account when a refresh token is invalidated, or to upgrade scope tiers, without losing the account ID, alias, description, or labels</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Reauth verifies the authorized Google account matches the existing email, preventing accidental account swaps</span></li>
           </ul>
         </div>
 
@@ -277,9 +277,9 @@
             <span class="release-date">May 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type fix">fix</span> Non-ASCII subjects (em-dash, smart quotes, accents) now RFC 2047 encoded so recipients see them correctly instead of mojibake like <code>â€"</code></li>
-            <li><span class="change-type fix">fix</span> Plain-text bodies no longer render with visible mid-sentence line breaks in Gmail — hard-wrapped paragraphs are unwrapped before send so clients reflow to the viewport</li>
-            <li><span class="change-type feat">feat</span> New <code>bodyFormat: "text" | "html"</code> parameter on <code>gmail_create_draft</code>, <code>gmail_update_draft</code>, <code>gmail_create_draft_with_attachment</code>, and <code>gmail_reply_in_thread</code> for HTML-formatted email</li>
+            <li><span class="change-type fix">fix</span><span class="change-text">Non-ASCII subjects (em-dash, smart quotes, accents) now RFC 2047 encoded so recipients see them correctly instead of mojibake like <code>â€"</code></span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text">Plain-text bodies no longer render with visible mid-sentence line breaks in Gmail — hard-wrapped paragraphs are unwrapped before send so clients reflow to the viewport</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">New <code>bodyFormat: "text" | "html"</code> parameter on <code>gmail_create_draft</code>, <code>gmail_update_draft</code>, <code>gmail_create_draft_with_attachment</code>, and <code>gmail_reply_in_thread</code> for HTML-formatted email</span></li>
           </ul>
         </div>
 
@@ -289,10 +289,10 @@
             <span class="release-date">April 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type feat">feat</span> Smart file previews — <code>drive_get_file_content</code> now returns truncated content (default 10k chars) to protect AI context windows from overload</li>
-            <li><span class="change-type feat">feat</span> New <code>drive_get_full_file_content</code> tool for when you genuinely need the complete file</li>
-            <li><span class="change-type feat">feat</span> New <code>drive_download_file</code> tool — download files from Drive directly to local disk</li>
-            <li><span class="change-type feat">feat</span> Full-text search shorthand — use <code>content:keyword</code> in <code>drive_search_files</code> to search inside file contents</li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Smart file previews — <code>drive_get_file_content</code> now returns truncated content (default 10k chars) to protect AI context windows from overload</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">New <code>drive_get_full_file_content</code> tool for when you genuinely need the complete file</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">New <code>drive_download_file</code> tool — download files from Drive directly to local disk</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Full-text search shorthand — use <code>content:keyword</code> in <code>drive_search_files</code> to search inside file contents</span></li>
           </ul>
         </div>
 
@@ -302,9 +302,9 @@
             <span class="release-date">April 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type fix">fix</span> Attachment downloads now work reliably — fixed a bug where Gmail's ephemeral attachment IDs caused every download to fail</li>
-            <li><span class="change-type fix">fix</span> <code>gmail_get_attachment</code> now saves files directly to disk instead of returning binary data in the response</li>
-            <li><span class="change-type fix">fix</span> <code>gmail_bulk_save_attachments</code> no longer fails due to the same stale ID issue</li>
+            <li><span class="change-type fix">fix</span><span class="change-text">Attachment downloads now work reliably — fixed a bug where Gmail's ephemeral attachment IDs caused every download to fail</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text"><code>gmail_get_attachment</code> now saves files directly to disk instead of returning binary data in the response</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text"><code>gmail_bulk_save_attachments</code> no longer fails due to the same stale ID issue</span></li>
           </ul>
         </div>
 
@@ -314,9 +314,9 @@
             <span class="release-date">March 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type feat">feat</span> File path support for attachments and uploads — the server reads large files directly from disk, bypassing AI context window limits</li>
-            <li><span class="change-type feat">feat</span> Gmail drafts with attachments now accept local file paths (PDFs, images, any file up to 25MB)</li>
-            <li><span class="change-type feat">feat</span> Drive file uploads accept local file paths (up to 50MB)</li>
+            <li><span class="change-type feat">feat</span><span class="change-text">File path support for attachments and uploads — the server reads large files directly from disk, bypassing AI context window limits</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Gmail drafts with attachments now accept local file paths (PDFs, images, any file up to 25MB)</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Drive file uploads accept local file paths (up to 50MB)</span></li>
           </ul>
         </div>
 
@@ -326,8 +326,8 @@
             <span class="release-date">March 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type fix">fix</span> Made keytar optional to fix slow <code>npx</code> startup times</li>
-            <li><span class="change-type fix">fix</span> Configured OIDC trusted publishing for npm</li>
+            <li><span class="change-type fix">fix</span><span class="change-text">Made keytar optional to fix slow <code>npx</code> startup times</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text">Configured OIDC trusted publishing for npm</span></li>
           </ul>
         </div>
 
@@ -337,11 +337,11 @@
             <span class="release-date">March 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type feat">feat</span> GitHub Actions CI/CD pipeline for automated npm publishing</li>
-            <li><span class="change-type feat">feat</span> Account aliases — name accounts "work" or "personal" instead of UUIDs</li>
-            <li><span class="change-type feat">feat</span> Account descriptions for human-readable context</li>
-            <li><span class="change-type feat">feat</span> Bulk attachment download to local disk</li>
-            <li><span class="change-type feat">feat</span> Auto-open browser for OAuth flow</li>
+            <li><span class="change-type feat">feat</span><span class="change-text">GitHub Actions CI/CD pipeline for automated npm publishing</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Account aliases — name accounts "work" or "personal" instead of UUIDs</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Account descriptions for human-readable context</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Bulk attachment download to local disk</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Auto-open browser for OAuth flow</span></li>
           </ul>
         </div>
 
@@ -351,10 +351,10 @@
             <span class="release-date">March 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type feat">feat</span> Google Calendar support — 10 tools for events, scheduling, RSVP</li>
-            <li><span class="change-type feat">feat</span> Google Drive support — 12 tools for files, folders, sharing</li>
-            <li><span class="change-type feat">feat</span> Shorthand query syntax for Drive search</li>
-            <li><span class="change-type fix">fix</span> Param coercion for MCP client compatibility</li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Google Calendar support — 10 tools for events, scheduling, RSVP</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Google Drive support — 12 tools for files, folders, sharing</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Shorthand query syntax for Drive search</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text">Param coercion for MCP client compatibility</span></li>
           </ul>
         </div>
 
@@ -364,11 +364,11 @@
             <span class="release-date">February 2026</span>
           </div>
           <ul class="release-changes">
-            <li><span class="change-type feat">feat</span> Zero-config OAuth — no Google Cloud project needed</li>
-            <li><span class="change-type feat">feat</span> Gmail read, draft, send with confirmation gates</li>
-            <li><span class="change-type feat">feat</span> Inbox management — labels, archive, trash</li>
-            <li><span class="change-type feat">feat</span> Tiered permission scopes (readonly, compose, full)</li>
-            <li><span class="change-type feat">feat</span> Static site with privacy policy and terms</li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Zero-config OAuth — no Google Cloud project needed</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Gmail read, draft, send with confirmation gates</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Inbox management — labels, archive, trash</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Tiered permission scopes (readonly, compose, full)</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Static site with privacy policy and terms</span></li>
           </ul>
         </div>
       </div>
