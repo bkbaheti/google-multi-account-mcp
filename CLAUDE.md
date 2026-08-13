@@ -174,6 +174,17 @@ This CLAUDE.md contains inlined spec sections that may evolve.
 - Integration tests for MCP tool handlers
 - Test before marking task complete
 
+## Deployment — read `docs/DEPLOYMENT.md` before investigating
+
+Two things ship from this repo by unrelated mechanisms, and neither is discoverable from the files:
+
+- **The website** (https://multiaccountgooglemcp.procedure.tech/) deploys **automatically from `master`** via Cloudflare. The connection lives in the Cloudflare dashboard — there is **no** deploy workflow, no `wrangler.toml`, no `CNAME` in this repo. Searching for one is a dead end; that has already cost a full investigation once.
+- **The npm package** publishes from `.github/workflows/publish.yml`, triggered by pushing a `v*` tag. It publishes to `latest`, not `beta`.
+
+Do not trust the branch `origin/cloudflare/workers-autoconfig` or the commits mentioning Cloudflare Pages/Workers — all three describe paths that are not in use. `docs/DEPLOYMENT.md` explains why.
+
+`mcp-google.procedure.tech` does **not** exist (NXDOMAIN). Never reference it; use the live domain above.
+
 ## Debugging "google_version returns an old version" (npx cache gotcha)
 
 `google_version` reads `dist/build-info.json` next to the server's compiled JS (see `loadBuildInfo` in `src/server/index.ts`), which is generated from `package.json` + `git rev-parse --short HEAD` by `scripts/generate-build-info.js` during `pnpm build`. So a stale version reading from `google_version` means one of two things:
@@ -204,6 +215,7 @@ CLAUDE.md                 # This file (agent instructions + key spec)
 docs/
   TASKS.md               # Task tracking (source of truth)
   ARCHITECTURE.md        # Design decisions log
+  DEPLOYMENT.md          # How the site and the npm package actually ship
 src/
   index.ts               # Library entrypoint
   cli.ts                 # CLI entrypoint
