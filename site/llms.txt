@@ -89,11 +89,14 @@ calendar:write (Write calendar)
 ### Account Management
 - google_version, google_list_accounts, google_add_account, google_check_pending_auth, google_reauth_account, google_remove_account, google_set_account_labels, google_set_account_alias, google_set_account_description
 
-### Gmail (19 tools)
-- gmail_search_messages, gmail_get_message, gmail_get_thread
+### Gmail (29 tools)
+- gmail_search_messages, gmail_get_message, gmail_get_messages_batch, gmail_get_thread
 - gmail_create_draft, gmail_create_draft_with_attachment, gmail_update_draft, gmail_get_draft, gmail_delete_draft, gmail_send_draft, gmail_reply_in_thread
-- gmail_list_labels, gmail_modify_labels, gmail_mark_read_unread, gmail_archive, gmail_trash, gmail_untrash
-- gmail_bulk_save_attachments
+- gmail_list_labels, gmail_create_label, gmail_update_label, gmail_delete_label, gmail_modify_labels, gmail_batch_modify_labels
+- gmail_mark_read_unread, gmail_archive, gmail_trash, gmail_untrash
+- gmail_list_attachments, gmail_get_attachment, gmail_bulk_save_attachments
+- gmail_list_filters, gmail_create_filter, gmail_delete_filter
+- gmail_get_vacation, gmail_set_vacation
 
 ### Google Drive (17 tools) — Shared Drives (Team Drives) fully supported
 - drive_list_shared_drives, drive_search_files (optional driveId), drive_list_files, drive_get_file, drive_get_file_content, drive_get_full_file_content, drive_download_file
