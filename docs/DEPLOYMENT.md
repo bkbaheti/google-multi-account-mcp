@@ -84,3 +84,28 @@ npm pack @procedure-tech/mcp-google@<version>   # then inspect package/dist/buil
 ```
 
 The `commit` field in `build-info.json` should match the tagged commit.
+
+## Release checklist
+
+`CLAUDE.md` carries this too, so an agent running a release is prompted by it. Repeated here because
+this is the canonical page.
+
+1. Bump `package.json`, commit. **Do not run `pnpm build`** — CI builds from the tagged commit.
+2. `git tag -a vX.Y.Z -m "..."` then `git push origin vX.Y.Z`.
+3. Wait for the workflow, then verify: `npm view @procedure-tech/mcp-google version dist-tags`.
+4. Confirm the artifact: `npm pack @procedure-tech/mcp-google@X.Y.Z`, check that
+   `package/dist/build-info.json`'s `commit` matches the tagged commit.
+5. **Ask the repo owner to move the `beta` dist-tag.** It cannot be automated (see above) and it
+   cannot be done by an agent — it needs their npm session and a 2FA one-time password:
+
+   ```
+   npm dist-tag add @procedure-tech/mcp-google@X.Y.Z beta --otp=<code>
+   ```
+
+   Then confirm with step 3 that `beta` moved. If this step is skipped, `beta` stays where it was —
+   which is how it ended up four months and two minor versions behind `latest`.
+6. If `site/` changed, confirm the Cloudflare deploy landed:
+   `curl -s https://multiaccountgooglemcp.procedure.tech/ | grep softwareVersion`
+
+If step 5 becomes tiresome, the better answer is to delete the tag rather than keep forgetting it:
+`npm dist-tag rm @procedure-tech/mcp-google beta --otp=<code>`. A single channel cannot drift.
