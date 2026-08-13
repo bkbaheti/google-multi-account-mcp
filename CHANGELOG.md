@@ -2,6 +2,8 @@
 
 ## v0.5.1 (August 2026)
 
+**0.5.0 was never published to npm** — it was superseded before release, so this is the version in which the capability model below first reached users. Everything listed under v0.5.0 ships here, including the breaking change.
+
 0.5.0 replaced scope tiers with the capability model described below, and in doing so was too strict: several gates refused calls Google's own scope reference pages say are authorized. This release corrects those gates and adds the permission UX the tightened model should have shipped with.
 
 - **fix:** Eight of the nine Drive read tools (`drive_get_file`, `drive_get_file_content`, `drive_get_full_file_content`, `drive_download_file`, `drive_get_comments`, `drive_get_comment_replies`, `drive_search_files`, `drive_list_files`) now accept `drive:appfiles` as an alternative to `drive:read`, matching what `drive.file` actually authorizes on Google's per-method scope reference. Previously an account holding only `drive:appfiles` could upload a file and then be refused permission to read it back. Only `drive_list_shared_drives` still requires `drive:read` — `drives.list` rejects `drive.file`.
@@ -18,7 +20,11 @@
 - **feat:** A Drive not-found on an account lacking `drive:read` is now returned as `DRIVE_FILE_NOT_VISIBLE` with `ambiguous: true` (the file may exist but be outside the account's reach) rather than a plain `NOT_FOUND`, which is reserved for accounts holding `drive:read`, where not-found reliably means the file doesn't exist.
 - **fix:** `gate-mapping.test.ts` now asserts against every registered tool handler rather than a hand-maintained list, so a tool registered without a capability gate fails the test instead of passing silently.
 
-## v0.5.0 (August 2026) — BREAKING
+## v0.5.0 — BREAKING (never released; shipped as part of 0.5.1)
+
+> Not published to npm. `npm view @procedure-tech/mcp-google@0.5.0` returns 404. The version was
+> bumped, then the gates below were found to be too strict and corrected before any tag was pushed.
+> Retained here because the migration table and the reasoning apply to 0.5.1.
 
 - **BREAKING:** Scope tiers (`mail_readonly`, `drive_full`, etc.) are replaced by eight per-service capabilities: `mail:read`, `mail:compose`, `mail:modify`, `mail:settings`, `drive:read`, `drive:appfiles`, `calendar:read`, `calendar:write`. `google_add_account` and `google_reauth_account` now take a `capabilities` array instead of a `scopeTier` string.
 
@@ -42,7 +48,13 @@
   | `calendar_full` | `calendar:write` |
   | `all` | all eight |
 
-  One exception: an account holding only `drive.file` will now be correctly refused by the nine `drive:read` tools and must be re-authorized with `google_reauth_account` to add `drive:read`. That's the fix working as intended, not a regression — those tools never should have worked on a `drive.file`-only grant.
+  ~~One exception: an account holding only `drive.file` will now be correctly refused by the nine `drive:read` tools…~~
+
+  **This was wrong, and 0.5.1 corrects it.** Google's per-method scope reference lists `drive.file` as
+  authorized for `files.get`, `files.export`, `files.list`, `comments.list` and `replies.list`, so
+  refusing those calls was a regression, not a fix. Eight of the nine Drive read tools accept
+  `drive:appfiles` as of 0.5.1. Only `drive_list_shared_drives` still requires `drive:read`, because
+  `drives.list` genuinely rejects `drive.file`.
 
 ## v0.4.2 (May 2026)
 
