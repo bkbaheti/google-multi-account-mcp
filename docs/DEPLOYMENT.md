@@ -55,6 +55,27 @@ Notes that matter:
 - **No lint step.** `pnpm biome check` currently reports pre-existing errors; they will not block a release. Do not read a green publish as a clean lint.
 - `dist/` is not committed. CI builds it from the tagged commit.
 
+### dist-tags cannot be automated here — do not try
+
+`beta` drifted to a four-month-old version (0.3.1) because nothing kept it current, and the obvious
+fix — add an `npm dist-tag add` step to `publish.yml` — **does not work**. npm's trusted-publishing
+docs are explicit: *"OIDC authentication supports the `npm publish` and `npm stage publish` commands.
+Other npm commands such as `install`, `view`, or `access` still require traditional authentication
+methods."*
+
+So a dist-tag step in CI would fail unless a long-lived npm token were stored as a repo secret —
+reintroducing exactly the dependency this project removed when it adopted OIDC (see the npm Trusted
+Publisher item in `docs/TASKS.md`). Do not trade a token-free pipeline for a dist-tag.
+
+Consequences, so nobody rediscovers this:
+
+- `npm publish` sets exactly one tag. Without `--tag` it sets `latest`, which is what this workflow does.
+- Any *additional* tag must be set by a human, from an authenticated CLI, with a 2FA one-time password
+  (`npm dist-tag add <pkg>@<version> beta --otp=<code>`). It cannot be scripted here.
+- Therefore: **prefer a single channel.** Every release goes to `latest`. "Beta" is a maturity
+  statement in the README, the site and the package description — it does not need a dist-tag, and a
+  second tag that nobody can automate will drift again.
+
 To verify what actually shipped, rather than trusting the green check:
 
 ```bash
