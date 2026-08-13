@@ -112,5 +112,5 @@ calendar:write (Write calendar)
 
 - npm: https://www.npmjs.com/package/@procedure-tech/mcp-google
 - GitHub: https://github.com/bkbaheti/google-multi-account-mcp
-- Website: https://mcp-google.procedure.tech
+- Website: https://multiaccountgooglemcp.procedure.tech
 - Built by: https://procedure.tech

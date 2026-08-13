@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://mcp-google.procedure.tech/sitemap.xml
+Sitemap: https://multiaccountgooglemcp.procedure.tech/sitemap.xml
