@@ -23,20 +23,61 @@
 - Per-account isolation prevents cross-account data leakage
 
 ### OAuth Flow
-**Decision:** Local HTTP server callback (port 8089)
+**Decision:** Local HTTP server callback on an ephemeral loopback port, with PKCE
 
 **Implementation:**
-- Spin up temporary HTTP server on localhost:8089
+- Spin up a temporary HTTP server bound to `127.0.0.1:0` (OS-assigned port)
 - Generate state parameter for CSRF protection
+- Generate a PKCE code verifier; send only the S256 challenge on the auth URL
 - Open browser to Google OAuth consent screen
 - Receive callback with authorization code
-- Exchange code for tokens
+- Exchange code for tokens, presenting the code verifier
 - 5-minute timeout for user authorization
 
 **Rationale:**
 - More reliable than device flow for desktop use
 - Works in standard development environments
 - State parameter prevents CSRF attacks
+- PKCE (RFC 7636) is what makes a *public* client safe. Since the shipped
+  client secret is published in the npm package (see "Shipped OAuth client"
+  below), the secret cannot gate the code exchange — the verifier, which never
+  leaves the process, does.
+- The ephemeral port (RFC 8252 §7.3) removes the predictable target that made
+  the pre-bind squat practical: with a fixed 8089, a local process claiming the
+  port first would receive the code and could redeem it with the published
+  secret.
+- `127.0.0.1` rather than `localhost` (RFC 8252 §8.3), because name resolution
+  can be redirected by a tampered hosts file.
+
+**Superseded:** originally a fixed `localhost:8089` with no PKCE. Changed
+2026-08 after a responsible-disclosure report about the embedded client secret
+surfaced the missing compensating control.
+
+**Consequence:** `startAuthFlowAsync` must await the bind before it can name
+the assigned port in `redirect_uri`, so it — and `AccountStore.startAddAccount`
+/ `startReauthAccount` — are async.
+
+### Shipped OAuth client
+**Decision:** Embed a public Desktop-app client ID *and secret* in the package;
+BYO credentials become an override rather than a requirement
+
+**Implementation:**
+- Constants in `src/auth/oauth-defaults.ts`
+- `resolveOAuthConfig()` resolves env vars → config file → shipped defaults
+
+**Rationale:**
+- Requiring a Google Cloud project before first run was the largest install barrier
+- Desktop-app clients are public clients (RFC 8252); Google documents their
+  secret as not confidential, and `gcloud` / `gh` / VS Code ship one the same way
+
+**Consequences, accepted:**
+- The secret is permanently public and rotation is not a remediation — a
+  replacement ships in the next tarball. Scanners will keep flagging it;
+  `SECURITY.md` exists so those reports are self-service.
+- Anyone can build on this client ID and show users our verified consent screen,
+  and consume our API quota. PKCE does not prevent either.
+- This reverses a decision `docs/SPEC.md` §10 recorded as non-reversible; that
+  section now logs the reversal and its costs.
 
 ### Scope Tiers (superseded, see Capabilities below)
 **Decision:** Three predefined scope tiers for incremental authorization

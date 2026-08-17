@@ -105,7 +105,18 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - HTTP/SSE transport support (deferred - significant architectural work)
 
 ### Non-Negotiable Constraints
-- BYO OAuth credentials (no shared client)
+- OAuth credential resolution: env vars → config file → **shipped default client**
+  (`src/auth/oauth-defaults.ts`). BYO is fully supported but is the *override*, not the
+  default — the package deliberately ships a public "Desktop app" client ID **and secret**
+  so install is zero-config. This reverses the original "no shared client" guardrail; see
+  `docs/SPEC.md` §10 and `SECURITY.md` before touching those constants.
+  - **The embedded client secret is not a leak and must not be "fixed" by rotation.** Google
+    Desktop-app clients are public clients under RFC 8252 — the secret is not confidential,
+    and any replacement ships in the next tarball. This has already been reported once
+    through responsible disclosure.
+  - What *does* protect the flow is PKCE plus an ephemeral loopback port (`src/auth/oauth.ts`).
+    Those are the compensating controls for a public client, not optional hardening — do not
+    remove them, and keep both auth flows on the shared `buildAuthUrl`.
 - Local-first stdio MCP server
 - Account isolation (tokens, cache, rate limits)
 - Draft-first + confirm gate for all sends

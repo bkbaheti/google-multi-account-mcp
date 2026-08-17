@@ -1,5 +1,55 @@
 # Tasks
 
+## OAuth Public-Client Hardening (COMPLETED)
+
+Trigger: responsible-disclosure email from Francesco Martignoni (Politecnico di Milano,
+2026-08-13), reporting a hardcoded credential at `src/auth/oauth-defaults.ts:10` as part of
+an academic study of 69,104 public MCP servers.
+
+**Triage: the reported finding is by design and was NOT remediated.** The value is a Google
+"Desktop app" OAuth client secret. Desktop-app clients are public clients under RFC 8252 —
+Google documents the secret as not confidential — and the package publishes it deliberately
+for zero-config install. Rotation is not a remediation: a replacement ships in the next
+tarball. Client type confirmed as Desktop app in the Cloud console (project
+`double-hold-485609-h9`), which is the fact the whole assessment rests on; had it been a Web
+application client the secret *would* be confidential and this would have been a real finding.
+
+What the report did surface is that the trade-off had been taken without the control that
+makes it safe (commit b51aad9):
+- [DONE] PKCE (RFC 7636, S256) on both auth flows. Without it, a local process that binds the
+  fixed port 8089 first receives the authorization code and can redeem it with the npm-published
+  secret — full Gmail/Drive/Calendar access from an unprivileged local process
+- [DONE] Verifier held in the flow closure, not on `PendingAuthSession`, which is serialized
+  into MCP tool responses
+- [DONE] Ephemeral OS-assigned callback port (RFC 8252 §7.3) instead of fixed 8089
+- [DONE] Literal `127.0.0.1` instead of `localhost` (RFC 8252 §8.3)
+- [DONE] Extracted shared `buildAuthUrl` — the two flows duplicated param assembly, which is
+  how one would end up with PKCE and the other without
+- [DONE] 12 tests: RFC 7636 Appendix B known-answer vector, verifier absent from the auth URL,
+  redeemed verifier matches the advertised challenge, per-session verifier independence,
+  ephemeral bind args, and the blocking flow covered separately from the async one
+
+Documentation, which contradicted the code and would have led the next person to "fix" the
+credential by rotating it:
+- [DONE] `CLAUDE.md` listed "BYO OAuth credentials (no shared client)" as a non-negotiable
+  constraint; a shared client has shipped since a976d7b
+- [DONE] `docs/SPEC.md` §2 called BYO "the default"; it is the override
+- [DONE] `docs/SPEC.md` §10 recorded "will not ship with a shared OAuth client" under
+  *non-reversible* decisions. Reversal now logged in place, with the costs the original
+  rationale correctly identified (consent-screen impersonation, quota exposure)
+- [DONE] `docs/ARCHITECTURE.md` — OAuth Flow decision updated; new "Shipped OAuth client" entry
+- [DONE] New `SECURITY.md` with a private reporting channel and an explicit "the embedded
+  secret is intentional, rotation is not a remediation" section, so the next scanner-driven
+  report is self-service
+
+Verified already correct, so not changed: `state` is generated per flow and compared on
+callback in both paths; tokens at rest use the OS keychain with an AES-256-GCM encrypted-file
+fallback.
+
+**Not done / follow-up:** no reply has been sent to the researcher yet.
+
+---
+
 ## Drive Comments & Export Format (COMPLETED)
 
 Requirement doc: `docs/plans/2026-06-08-drive-comments-and-export-format.md`.

@@ -48,8 +48,16 @@
 ## 2) Authentication & account management
 
 - OAuth strategy
-  - BYO OAuth credentials (default)
+  - Shipped default client (default path, added 2026-03)
+    - The package embeds a Google "Desktop app" OAuth client ID and secret
+      (`src/auth/oauth-defaults.ts`) so that install is zero-config.
+    - Desktop-app clients are public clients (RFC 8252): the embedded secret is
+      not confidential and is not treated as one. PKCE and an ephemeral loopback
+      port are the controls that make this safe — see `SECURITY.md`.
+  - BYO OAuth credentials (override, still fully supported)
     - Users create their own Google Cloud OAuth client and supply credentials.
+    - Resolution order: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` env vars →
+      config file `oauth` field → shipped defaults.
   - OAuth client configuration
     - Client ID
     - Client secret (if applicable)
@@ -330,10 +338,23 @@
 
 ## 10) Non-reversible decisions (guardrails)
 
-- OAuth ownership model
-  - BYO OAuth credentials is the default and expected path.
-  - The package will not ship with a shared Google OAuth client for end users.
-  - Rationale: avoids centralized trust, verification, and security assessment burden.
+- OAuth ownership model — **REVERSED 2026-03, kept here as a record**
+  - Original decision: "BYO OAuth credentials is the default and expected path. The
+    package will not ship with a shared Google OAuth client for end users. Rationale:
+    avoids centralized trust, verification, and security assessment burden."
+  - What actually shipped: the package embeds a public Desktop-app client ID and secret
+    and falls back to them when no BYO credentials are configured
+    (`docs/plans/2026-03-16-remote-hosting-design.md`). BYO became the override.
+  - Why it was reversed: requiring every user to create a Google Cloud project before
+    the server would start was the single largest barrier to install.
+  - What the reversal actually costs, since the original rationale was not wrong:
+    - Anyone can build a tool on this client ID and users will see *our* verified
+      consent screen and app name. PKCE does not fix this; it is inherent to a
+      shared public client, and is the accepted cost.
+    - Third-party use consumes this project's API quota and can put the OAuth
+      verification standing at risk.
+  - Listed under "non-reversible" and then reversed anyway, so treat this section as
+    a log of decisions and their costs, not a set of locks.
 
 - Execution model
   - Local-first MCP server over stdio is the canonical mode.
