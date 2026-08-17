@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.6.0 — BREAKING (August 2026)
+
+OAuth hardening for the shipped public client. Prompted by a responsible-disclosure report from Francesco Martignoni (Politecnico di Milano) about the client secret committed at `src/auth/oauth-defaults.ts`.
+
+**To be clear about that report, because scanners will keep filing it:** the embedded secret is intentional and was *not* rotated. It belongs to a Google "Desktop app" OAuth client, which is a public client under RFC 8252 — Google documents such secrets as not confidential, and the same pattern ships in `gcloud`, the GitHub CLI, and VS Code. Rotation is not a remediation: this server is distributed as an npm package, so any replacement would be published in the next release. **Your credentials were not exposed and no action is required of you.** See `SECURITY.md`.
+
+What the report did surface is that the trade-off had been taken without the control that makes a public client safe. That is what this release fixes.
+
+- **feat:** PKCE (RFC 7636, S256) on both OAuth flows. Previously the authorization code was protected only by the callback landing on a fixed local port. A process on the same machine that bound port 8089 first would receive the code, and the client secret needed to redeem it is published on npm — so an unprivileged local process could obtain full Gmail/Drive/Calendar access. The `code_verifier` never leaves the server process, so an intercepted code can no longer be exchanged. Exploitation required local code execution, so this was not remotely reachable.
+- **BREAKING:** The OAuth callback server now binds an **OS-assigned ephemeral port** on `127.0.0.1` instead of a fixed `localhost:8089` (RFC 8252 §7.3, §8.3). There is no longer a predictable port to squat, concurrent auth flows no longer collide, and "port 8089 already in use" is gone as a failure mode. If you have a **firewall rule, proxy exception, or corporate policy pinned to port 8089 or to the hostname `localhost`**, it no longer applies and may need widening to the loopback interface. Bring-your-own-credentials users need no console change: Desktop-app clients have no redirect-URI allowlist. (If you created a *Web application* client instead, the loopback flow will not work — create a Desktop app client; the README's BYO steps were wrong about this and are corrected.)
+- **BREAKING (library consumers only):** `AccountStore.startAddAccount()` and `AccountStore.startReauthAccount()` now return a `Promise` and must be awaited. The authorization URL cannot be built until the callback socket is listening, because `redirect_uri` has to name the assigned port. MCP tool users are unaffected — no tool signature or response shape changed.
+- **docs:** New `SECURITY.md` — private reporting channel, plus an explicit statement of why the embedded secret is intentional and why rotation is not a remediation, so future scanner-driven reports are self-service. Records the accepted trade-offs of a shared public client that PKCE does *not* fix: anyone can build on this client ID and show users our verified consent screen, and third-party use consumes this project's API quota. Both are avoidable by bringing your own credentials.
+- **docs:** `CLAUDE.md` and `docs/SPEC.md` had forbidden a shared OAuth client — `SPEC.md` §10 listed it under *non-reversible* decisions — while the code has shipped one since v0.4.x. The reversal and its costs are now recorded rather than contradicted, so the credential does not read as a mistake to be "fixed."
+
+Unchanged because they were already correct: the `state` parameter is generated per flow and verified on callback in both paths, and tokens at rest continue to use the OS keychain with an AES-256-GCM encrypted-file fallback.
+
 ## v0.5.1 (August 2026)
 
 **0.5.0 was never published to npm** — it was superseded before release, so this is the version in which the capability model below first reached users. Everything listed under v0.5.0 ships here, including the breaking change.
