@@ -149,9 +149,15 @@ Priority: environment variables > config file > built-in defaults.
 3. Select **Desktop app** as the application type
 4. Copy the **Client ID** and **Client Secret**
 
-#### Step 5: Add Redirect URI
+#### Step 5: Redirect URI — nothing to configure
 
-1. Under **Authorized redirect URIs**, add: `http://localhost:8089/callback`
+**Desktop app** clients have no "Authorized redirect URIs" field, and none is
+needed. The server binds an OS-assigned port on `127.0.0.1` for each OAuth
+flow and Google accepts any loopback port for this client type.
+
+If you created a **Web application** client instead, the loopback flow will not
+work — Web clients require every redirect URI to be registered exactly, and the
+port is not fixed. Create a Desktop app client.
 
 #### Step 6: Configure
 
@@ -501,11 +507,12 @@ If you don't see the URL:
 2. The URL is also logged to stderr - check terminal output if running manually
 3. The OAuth flow times out after 5 minutes if not completed
 
-### Port 8089 already in use
+### OAuth callback port
 
-The OAuth callback server uses port 8089. If it's in use:
-- Wait for the previous OAuth flow to complete
-- Kill any process using the port: `lsof -ti:8089 | xargs kill`
+The callback server binds an OS-assigned port on `127.0.0.1` for each flow, so
+there is no fixed port to free up and concurrent flows do not collide. Earlier
+versions used a fixed port 8089; if you have a firewall rule pinned to that
+port, it is no longer used.
 
 ### Keychain access issues (Linux/headless)
 
