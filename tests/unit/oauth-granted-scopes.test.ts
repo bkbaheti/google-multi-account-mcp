@@ -66,7 +66,12 @@ let capturedHandler: ((req: http.IncomingMessage, res: http.ServerResponse) => u
 const mockCreateServer = vi.fn((handler: unknown) => {
   capturedHandler = handler as typeof capturedHandler;
   return {
-    listen: (_port: number, cb?: () => void) => cb?.(),
+    // listen(0, '127.0.0.1', cb) - the callback position varies, so pick it
+    // out by type rather than by index.
+    listen: (...args: unknown[]) => {
+      (args.find((a) => typeof a === 'function') as (() => void) | undefined)?.();
+    },
+    address: () => ({ address: '127.0.0.1', family: 'IPv4', port: 54321 }),
     on: vi.fn(),
     close: vi.fn(),
   } as unknown as http.Server;
@@ -116,7 +121,7 @@ describe('GoogleOAuth callback flow persists granted scopes, not requested', () 
       mockStorage as never,
     );
 
-    const session = oauth.startAuthFlowAsync([READONLY, DRIVE_READONLY]);
+    const session = await oauth.startAuthFlowAsync([READONLY, DRIVE_READONLY]);
     expect(capturedHandler).not.toBeNull();
 
     const { req, res } = fakeCallbackRequest(`code=auth-code&state=${session.state}`);

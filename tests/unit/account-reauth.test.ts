@@ -101,7 +101,7 @@ describe('AccountStore reauth', () => {
   describe('startReauthAccount', () => {
     it('reuses existing account ID and email in OAuth options', async () => {
       const store = await getAccountStore();
-      const result = store.startReauthAccount('uuid-1');
+      const result = await store.startReauthAccount('uuid-1');
       expect('session' in result).toBe(true);
       if (!('session' in result)) return;
 
@@ -113,7 +113,7 @@ describe('AccountStore reauth', () => {
 
     it('resolves by alias', async () => {
       const store = await getAccountStore();
-      const result = store.startReauthAccount('work');
+      const result = await store.startReauthAccount('work');
       expect('session' in result).toBe(true);
       if (!('session' in result)) return;
       expect(result.session.existingAccountId).toBe('uuid-1');
@@ -121,7 +121,7 @@ describe('AccountStore reauth', () => {
 
     it('resolves by email', async () => {
       const store = await getAccountStore();
-      const result = store.startReauthAccount('alice@personal.com');
+      const result = await store.startReauthAccount('alice@personal.com');
       expect('session' in result).toBe(true);
       if (!('session' in result)) return;
       expect(result.session.existingAccountId).toBe('uuid-2');
@@ -129,13 +129,13 @@ describe('AccountStore reauth', () => {
 
     it('returns error for unknown account', async () => {
       const store = await getAccountStore();
-      const result = store.startReauthAccount('nonexistent');
+      const result = await store.startReauthAccount('nonexistent');
       expect('error' in result).toBe(true);
     });
 
     it('defaults scopes to the account current scopes when no capabilities given', async () => {
       const store = await getAccountStore();
-      store.startReauthAccount('uuid-1');
+      await store.startReauthAccount('uuid-1');
       expect(lastStartAuthFlowArgs?.scopes).toEqual([
         'https://www.googleapis.com/auth/gmail.readonly',
       ]);
@@ -143,7 +143,7 @@ describe('AccountStore reauth', () => {
 
     it('uses provided capability when supplied', async () => {
       const store = await getAccountStore();
-      store.startReauthAccount('uuid-1', ['mail:compose']);
+      await store.startReauthAccount('uuid-1', ['mail:compose']);
       expect(lastStartAuthFlowArgs?.scopes).toContain(
         'https://www.googleapis.com/auth/gmail.compose',
       );
@@ -151,7 +151,7 @@ describe('AccountStore reauth', () => {
 
     it('uses provided multiple capabilities when supplied', async () => {
       const store = await getAccountStore();
-      store.startReauthAccount('uuid-1', ['mail:read', 'drive:read']);
+      await store.startReauthAccount('uuid-1', ['mail:read', 'drive:read']);
       const scopes = lastStartAuthFlowArgs?.scopes ?? [];
       expect(scopes).toContain('https://www.googleapis.com/auth/gmail.readonly');
       expect(scopes).toContain('https://www.googleapis.com/auth/drive.readonly');
@@ -165,7 +165,7 @@ describe('AccountStore reauth', () => {
     // full reauth. [] must be treated exactly like omitting the argument.
     it('treats an empty capabilities array as unspecified and reuses existing scopes', async () => {
       const store = await getAccountStore();
-      store.startReauthAccount('uuid-1', []);
+      await store.startReauthAccount('uuid-1', []);
       expect(lastStartAuthFlowArgs?.scopes).toEqual([
         'https://www.googleapis.com/auth/gmail.readonly',
       ]);
@@ -175,7 +175,7 @@ describe('AccountStore reauth', () => {
   describe('startAddAccount', () => {
     it('defaults to mail:read when capabilities is omitted', async () => {
       const store = await getAccountStore();
-      store.startAddAccount();
+      await store.startAddAccount();
       expect(lastStartAuthFlowArgs?.scopes).toContain(
         'https://www.googleapis.com/auth/gmail.readonly',
       );
@@ -186,7 +186,7 @@ describe('AccountStore reauth', () => {
     // scopesFor([]) (userinfo.email only).
     it('treats an empty capabilities array as unspecified and defaults to mail:read', async () => {
       const store = await getAccountStore();
-      store.startAddAccount([]);
+      await store.startAddAccount([]);
       expect(lastStartAuthFlowArgs?.scopes).toContain(
         'https://www.googleapis.com/auth/gmail.readonly',
       );

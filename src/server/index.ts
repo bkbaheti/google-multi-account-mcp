@@ -316,8 +316,9 @@ export function createServer(options: ServerOptions): McpServer {
       const capabilities = Array.from(new Set([...presetCapabilities, ...explicitCapabilities]));
 
       try {
-        // Start async auth flow - returns immediately with auth URL
-        const session = accountStore.startAddAccount(capabilities);
+        // Start async auth flow - resolves with the auth URL once the
+        // loopback callback server has bound its ephemeral port
+        const session = await accountStore.startAddAccount(capabilities);
 
         // Auto-open browser, best-effort (ignore errors for headless/SSH environments)
         open(session.authUrl).catch(() => {});
@@ -484,7 +485,7 @@ export function createServer(options: ServerOptions): McpServer {
       }
 
       try {
-        const result = accountStore.startReauthAccount(account.id, capabilities);
+        const result = await accountStore.startReauthAccount(account.id, capabilities);
         if ('error' in result) {
           return errorResponse(accountNotFound(args.accountId).toResponse());
         }

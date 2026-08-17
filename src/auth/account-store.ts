@@ -104,7 +104,9 @@ export class AccountStore {
    * Start adding an account asynchronously - returns auth URL immediately.
    * Use checkPendingAuth to poll for completion.
    */
-  startAddAccount(capabilities: Capability[] = DEFAULT_CAPABILITIES): PendingAuthSession {
+  async startAddAccount(
+    capabilities: Capability[] = DEFAULT_CAPABILITIES,
+  ): Promise<PendingAuthSession> {
     const scopes = scopesFor(capabilities.length > 0 ? capabilities : DEFAULT_CAPABILITIES);
     const oauth = this.getOAuth();
     return oauth.startAuthFlowAsync(scopes);
@@ -118,10 +120,10 @@ export class AccountStore {
    *
    * Returns { session } on success or { error } if the account is unknown.
    */
-  startReauthAccount(
+  async startReauthAccount(
     accountIdOrAlias: string,
     capabilities?: Capability[],
-  ): { session: PendingAuthSession } | { error: string } {
+  ): Promise<{ session: PendingAuthSession } | { error: string }> {
     const account = this.resolveAccount(accountIdOrAlias);
     if (!account) {
       return { error: `Account not found: ${accountIdOrAlias}` };
@@ -133,7 +135,7 @@ export class AccountStore {
       capabilities && capabilities.length > 0 ? scopesFor(capabilities) : [...account.scopes];
 
     const oauth = this.getOAuth();
-    const session = oauth.startAuthFlowAsync(scopes, {
+    const session = await oauth.startAuthFlowAsync(scopes, {
       existingAccountId: account.id,
       existingEmail: account.email,
     });
