@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://multiaccountgooglemcp.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.6.0",
+    "softwareVersion": "0.7.0",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -236,8 +236,20 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.6.0</span>
+            <span class="release-version">v0.7.0</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">August 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type fix">fix</span><span class="change-text">Emails composed as plain text now render correctly in web clients. Bullet lists, numbered lists, postal addresses and sign-offs kept collapsing into one run-on line, because the server joined every line in a paragraph to stop Gmail breaking sentences mid-way. Messages are now sent as <code>multipart/alternative</code> — your text untouched, alongside a generated HTML version — so line breaks survive and paragraphs still reflow to the window</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text">The <code>bodyFormat</code> tool description never mentioned that line breaks were being discarded, so the workaround was to tell every agent to pass <code>bodyFormat: "html"</code>. That is no longer needed: <code>"text"</code> is correct for almost every case, and <code>"html"</code> is only for callers writing their own markup</span></li>
+            <li><span class="change-type breaking">breaking</span><span class="change-text">Authors now own their wrapping. Prose that you hard-wrap yourself renders with those breaks rather than being joined — send unwrapped paragraphs and let the reader's client reflow them. Note that indentation in a plain-text body does not survive into HTML; use <code>bodyFormat: "html"</code> with <code>&lt;pre&gt;</code> if you need it</span></li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.6.0</span>
             <span class="release-date">August 2026</span>
           </div>
           <ul class="release-changes">
