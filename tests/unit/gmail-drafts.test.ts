@@ -328,7 +328,7 @@ describe('GmailClient drafts', () => {
       expect(decoded).not.toContain('Subject: Q3 update —');
     });
 
-    it('createDraft unwraps plain-text bodies and declares format=flowed', async () => {
+    it('createDraft sends plain-text bodies as multipart/alternative, breaks intact', async () => {
       mockDraftsCreate.mockResolvedValue({
         data: { id: 'd1', message: { id: 'm1', threadId: 't1' } },
       });
@@ -341,9 +341,13 @@ describe('GmailClient drafts', () => {
 
       const raw = mockDraftsCreate.mock.calls[0][0].requestBody.message.raw;
       const decoded = Buffer.from(raw, 'base64url').toString('utf-8');
-      expect(decoded).toContain('Content-Type: text/plain; charset=utf-8; format=flowed; delsp=no');
-      // Intra-paragraph hard wrap is physically joined so Gmail reflows.
-      expect(decoded).toContain('Line one of a paragraph. Line two of the same paragraph.');
+      expect(decoded).toContain('Content-Type: multipart/alternative; boundary=');
+      // The author's line break survives in both parts; it used to be joined.
+      expect(decoded).toContain('Line one of a paragraph.\r\nLine two of the same paragraph.');
+      expect(decoded).toContain(
+        '<p>Line one of a paragraph.<br>Line two of the same paragraph.</p>',
+      );
+      expect(decoded).not.toContain('a paragraph. Line two');
     });
 
     it('createDraft honors bodyFormat: "html"', async () => {

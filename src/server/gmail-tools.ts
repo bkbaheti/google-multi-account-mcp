@@ -230,7 +230,7 @@ export function registerGmailTools(
           .enum(['text', 'html'])
           .optional()
           .describe(
-            'Body content type. "text" (default) sends as text/plain with RFC 3676 format=flowed so clients reflow paragraphs instead of rendering hard wraps. "html" sends as text/html for HTML-formatted bodies.',
+            'Body content type. "text" (default) is correct for almost all cases: the body is sent as multipart/alternative, pairing your text verbatim with a generated HTML version, so line breaks, lists and sign-offs render correctly in web clients without you writing any markup. Use "html" only when you are supplying your own HTML markup, in which case the body is sent as-is and you are responsible for escaping it.',
           ),
       },
     },
@@ -290,7 +290,7 @@ export function registerGmailTools(
           .enum(['text', 'html'])
           .optional()
           .describe(
-            'Body content type. "text" (default) sends as text/plain with RFC 3676 format=flowed so clients reflow paragraphs instead of rendering hard wraps. "html" sends as text/html for HTML-formatted bodies.',
+            'Body content type. "text" (default) is correct for almost all cases: the body is sent as multipart/alternative, pairing your text verbatim with a generated HTML version, so line breaks, lists and sign-offs render correctly in web clients without you writing any markup. Use "html" only when you are supplying your own HTML markup, in which case the body is sent as-is and you are responsible for escaping it.',
           ),
       },
     },
@@ -479,7 +479,7 @@ export function registerGmailTools(
           .enum(['text', 'html'])
           .optional()
           .describe(
-            'Body content type. "text" (default) sends as text/plain with RFC 3676 format=flowed so clients reflow paragraphs instead of rendering hard wraps. "html" sends as text/html for HTML-formatted bodies.',
+            'Body content type. "text" (default) is correct for almost all cases: the body is sent as multipart/alternative, pairing your text verbatim with a generated HTML version, so line breaks, lists and sign-offs render correctly in web clients without you writing any markup. Use "html" only when you are supplying your own HTML markup, in which case the body is sent as-is and you are responsible for escaping it.',
           ),
         sendImmediately: z
           .boolean()
@@ -1123,7 +1123,7 @@ export function registerGmailTools(
           .enum(['text', 'html'])
           .optional()
           .describe(
-            'Body content type. "text" (default) sends as text/plain with RFC 3676 format=flowed so clients reflow paragraphs instead of rendering hard wraps. "html" sends as text/html for HTML-formatted bodies.',
+            'Body content type. "text" (default) is correct for almost all cases: the body is sent as multipart/alternative, pairing your text verbatim with a generated HTML version, so line breaks, lists and sign-offs render correctly in web clients without you writing any markup. Use "html" only when you are supplying your own HTML markup, in which case the body is sent as-is and you are responsible for escaping it.',
           ),
       },
     },

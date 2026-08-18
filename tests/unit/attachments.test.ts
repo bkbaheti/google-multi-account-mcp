@@ -5,7 +5,7 @@ import {
   encodeMimeHeader,
   type MimeAttachment,
   type MimeMessageOptions,
-  toFlowedFormat,
+  textToHtml,
 } from '../../src/gmail/index.js';
 
 describe('Attachment and MIME utilities', () => {
@@ -30,39 +30,30 @@ describe('Attachment and MIME utilities', () => {
     });
   });
 
-  describe('toFlowedFormat', () => {
-    it('joins intra-paragraph lines with a space so clients rewrap to viewport', () => {
-      expect(toFlowedFormat('line a\nline b')).toBe('line a line b');
+  // `toFlowedFormat` was removed. It joined every line within a paragraph so
+  // that nothing wrapped mid-sentence in Gmail's web view, which ignores RFC
+  // 3676 format=flowed — but that silently destroyed lists, addresses and
+  // sign-offs. Plain text is now sent verbatim alongside a generated HTML
+  // alternative; see tests/unit/mime-multipart-alternative.test.ts.
+  describe('textToHtml', () => {
+    it('preserves an intentional line break as <br>', () => {
+      expect(textToHtml('line a\nline b')).toBe('<p>line a<br>line b</p>');
     });
 
     it('keeps blank lines as paragraph separators', () => {
-      expect(toFlowedFormat('p1\n\np2')).toBe('p1\r\n\r\np2');
+      expect(textToHtml('p1\n\np2')).toBe('<p>p1</p>\r\n<p>p2</p>');
     });
 
-    it('collapses repeated blank lines to a single paragraph break', () => {
-      expect(toFlowedFormat('p1\n\n\n\np2')).toBe('p1\r\n\r\np2');
-    });
-
-    it('trims trailing whitespace from each line before joining', () => {
-      expect(toFlowedFormat('line a   \nline b')).toBe('line a line b');
-    });
-
-    it('leaves a single line unchanged', () => {
-      expect(toFlowedFormat('only line')).toBe('only line');
+    it('leaves a single line as one paragraph', () => {
+      expect(textToHtml('only line')).toBe('<p>only line</p>');
     });
 
     it('normalizes mixed CRLF/CR/LF input', () => {
-      expect(toFlowedFormat('a\r\nb\rc\nd')).toBe('a b c d');
+      expect(textToHtml('a\r\nb\rc\nd')).toBe('<p>a<br>b<br>c<br>d</p>');
     });
 
-    it('unwraps a hard-wrapped 76-col paragraph into a single line', () => {
-      const wrapped = [
-        'This is a deliberately long paragraph designed to exceed seventy-six',
-        'characters so that the receiving client wraps it on its own.',
-      ].join('\n');
-      expect(toFlowedFormat(wrapped)).toBe(
-        'This is a deliberately long paragraph designed to exceed seventy-six characters so that the receiving client wraps it on its own.',
-      );
+    it('does not leave a stray empty paragraph for a trailing newline', () => {
+      expect(textToHtml('body\n')).toBe('<p>body</p>');
     });
   });
 
@@ -307,11 +298,10 @@ describe('Attachment and MIME utilities', () => {
       expect(decoded).not.toContain('Subject: Re: “');
     });
 
-    it('plain-text body is sent with format=flowed (RFC 3676)', () => {
-      // Bug repro: plain-text bodies render with visible mid-paragraph line breaks
-      // because format=flowed wasn't declared. Receiving clients reflow soft breaks
-      // (lines ending with a single space) to the viewport width when format=flowed
-      // is present, fixing the hard-wrap artifact.
+    it('plain-text body is sent as multipart/alternative with both parts', () => {
+      // Superseded the format=flowed approach: Gmail's web view ignores RFC
+      // 3676, so declaring it changed nothing there. An HTML alternative is
+      // something every web client actually honours.
       const options: MimeMessageOptions = {
         to: 'to@example.com',
         subject: 'Test',
@@ -319,19 +309,21 @@ describe('Attachment and MIME utilities', () => {
       };
 
       const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
-      expect(decoded).toContain('Content-Type: text/plain; charset=utf-8; format=flowed; delsp=no');
+      expect(decoded).toContain('Content-Type: multipart/alternative; boundary=');
+      expect(decoded).toContain('Content-Type: text/plain; charset=utf-8');
+      expect(decoded).toContain('Content-Type: text/html; charset=utf-8');
+      expect(decoded).not.toContain('format=flowed');
     });
 
-    it('unwraps intra-paragraph hard wraps into single lines so Gmail reflows', () => {
-      // Gmail's web view does not honor RFC 3676 soft breaks, so callers that
-      // hard-wrap at 76 chars would otherwise see visible mid-sentence breaks.
-      // We join those continuation lines and let Gmail wrap at the viewport.
+    it('keeps author line breaks instead of joining them into one line', () => {
+      // Regression: the previous unwrapping joined these two lines with a
+      // space, which also ran consecutive list items together.
       const options: MimeMessageOptions = {
         to: 'to@example.com',
         subject: 'Test',
         body: [
-          'This is the first line of a paragraph that was hard-wrapped.',
-          'It continues on a second line which should be reflowed.',
+          'This is the first line of a paragraph.',
+          'It continues on a second line.',
           '',
           'This is a second paragraph.',
         ].join('\n'),
@@ -339,14 +331,17 @@ describe('Attachment and MIME utilities', () => {
 
       const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
       expect(decoded).toContain(
-        'This is the first line of a paragraph that was hard-wrapped. It continues on a second line which should be reflowed.',
+        'This is the first line of a paragraph.\r\nIt continues on a second line.',
       );
-      expect(decoded).toContain('\r\n\r\nThis is a second paragraph.');
-      // The original hard wrap inside the paragraph must NOT survive.
-      expect(decoded).not.toContain('hard-wrapped.\r\nIt continues');
+      expect(decoded).toContain('This is a second paragraph.');
+      expect(decoded).not.toContain('a paragraph. It continues');
+      // And the html alternative expresses the same break as a <br>.
+      expect(decoded).toContain(
+        '<p>This is the first line of a paragraph.<br>It continues on a second line.</p>',
+      );
     });
 
-    it('html bodyFormat sends as text/html without flowed transformation', () => {
+    it('html bodyFormat sends a single text/html part, no alternative wrapper', () => {
       const options: MimeMessageOptions = {
         to: 'to@example.com',
         subject: 'Test',
@@ -356,17 +351,17 @@ describe('Attachment and MIME utilities', () => {
 
       const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
       expect(decoded).toContain('Content-Type: text/html; charset=utf-8');
-      expect(decoded).not.toContain('format=flowed');
-      // HTML body must not be space-stuffed for flowed semantics
+      expect(decoded).not.toContain('multipart/alternative');
+      // HTML body must be passed through untouched
       expect(decoded).toContain('<p>Line one</p>');
       expect(decoded).not.toContain('<p>Line one</p> \r\n');
     });
 
-    it('format=flowed applies to multipart messages with attachments', () => {
+    it('nests multipart/alternative inside multipart/mixed when attachments exist', () => {
       const options: MimeMessageOptions = {
         to: 'to@example.com',
         subject: 'Test',
-        body: 'Hard-wrapped line one.\nContinuation line two.',
+        body: 'Line one.\nLine two.',
         attachments: [
           {
             filename: 'file.txt',
@@ -377,8 +372,11 @@ describe('Attachment and MIME utilities', () => {
       };
 
       const decoded = Buffer.from(buildRawMessage(options), 'base64url').toString('utf-8');
-      expect(decoded).toContain('Content-Type: text/plain; charset=utf-8; format=flowed; delsp=no');
-      expect(decoded).toContain('Hard-wrapped line one. Continuation line two.');
+      expect(decoded).toContain('Content-Type: multipart/mixed; boundary=');
+      expect(decoded).toContain('Content-Type: multipart/alternative; boundary=');
+      // Author line breaks survive here too, not just in the simple path.
+      expect(decoded).toContain('Line one.\r\nLine two.');
+      expect(decoded).toContain('<p>Line one.<br>Line two.</p>');
     });
 
     it('closes multipart message with proper boundary terminator', () => {

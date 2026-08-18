@@ -51,41 +51,70 @@ function chunkBase64(data: string, lineLength = 76): string {
   return lines.join('\r\n');
 }
 
-// Unwrap a plain-text body so each paragraph is a single long line that the
-// recipient's client will rewrap to its viewport. Gmail's web view ignores
-// RFC 3676 format=flowed soft breaks, so we have to physically join the lines
-// — leaving 76-col hard wraps in the body causes visible mid-sentence breaks
-// in the rendered email. Blank lines remain paragraph separators.
-//
-// Tradeoff: callers that want literal line breaks (lists, addresses, code,
-// signatures) should pass bodyFormat: "html" with explicit <br> or <pre>.
-export function toFlowedFormat(body: string): string {
-  const normalized = body.replace(/\r\n?/g, '\n');
-  return normalized
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Split a body into paragraphs on blank lines, discarding empty ones.
+function paragraphsOf(body: string): string[][] {
+  return body
+    .replace(/\r\n?/g, '\n')
     .split(/\n{2,}/)
-    .map((paragraph) =>
-      paragraph
-        .split('\n')
-        .map((line) => line.trimEnd())
-        .filter((line) => line !== '')
-        .join(' '),
-    )
-    .filter((paragraph) => paragraph !== '')
-    .join('\r\n\r\n');
+    .map((paragraph) => paragraph.replace(/^\n+|\n+$/g, ''))
+    .filter((paragraph) => paragraph.trim() !== '')
+    .map((paragraph) => paragraph.split('\n'));
 }
 
-function bodyContentType(bodyFormat: BodyFormat): string {
-  if (bodyFormat === 'html') {
-    return 'Content-Type: text/html; charset=utf-8';
-  }
-  return 'Content-Type: text/plain; charset=utf-8; format=flowed; delsp=no';
+// MIME bodies use CRLF line endings.
+function toCrlf(value: string): string {
+  return value.replace(/\r\n?/g, '\n').replace(/\n/g, '\r\n');
 }
 
-function formatBody(body: string, bodyFormat: BodyFormat): string {
-  if (bodyFormat === 'html') {
-    return body;
-  }
-  return toFlowedFormat(body);
+/**
+ * Render a plain-text body as minimal HTML, preserving the author's line
+ * breaks: a single newline becomes <br>, a blank line starts a new <p>.
+ *
+ * This exists because text/plain cannot express the difference between an
+ * intentional line break and a soft wrap in a way Gmail's web client honours —
+ * it ignores RFC 3676 format=flowed. The previous approach joined every line
+ * within a paragraph so that nothing wrapped mid-sentence, which silently
+ * destroyed lists, postal addresses, sign-offs and pasted code. Emitting an
+ * HTML alternative alongside the untouched plain text gives web clients
+ * something they will reflow to the viewport with the breaks intact.
+ *
+ * Body text is agent-authored and may contain markup characters, so it is
+ * escaped rather than interpolated. No Markdown is rendered: silently
+ * transforming ** or # would surprise callers, and a bullet written as "- item"
+ * already reads correctly once its line break survives.
+ */
+export function textToHtml(body: string): string {
+  return paragraphsOf(body)
+    .map((lines) => `<p>${lines.map(escapeHtml).join('<br>')}</p>`)
+    .join('\r\n');
+}
+
+// The two alternative parts, least-preferred first: a client picks the last
+// part it understands, so text/html must come after text/plain.
+function alternativeParts(body: string, boundary: string): string[] {
+  return [
+    `--${boundary}`,
+    'Content-Type: text/plain; charset=utf-8',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    toCrlf(body),
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    textToHtml(body),
+    '',
+    `--${boundary}--`,
+  ];
 }
 
 // Build a simple text message (no attachments)
@@ -108,10 +137,18 @@ function buildSimpleMessage(options: MimeMessageOptions): string {
     lines.push(`References: ${options.references}`);
   }
   lines.push('MIME-Version: 1.0');
-  lines.push(bodyContentType(bodyFormat));
-  lines.push('Content-Transfer-Encoding: 8bit');
-  lines.push('');
-  lines.push(formatBody(options.body, bodyFormat));
+
+  if (bodyFormat === 'html') {
+    lines.push('Content-Type: text/html; charset=utf-8');
+    lines.push('Content-Transfer-Encoding: 8bit');
+    lines.push('');
+    lines.push(options.body);
+  } else {
+    const altBoundary = generateBoundary();
+    lines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+    lines.push('');
+    lines.push(...alternativeParts(options.body, altBoundary));
+  }
 
   return lines.join('\r\n');
 }
@@ -141,12 +178,22 @@ function buildMultipartMessage(options: MimeMessageOptions): string {
   lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
   lines.push('');
 
-  // Body part
+  // Body part. For plain text this is itself a multipart/alternative, so the
+  // structure is multipart/mixed > multipart/alternative + attachments. The
+  // inner boundary must differ from the outer one or parsers cannot tell the
+  // nested part from the enclosing one.
   lines.push(`--${boundary}`);
-  lines.push(bodyContentType(bodyFormat));
-  lines.push('Content-Transfer-Encoding: 8bit');
-  lines.push('');
-  lines.push(formatBody(options.body, bodyFormat));
+  if (bodyFormat === 'html') {
+    lines.push('Content-Type: text/html; charset=utf-8');
+    lines.push('Content-Transfer-Encoding: 8bit');
+    lines.push('');
+    lines.push(options.body);
+  } else {
+    const altBoundary = generateBoundary();
+    lines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+    lines.push('');
+    lines.push(...alternativeParts(options.body, altBoundary));
+  }
   lines.push('');
 
   // Attachment parts

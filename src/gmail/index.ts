@@ -32,5 +32,5 @@ export {
   encodeMimeHeader,
   type MimeAttachment,
   type MimeMessageOptions,
-  toFlowedFormat,
+  textToHtml,
 } from './mime.js';
