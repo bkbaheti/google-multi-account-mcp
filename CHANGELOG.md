@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.7.0 (August 2026)
+
+Email bodies sent as plain text now render correctly in web clients without the caller doing anything.
+
+- **fix:** Plain-text bodies are sent as `multipart/alternative` — your text verbatim in the `text/plain` part, plus a generated `text/html` part where a blank line becomes a paragraph and a single newline becomes a line break. Previously the server joined every line within a paragraph so that nothing wrapped mid-sentence in Gmail's web view, which ignores RFC 3676 `format=flowed`. That silently destroyed bullet lists, numbered lists, postal addresses, sign-offs and pasted code: a three-item list arrived as one run-on line. Web clients now pick the HTML part and reflow to the viewport with the breaks intact; plain-text clients get the untouched text. With attachments the structure nests as `multipart/mixed` > `multipart/alternative`.
+- **fix:** The `bodyFormat` tool descriptions claimed `format=flowed` made clients "reflow paragraphs instead of rendering hard wraps" and never mentioned that intentional line breaks were discarded. That omission is why agents had to be told, per-agent, to pass `bodyFormat: "html"` as a workaround. `bodyFormat` is now genuinely optional: `"text"` is correct for almost every case, and `"html"` is only for callers supplying their own markup.
+- **BREAKING (behaviour):** Authors now own their wrapping. Prose that the caller hard-wraps renders with those breaks rather than being joined into a single line. Callers that relied on the old unwrapping to tidy up hard-wrapped input should send unwrapped paragraphs and let the client reflow them.
+- **BREAKING (library consumers only):** `toFlowedFormat` is removed, replaced by `textToHtml`. Both are reachable only via a deep import of `dist/gmail/`; nothing exported from the package root changed, and no MCP tool signature or response changed.
+
+Body text is HTML-escaped, since it is agent-authored and may contain markup characters. No Markdown is rendered — silently transforming `**` or `#` would surprise callers, and `- item` reads correctly once its line break survives. Note that HTML collapses leading whitespace, so indentation in a plain-text body does not survive into the HTML part; send `bodyFormat: "html"` with `<pre>` if you need indentation preserved.
+
 ## v0.6.0 — BREAKING (August 2026)
 
 OAuth hardening for the shipped public client. Prompted by a responsible-disclosure report from Francesco Martignoni (Politecnico di Milano) about the client secret committed at `src/auth/oauth-defaults.ts`.
