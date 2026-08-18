@@ -46,7 +46,7 @@ git tag -a v0.5.2 -m "..."
 git push origin v0.5.2
 ```
 
-CI then runs: `pnpm install --frozen-lockfile` → `pnpm build` → `pnpm test` → `npm publish --provenance --access public`.
+CI then runs: `pnpm install --frozen-lockfile` → `pnpm build` → `pnpm test` → `npx npm@latest publish --provenance --access public`.
 
 Notes that matter:
 
@@ -55,7 +55,11 @@ Notes that matter:
 - **No lint step.** `pnpm biome check` currently reports pre-existing errors; they will not block a release. Do not read a green publish as a clean lint.
 - `dist/` is not committed. CI builds it from the tagged commit.
 
-### dist-tags cannot be automated here — do not try
+### dist-tags cannot be automated here — `beta` was therefore retired
+
+**Current state: `latest` is the only dist-tag.** `beta` was removed on 2026-08-18
+(`npm dist-tag rm @procedure-tech/mcp-google beta`). The reasoning below is kept because it is
+why the tag is gone and why it must not come back.
 
 `beta` drifted to a four-month-old version (0.3.1) because nothing kept it current, and the obvious
 fix — add an `npm dist-tag add` step to `publish.yml` — **does not work**. npm's trusted-publishing
@@ -72,9 +76,14 @@ Consequences, so nobody rediscovers this:
 - `npm publish` sets exactly one tag. Without `--tag` it sets `latest`, which is what this workflow does.
 - Any *additional* tag must be set by a human, from an authenticated CLI, with a 2FA one-time password
   (`npm dist-tag add <pkg>@<version> beta --otp=<code>`). It cannot be scripted here.
-- Therefore: **prefer a single channel.** Every release goes to `latest`. "Beta" is a maturity
+- Therefore: **there is a single channel.** Every release goes to `latest`. "Beta" is a maturity
   statement in the README, the site and the package description — it does not need a dist-tag, and a
   second tag that nobody can automate will drift again.
+- **Do not re-add `beta`, or any other second tag.** Doing so reintroduces a per-release manual step
+  that requires a human with a 2FA one-time password, which is exactly the failure this removal
+  fixed. If a pre-release channel is ever genuinely needed, publish a prerelease *version*
+  (`0.7.0-rc.1`) — npm keeps prerelease versions out of `latest` automatically, with no second tag
+  to maintain.
 
 To verify what actually shipped, rather than trusting the green check:
 
@@ -95,17 +104,12 @@ this is the canonical page.
 3. Wait for the workflow, then verify: `npm view @procedure-tech/mcp-google version dist-tags`.
 4. Confirm the artifact: `npm pack @procedure-tech/mcp-google@X.Y.Z`, check that
    `package/dist/build-info.json`'s `commit` matches the tagged commit.
-5. **Ask the repo owner to move the `beta` dist-tag.** It cannot be automated (see above) and it
-   cannot be done by an agent — it needs their npm session and a 2FA one-time password:
-
-   ```
-   npm dist-tag add @procedure-tech/mcp-google@X.Y.Z beta --otp=<code>
-   ```
-
-   Then confirm with step 3 that `beta` moved. If this step is skipped, `beta` stays where it was —
-   which is how it ended up four months and two minor versions behind `latest`.
-6. If `site/` changed, confirm the Cloudflare deploy landed:
+5. If `site/` changed, bump `site/index.html` (`softwareVersion` in the JSON-LD, and the
+   release-notes block) and push, then confirm the Cloudflare deploy landed:
    `curl -s https://multiaccountgooglemcp.procedure.tech/ | grep softwareVersion`
 
-If step 5 becomes tiresome, the better answer is to delete the tag rather than keep forgetting it:
-`npm dist-tag rm @procedure-tech/mcp-google beta --otp=<code>`. A single channel cannot drift.
+   Do this **after** the npm tag is out, never before. The site auto-deploys from `master`, so an
+   early bump advertises a version nobody can install yet.
+
+There is no dist-tag step. `latest` is the only tag and `npm publish` sets it; see above for why a
+second one is not worth having.

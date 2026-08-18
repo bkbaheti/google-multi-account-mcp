@@ -46,6 +46,26 @@ Verified already correct, so not changed: `state` is generated per flow and comp
 callback in both paths; tokens at rest use the OS keychain with an AES-256-GCM encrypted-file
 fallback.
 
+Verified against the live Google endpoint before release, since the unit tests mock `node:http`
+and `googleapis` and therefore prove nothing about what Google accepts:
+- [DONE] Google issued a consent screen for an ephemeral loopback redirect (`127.0.0.1:60772`) —
+  confirming Desktop-app clients have no redirect-URI allowlist, which is what made the ephemeral
+  port safe to adopt
+- [DONE] The S256 challenge/verifier round-tripped through Google's token endpoint successfully
+- Note: Google returns `openid` alongside `userinfo.email` whether or not it was requested. Harmless
+  — `capabilitiesOf` tests known capabilities against the granted set, so unrecognised scopes are
+  ignored. Pre-existing behaviour, not introduced here.
+
+**Released as v0.6.0** (commit a38331e). Minor rather than patch: `AccountStore.startAddAccount` and
+`startReauthAccount` became async, and `AccountStore` is exported from the library entrypoint.
+Verified post-publish that the tarball's `dist/build-info.json` commit matched the tagged commit, and
+that the shipped `dist/auth/oauth.js` actually contains the PKCE code and no longer references 8089 —
+a green workflow alone does not establish either.
+
+**The `beta` dist-tag was retired** as part of this release rather than moved forward. Keeping it
+current was a manual, un-automatable step (OIDC authorizes only `npm publish`), and it had already
+drifted four months behind `latest` once. `latest` is now the only channel. See `docs/DEPLOYMENT.md`.
+
 **Not done / follow-up:** no reply has been sent to the researcher yet.
 
 ---
@@ -407,4 +427,7 @@ Identified from comparing against mcp-gsuite, mcp-google-workspace, and gmail-mc
 
 ### Beta / Pre-Approval Notices
 - [DONE] Add beta notice to package.json description, README, and landing page — "Google OAuth approval pending, by-invite access"
-- [DONE] Publish with `--tag beta` dist-tag (workflow uses `npm publish --tag beta`)
+- [DONE] Publish with `--tag beta` dist-tag — **no longer true, and the parenthetical was never
+  true.** `publish.yml` runs `npx npm@latest publish --provenance --access public` with no `--tag`,
+  so it has always published to `latest`. The `beta` tag was set by hand, drifted, and was retired
+  on 2026-08-18. Left here as a record; see `docs/DEPLOYMENT.md` for current behaviour.

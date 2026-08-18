@@ -196,34 +196,33 @@ Do not trust the branch `origin/cloudflare/workers-autoconfig` or the commits me
 
 `mcp-google.procedure.tech` does **not** exist (NXDOMAIN). Never reference it; use the live domain above.
 
-### Release checklist — the last step is NOT optional
+### Release checklist
 
-After pushing a `v*` tag and seeing the workflow go green, you are not finished. Do all four:
+There is exactly **one** dist-tag: `latest`. `beta` was retired on 2026-08-18
+(`npm dist-tag rm`) precisely because keeping it current was a manual step that
+could not be automated, and it had already drifted four months behind `latest`
+(stuck on 0.3.1 while `latest` was 0.5.1) — so anyone following the project's own
+"Beta" labelling was installing a build from April.
+
+**Do not re-add `beta` or any second tag.** OIDC in CI authorizes only `npm publish`,
+so a second tag can only be maintained by a human with a 2FA one-time password on every
+single release. It will drift again. "Beta" is a maturity statement in the README, on
+the site, and in the package description; it does not need a dist-tag. See
+`docs/DEPLOYMENT.md`.
+
+After pushing a `v*` tag and seeing the workflow go green, you are not finished:
 
 1. **Verify what actually shipped**, rather than trusting the green check:
-   `npm view @procedure-tech/mcp-google version dist-tags` — `latest` must be the new version.
+   `npm view @procedure-tech/mcp-google version dist-tags` — `latest` must be the new
+   version, and must be the only tag listed.
 2. **Confirm the published build matches the tag**: `npm pack @procedure-tech/mcp-google@<version>`
    and check `package/dist/build-info.json` — its `commit` must equal the tagged commit. A mismatch
    means the build predates the version bump.
-3. **STOP AND ASK THE USER TO UPDATE THE `beta` DIST-TAG.** You cannot do this yourself: it requires
-   their npm login *and* a 2FA one-time password, and OIDC in CI only authorizes `npm publish`
-   (see `docs/DEPLOYMENT.md`). Ask them to run, with a fresh code:
-
-   ```
-   ! npm dist-tag add @procedure-tech/mcp-google@<version> beta --otp=<code>
-   ```
-
-   Then re-run step 1 and confirm `beta` moved. **Do not report the release as complete until you
-   have either seen `beta` updated or been told explicitly to skip it.** This tag silently drifted
-   four months behind `latest` (stuck on 0.3.1 while `latest` was 0.5.1), so anyone following the
-   project's own "Beta" labelling was installing a build from April. Forgetting is the default
-   failure; asking is the only thing that prevents it.
-4. **If the site content changed**, confirm the deploy landed:
+3. **If the site content changed**, confirm the deploy landed:
    `curl -s https://multiaccountgooglemcp.procedure.tech/ | grep softwareVersion`
-
-Standing recommendation, if the user ever wants to stop doing step 3: remove the `beta` tag
-entirely (`npm dist-tag rm @procedure-tech/mcp-google beta --otp=<code>`) and let "Beta" be a
-maturity statement in the README and on the site. One channel cannot drift.
+   Bump `site/index.html` (`softwareVersion` in the JSON-LD, and the release-notes block)
+   *after* the npm tag is out, never before — the site auto-deploys from `master`, so an
+   early bump advertises a version nobody can install.
 
 ## Debugging "google_version returns an old version" (npx cache gotcha)
 
