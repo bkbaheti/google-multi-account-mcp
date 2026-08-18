@@ -753,6 +753,12 @@ footer {
   border: 1px solid rgba(234, 179, 8, 0.25);
 }
 
+.change-type.breaking {
+  background: rgba(220, 38, 38, 0.14);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, 0.28);
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   nav {

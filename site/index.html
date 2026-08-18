@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://multiaccountgooglemcp.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.5.1",
+    "softwareVersion": "0.6.0",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -236,8 +236,21 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.5.1</span>
+            <span class="release-version">v0.6.0</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">August 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type feat">feat</span><span class="change-text">OAuth now uses PKCE (RFC 7636). Previously the authorization code was protected only by arriving on a fixed local port, so another process on the same machine that claimed that port first could have intercepted it. The verifier never leaves the server, making an intercepted code useless</span></li>
+            <li><span class="change-type breaking">breaking</span><span class="change-text">The OAuth callback now binds an OS-assigned port on <code>127.0.0.1</code> instead of a fixed <code>localhost:8089</code>. Nothing to configure, and "port 8089 already in use" is gone — but a firewall or proxy rule pinned to port 8089 or to the hostname <code>localhost</code> no longer applies</span></li>
+            <li><span class="change-type breaking">breaking</span><span class="change-text">For anyone importing this package as a library: <code>AccountStore.startAddAccount</code> and <code>startReauthAccount</code> now return promises and must be awaited. No MCP tool signature or response changed</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text">On the OAuth client secret published in this package, which automated scanners flag: it belongs to a Google "Desktop app" client, which is a public client under RFC 8252 where the secret is not confidential — the same pattern used by <code>gcloud</code> and the GitHub CLI. It is intentional and was not rotated. Your credentials were never exposed and no action is required. See SECURITY.md</span></li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.5.1</span>
             <span class="release-date">August 2026</span>
           </div>
           <ul class="release-changes">
