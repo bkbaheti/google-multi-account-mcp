@@ -66,7 +66,18 @@ a green workflow alone does not establish either.
 current was a manual, un-automatable step (OIDC authorizes only `npm publish`), and it had already
 drifted four months behind `latest` once. `latest` is now the only channel. See `docs/DEPLOYMENT.md`.
 
-**Not done / follow-up:** no reply has been sent to the researcher yet.
+**Reply sent** to Francesco Martignoni on 2026-08-18 (cc: M. Carminati, S. Longari, and internal),
+threaded onto the original disclosure. States that the credential is intentional and was not rotated,
+that his report nonetheless surfaced the missing PKCE, and what shipped in v0.6.0. Also passes back
+the methodological point that Desktop-app vs Web-application client type is what separates a false
+positive from a real finding here, and that "public client without PKCE" is the statically-detectable
+class that actually discriminates.
+
+Verified end-to-end on both paths: the standalone script (isolated, in-memory token store) and the
+real MCP tool path via `google_reauth_account`, whose auth URL carried an ephemeral
+`127.0.0.1` redirect and `code_challenge_method=S256`.
+
+**Follow-up:** none outstanding for this work.
 
 ---
 
