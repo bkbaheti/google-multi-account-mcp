@@ -11,8 +11,56 @@ import {
   toMcpError,
   validationError,
 } from '../errors/index.js';
-import { GmailClient, getHeader, getTextBody } from '../gmail/index.js';
+import { GmailClient, getHeader, getTextBody, type Message } from '../gmail/index.js';
 import { coerceArgs, GMAIL_MAX_ATTACHMENT_BYTES, readFileAsBase64 } from '../utils/index.js';
+
+// Header fields surfaced on every message response, defined once. gmail_get_message,
+// gmail_get_messages_batch and gmail_get_thread each used to inline their own From/To/Subject/Date
+// list, which is how Cc, Bcc and Reply-To came to be missing from all three while gmail_get_draft
+// returned them. References is deliberately absent: it repeats every prior Message-ID, so including
+// it would grow a thread response quadratically. Ask for it by name via metadataHeaders.
+const MESSAGE_HEADER_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ['from', 'From'],
+  ['to', 'To'],
+  ['cc', 'Cc'],
+  ['bcc', 'Bcc'],
+  ['replyTo', 'Reply-To'],
+  ['subject', 'Subject'],
+  ['date', 'Date'],
+  ['messageId', 'Message-ID'],
+  ['inReplyTo', 'In-Reply-To'],
+];
+
+export function extractMessageHeaders(message: Pick<Message, 'payload'>): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const [field, header] of MESSAGE_HEADER_FIELDS) {
+    const value = getHeader(message, header);
+    if (value !== undefined) {
+      fields[field] = value;
+    }
+  }
+  return fields;
+}
+
+// When the caller names headers explicitly, echo back exactly what Gmail returned — otherwise
+// anything outside MESSAGE_HEADER_FIELDS (List-Unsubscribe, References, Authentication-Results)
+// would be requested from Gmail and then dropped on the way out.
+function rawHeaders(
+  message: Pick<Message, 'payload'>,
+  metadataHeaders: string[] | undefined,
+): { headers?: Array<{ name: string; value: string }> } {
+  if (!metadataHeaders || metadataHeaders.length === 0) {
+    return {};
+  }
+  return { headers: message.payload?.headers ?? [] };
+}
+
+const metadataHeadersSchema = z
+  .array(z.string())
+  .optional()
+  .describe(
+    'Only with format="metadata": restrict the headers Gmail returns to these names (e.g. ["From","Cc","List-Unsubscribe"]). Named headers are also echoed back verbatim under "headers". Ignored for other formats.',
+  );
 
 export function registerGmailTools(
   server: McpServer,
@@ -70,6 +118,7 @@ export function registerGmailTools(
           .enum(['minimal', 'metadata', 'full'])
           .optional()
           .describe('Response format (default: full)'),
+        metadataHeaders: metadataHeadersSchema,
       },
     },
     async (args) => {
@@ -78,7 +127,11 @@ export function registerGmailTools(
 
       try {
         const client = new GmailClient(accountStore, args.accountId);
-        const message = await client.getMessage(args.messageId, args.format ?? 'full');
+        const message = await client.getMessage(
+          args.messageId,
+          args.format ?? 'full',
+          args.metadataHeaders,
+        );
 
         // Extract useful info for the response
         const response = {
@@ -86,10 +139,8 @@ export function registerGmailTools(
           threadId: message.threadId,
           labelIds: message.labelIds,
           snippet: message.snippet,
-          from: getHeader(message, 'From'),
-          to: getHeader(message, 'To'),
-          subject: getHeader(message, 'Subject'),
-          date: getHeader(message, 'Date'),
+          ...extractMessageHeaders(message),
+          ...rawHeaders(message, args.metadataHeaders),
           body: getTextBody(message),
         };
 
@@ -113,6 +164,7 @@ export function registerGmailTools(
           .enum(['minimal', 'metadata', 'full'])
           .optional()
           .describe('Response format (default: full)'),
+        metadataHeaders: metadataHeadersSchema,
       },
     },
     async (args) => {
@@ -121,7 +173,11 @@ export function registerGmailTools(
 
       try {
         const client = new GmailClient(accountStore, args.accountId);
-        const results = await client.getMessagesBatch(args.messageIds, args.format ?? 'full');
+        const results = await client.getMessagesBatch(
+          args.messageIds,
+          args.format ?? 'full',
+          args.metadataHeaders,
+        );
 
         // Transform results for response
         const messages = results.map((result) => {
@@ -134,10 +190,8 @@ export function registerGmailTools(
                 threadId: result.message.threadId,
                 labelIds: result.message.labelIds,
                 snippet: result.message.snippet,
-                from: getHeader(result.message, 'From'),
-                to: getHeader(result.message, 'To'),
-                subject: getHeader(result.message, 'Subject'),
-                date: getHeader(result.message, 'Date'),
+                ...extractMessageHeaders(result.message),
+                ...rawHeaders(result.message, args.metadataHeaders),
                 body: getTextBody(result.message),
               },
             };
@@ -176,6 +230,7 @@ export function registerGmailTools(
           .enum(['minimal', 'metadata', 'full'])
           .optional()
           .describe('Response format (default: full)'),
+        metadataHeaders: metadataHeadersSchema,
       },
     },
     async (args) => {
@@ -184,17 +239,19 @@ export function registerGmailTools(
 
       try {
         const client = new GmailClient(accountStore, args.accountId);
-        const thread = await client.getThread(args.threadId, args.format ?? 'full');
+        const thread = await client.getThread(
+          args.threadId,
+          args.format ?? 'full',
+          args.metadataHeaders,
+        );
 
         // Extract useful info for the response
         const response = {
           id: thread.id,
           messages: thread.messages?.map((msg) => ({
             id: msg.id,
-            from: getHeader(msg, 'From'),
-            to: getHeader(msg, 'To'),
-            subject: getHeader(msg, 'Subject'),
-            date: getHeader(msg, 'Date'),
+            ...extractMessageHeaders(msg),
+            ...rawHeaders(msg, args.metadataHeaders),
             snippet: msg.snippet,
             body: getTextBody(msg),
           })),
@@ -347,11 +404,6 @@ export function registerGmailTools(
         const client = new GmailClient(accountStore, args.accountId);
         const draft = await client.getDraft(args.draftId);
 
-        // Extract headers for easy access
-        const headers = draft.message?.payload?.headers ?? [];
-        const getHeaderValue = (name: string): string | undefined =>
-          headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value;
-
         // Get body content
         const bodyContent = draft.message?.payload?.body?.data
           ? Buffer.from(draft.message.payload.body.data, 'base64url').toString('utf-8')
@@ -364,12 +416,7 @@ export function registerGmailTools(
             threadId: draft.message?.threadId,
             labelIds: draft.message?.labelIds,
             snippet: draft.message?.snippet,
-            from: getHeaderValue('From'),
-            to: getHeaderValue('To'),
-            cc: getHeaderValue('Cc'),
-            bcc: getHeaderValue('Bcc'),
-            subject: getHeaderValue('Subject'),
-            date: getHeaderValue('Date'),
+            ...extractMessageHeaders(draft.message ?? {}),
             body: bodyContent,
           },
         };

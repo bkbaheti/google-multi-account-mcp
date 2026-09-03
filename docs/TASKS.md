@@ -1,5 +1,39 @@
 # Tasks
 
+## Message headers dropped from every read path (COMPLETED — v0.8.0)
+
+Reported from another session: `gmail_get_message` and `gmail_get_thread` returned no `cc` at
+any format, while `gmail_get_draft` did. Correctly diagnosed there as header extraction, not
+OAuth scope.
+
+- [DONE] Reproduced against live Gmail: a message matching `cc:procedure.tech` came back from
+  `gmail_get_message` with no `cc` field at `metadata`, and the same at `full`
+- [DONE] Root cause: `gmail_get_message`, `gmail_get_messages_batch` and `gmail_get_thread` each
+  inlined `From`/`To`/`Subject`/`Date` when building their response. `convertPayload` had
+  preserved every header from the API all along — nothing was ever missing from Gmail's
+  response, only from ours. `gmail_get_draft` was the fourth copy of the same list and the only
+  one that had been extended with `Cc`/`Bcc`, which is why drafts disagreed with received mail
+- [DONE] Single `MESSAGE_HEADER_FIELDS` list in `src/server/gmail-tools.ts`, consumed by all
+  four handlers, adding `cc`, `bcc`, `replyTo`, `messageId`, `inReplyTo`. Four copies of a
+  whitelist is the defect; the missing `Cc` was the symptom
+- [DONE] `metadataHeaders` passed through `getMessage`/`getMessagesBatch`/`getThread` to the
+  Gmail API, gated to `format: 'metadata'` where Google honours it, and echoed back as raw
+  `headers` so arbitrary requested headers are not swallowed by the named-field set
+- [DONE] `getHeader` widened to `Pick<Message, 'payload'>` so draft messages share it
+- [DONE] 12 unit tests, written failing first: named-field extraction, case-insensitive header
+  matching, omission of absent headers, the deliberate `References` exclusion, and
+  metadataHeaders forwarding on the message, thread and batch paths (plus empty-array and
+  wrong-format cases)
+- [DONE] Verified against live Gmail after the fix — mocks prove nothing about what Google
+  returns: `cc` present with two recipients at both `metadata` and `full`, thread messages
+  carrying `cc`, and a `metadataHeaders` request returning exactly the named headers
+
+`References` deliberately not surfaced as a named field: it repeats every prior `Message-ID`,
+so a thread response would grow quadratically. `metadataHeaders` is the escape hatch.
+
+Observed while verifying, unrelated to this bug: the npx-installed server was still reporting
+v0.6.0 / `aa5bbb2` two releases later — the npx cache gotcha already documented in `CLAUDE.md`.
+
 ## OAuth Public-Client Hardening (COMPLETED)
 
 Trigger: responsible-disclosure email from Francesco Martignoni (Politecnico di Milano,

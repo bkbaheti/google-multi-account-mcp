@@ -120,11 +120,18 @@
     - Inputs: { accountId, query, maxResults?, pageToken? }
     - Returns: { messages: [{ id, threadId, snippet?, internalDate? }], nextPageToken? }
   - `gmail_get_message`
-    - Inputs: { accountId, messageId, format?: 'metadata'|'full' }
-    - Returns: { id, threadId, headers, snippet, bodyText?, bodyHtml?, labelIds?, internalDate }
+    - Inputs: { accountId, messageId, format?: 'minimal'|'metadata'|'full', metadataHeaders?: string[] }
+    - Returns: { id, threadId, from?, to?, cc?, bcc?, replyTo?, subject?, date?, messageId?, inReplyTo?, headers?, snippet, body?, labelIds? }
+    - Header fields are omitted when the message does not carry them. `References` is not
+      surfaced as a field: it repeats every prior `Message-ID`, so including it would grow a
+      thread response quadratically — request it by name via `metadataHeaders`.
+    - `metadataHeaders` applies only to `format: 'metadata'`, matching the Gmail API, and is
+      dropped for other formats rather than sent as a no-op filter. When supplied, the headers
+      Gmail returned are echoed verbatim as `headers: [{ name, value }]`, so headers outside
+      the named set (`List-Unsubscribe`, `Authentication-Results`, …) reach the caller.
   - `gmail_get_thread`
-    - Inputs: { accountId, threadId }
-    - Returns: { threadId, messages: [...] }
+    - Inputs: { accountId, threadId, format?: 'minimal'|'metadata'|'full', metadataHeaders?: string[] }
+    - Returns: { id, messages: [{ id, ...same header fields as gmail_get_message, snippet, body? }] }
 
 - Gmail draft/send tools
   - `gmail_create_draft`

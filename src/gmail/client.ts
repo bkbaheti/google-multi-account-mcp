@@ -178,6 +178,19 @@ export interface VacationSettings {
   endTime?: number; // epoch ms
 }
 
+// Gmail honours metadataHeaders only for format=metadata; sending it with minimal or full
+// looks like a filter that never applies, so drop it rather than pass a no-op through.
+// An empty array is treated as "unspecified" — asking Gmail for zero headers is never intended.
+function metadataHeaderParam(
+  format: 'minimal' | 'metadata' | 'full',
+  metadataHeaders: string[] | undefined,
+): { metadataHeaders?: string[] } {
+  if (format !== 'metadata' || !metadataHeaders || metadataHeaders.length === 0) {
+    return {};
+  }
+  return { metadataHeaders };
+}
+
 export class GmailClient {
   private readonly accountStore: AccountStore;
   private readonly accountId: string;
@@ -244,6 +257,7 @@ export class GmailClient {
   async getMessage(
     messageId: string,
     format: 'minimal' | 'metadata' | 'full' = 'full',
+    metadataHeaders?: string[],
   ): Promise<Message> {
     const gmail = await this.getGmail();
 
@@ -251,6 +265,7 @@ export class GmailClient {
       userId: 'me',
       id: messageId,
       format,
+      ...metadataHeaderParam(format, metadataHeaders),
     });
 
     return this.convertMessage(response.data);
@@ -260,6 +275,7 @@ export class GmailClient {
   async getMessagesBatch(
     messageIds: string[],
     format: 'minimal' | 'metadata' | 'full' = 'full',
+    metadataHeaders?: string[],
   ): Promise<BatchMessageResult[]> {
     // Limit batch size to prevent overwhelming the API
     const maxBatchSize = 50;
@@ -267,7 +283,7 @@ export class GmailClient {
 
     const results = await Promise.allSettled(
       idsToFetch.map(async (id) => {
-        const message = await this.getMessage(id, format);
+        const message = await this.getMessage(id, format, metadataHeaders);
         return { id, message };
       }),
     );
@@ -453,6 +469,7 @@ export class GmailClient {
   async getThread(
     threadId: string,
     format: 'minimal' | 'metadata' | 'full' = 'full',
+    metadataHeaders?: string[],
   ): Promise<Thread> {
     const gmail = await this.getGmail();
 
@@ -460,6 +477,7 @@ export class GmailClient {
       userId: 'me',
       id: threadId,
       format,
+      ...metadataHeaderParam(format, metadataHeaders),
     });
 
     const result: Thread = {
@@ -1045,8 +1063,9 @@ export class GmailClient {
   }
 }
 
-// Helper to extract common headers
-export function getHeader(message: Message, name: string): string | undefined {
+// Helper to extract common headers. Takes anything carrying a payload — messages and
+// draft messages both do — so header extraction does not have to be reimplemented per type.
+export function getHeader(message: Pick<Message, 'payload'>, name: string): string | undefined {
   const header = message.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase());
   return header?.value;
 }

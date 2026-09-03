@@ -26,8 +26,8 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 
 **Gmail Read:**
 - `gmail_search_messages` - search with query
-- `gmail_get_message` - fetch single message
-- `gmail_get_thread` - fetch thread
+- `gmail_get_message` - fetch single message (returns From/To/**Cc**/**Bcc**/**Reply-To**/Subject/Date/**Message-ID**/**In-Reply-To**; optional `metadataHeaders` restricts and echoes headers when `format: "metadata"`)
+- `gmail_get_thread` - fetch thread (same header set per message)
 
 **Gmail Write (with confirm gate):**
 - `gmail_create_draft` - create draft
@@ -120,6 +120,14 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - Local-first stdio MCP server
 - Account isolation (tokens, cache, rate limits)
 - Draft-first + confirm gate for all sends
+- **One header list.** `MESSAGE_HEADER_FIELDS` in `src/server/gmail-tools.ts` is the single
+  definition of which headers a message response surfaces, used by `gmail_get_message`,
+  `gmail_get_messages_batch`, `gmail_get_thread` and `gmail_get_draft`. Each of those four
+  handlers previously inlined its own list; three drifted to From/To/Subject/Date only, which
+  is how Cc silently disappeared from every read path while drafts still returned it. Add
+  headers there, never in a handler. `References` is deliberately excluded — it repeats every
+  prior `Message-ID`, so surfacing it per message would grow a thread response quadratically;
+  callers that need it name it in `metadataHeaders`.
 - Per-service capabilities with explicit upgrade (`mail:read`, `mail:compose`, `mail:modify`, `mail:settings`, `drive:read`, `drive:appfiles`, `calendar:read`, `calendar:write`). Capabilities are checked directly against required scopes — there is no tier-to-scope lookup. The only true implication is `mail:modify` ⇒ `mail:read` (Google documents `gmail.modify` as including read access). Deliberately no `drive:appfiles` ⇒ `drive:read` implication: `drive.file` (per-file, app-created access) and `drive.readonly` (read everything) are independent grants, neither contains the other — asserting otherwise previously defeated the scope gate on `drive_get_comments`. Same reasoning excludes any `calendar:write` ⇒ `calendar:read` implication (`calendar.events` doesn't authorize `calendarList.list` or `freebusy.query`).
 
 ---

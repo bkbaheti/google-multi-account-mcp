@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.8.0 (September 2026)
+
+Reading a message no longer hides who else was on it.
+
+- **fix:** `gmail_get_message`, `gmail_get_thread` and `gmail_get_messages_batch` return `cc`, `bcc`, `replyTo`, `messageId` and `inReplyTo` alongside the `from`/`to`/`subject`/`date` they already returned. Every one of those headers was fetched from Gmail and then discarded: each handler built its response from its own inlined four-header list, so a message copied to five people came back looking like a private note to one. This affected **all three formats**, `metadata` and `full` included — the headers were never missing from the API response, only from ours. `gmail_get_draft` was unaffected because its handler happened to read `Cc` and `Bcc` explicitly, which is why drafts and received mail disagreed about the same message.
+- **fix:** All four handlers now share one `MESSAGE_HEADER_FIELDS` list, so a header added for one read path cannot go missing from the others. That divergence was the actual defect; the missing `Cc` was its symptom. As a side effect `gmail_get_draft` gains `replyTo`, `messageId` and `inReplyTo` when a draft carries them.
+- **feat:** `gmail_get_message`, `gmail_get_thread` and `gmail_get_messages_batch` accept `metadataHeaders: string[]`. With `format: "metadata"` it restricts Gmail to the headers you name, and those headers are echoed back verbatim as `headers: [{ name, value }]` — so headers outside the standard set (`List-Unsubscribe`, `Authentication-Results`, `References`) now reach callers at all. It is dropped for `minimal` and `full`, where the Gmail API ignores it, rather than passed through as a filter that silently never applies. An empty array means "unspecified" rather than "no headers".
+- **feat (library consumers):** `GmailClient.getMessage`, `getMessagesBatch` and `getThread` take an optional third `metadataHeaders` argument. `getHeader` now accepts anything carrying a `payload`, so it works on draft messages as well as messages. Both changes are additive — existing calls are unaffected.
+
+`References` is deliberately **not** returned as a named field. It repeats every prior `Message-ID` in the thread, so surfacing it per message would grow a thread response roughly quadratically for no benefit most callers would notice. Ask for it by name through `metadataHeaders` if you need it.
+
+Verified against live Gmail, not only mocks: a message with two people on `Cc` now returns both at `metadata` and at `full`, and a `metadataHeaders` request returned exactly the named headers.
+
 ## v0.7.0 (August 2026)
 
 Email bodies sent as plain text now render correctly in web clients without the caller doing anything.
