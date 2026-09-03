@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://multiaccountgooglemcp.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.7.0",
+    "softwareVersion": "0.8.0",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -236,8 +236,20 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.7.0</span>
+            <span class="release-version">v0.8.0</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">September 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type fix">fix</span><span class="change-text">Reading a message no longer hides who else was on it. <code>gmail_get_message</code>, <code>gmail_get_thread</code> and <code>gmail_get_messages_batch</code> now return <code>cc</code>, <code>bcc</code>, <code>replyTo</code>, <code>messageId</code> and <code>inReplyTo</code> alongside the sender, recipient, subject and date they already returned. Those headers were being fetched from Gmail and then thrown away, at every format — so a message copied to five people came back looking like a private note to one</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text">All four read paths now share one list of which headers to surface. Each handler previously kept its own copy, and three of them drifted — which is why <code>gmail_get_draft</code> returned the Cc on a draft while every other tool dropped it from the same message</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">New optional <code>metadataHeaders</code> parameter on those three tools. With <code>format: "metadata"</code> it limits Gmail to the headers you name and hands them back verbatim, so headers outside the standard set — <code>List-Unsubscribe</code>, <code>References</code>, <code>Authentication-Results</code> — are reachable for the first time</span></li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.7.0</span>
             <span class="release-date">August 2026</span>
           </div>
           <ul class="release-changes">
