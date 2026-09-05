@@ -246,6 +246,28 @@ describe('Calendar conferencing', () => {
       expect(mockEventsGet).not.toHaveBeenCalled();
     });
 
+    it('keeps a successful create when the follow-up read fails', async () => {
+      // The insert already happened and its invitations already went out. Surfacing the
+      // read's failure would report the write as failed, and a retry of a non-idempotent
+      // create means a second event and a second round of invitations.
+      mockEventsInsert.mockResolvedValueOnce({
+        data: baseEvent({
+          conferenceData: { createRequest: { status: { statusCode: 'pending' } } },
+        }),
+      });
+      mockEventsGet.mockRejectedValueOnce(new Error('Rate Limit Exceeded'));
+
+      const event = await client.createEvent({
+        summary: 'Standup',
+        start: START,
+        end: END,
+        conferencing: { type: 'googleMeet' },
+      });
+
+      expect(event.id).toBe('evt-1');
+      expect(event.conferenceData?.status).toBe('pending');
+    });
+
     it('re-reads the calendar the event was created on, not always primary', async () => {
       mockEventsInsert.mockResolvedValueOnce({
         data: baseEvent({
@@ -272,6 +294,10 @@ describe('Calendar conferencing', () => {
 
     it('extracts the code from a full Meet URL', () => {
       expect(normalizeMeetingCode('https://meet.google.com/abc-defg-hij')).toBe('abc-defg-hij');
+    });
+
+    it('accepts a Meet URL pasted without its scheme', () => {
+      expect(normalizeMeetingCode('meet.google.com/abc-defg-hij')).toBe('abc-defg-hij');
     });
 
     it('ignores query strings and trailing paths on the URL', () => {
@@ -302,6 +328,7 @@ describe('Calendar conferencing', () => {
       const data = buildConferenceData({ type: 'existing', meetingCode: 'abc-defg-hij' });
 
       expect(data).toEqual({
+        conferenceId: 'abc-defg-hij',
         conferenceSolution: { key: { type: 'hangoutsMeet' } },
         entryPoints: [
           {
@@ -463,6 +490,53 @@ describe('Calendar conferencing', () => {
       const params = mockEventsPatch.mock.calls[0][0];
       expect(params.conferenceDataVersion).toBe(1);
       expect(params.requestBody.conferenceData).toBeNull();
+    });
+
+    it('converts an all-day event to a timed one by nulling the date it replaces', async () => {
+      mockEventsPatch.mockResolvedValueOnce({ data: baseEvent() });
+
+      await client.updateEvent('evt-1', { start: START, end: END });
+
+      // Patch merges nested objects, so without the explicit null the event would end up
+      // with both date and dateTime set and Google would reject it.
+      const body = mockEventsPatch.mock.calls[0][0].requestBody;
+      expect(body.start).toEqual({ dateTime: START.dateTime, date: null });
+      expect(body.end).toEqual({ dateTime: END.dateTime, date: null });
+    });
+
+    it('converts a timed event to all-day by nulling both dateTime and timeZone', async () => {
+      mockEventsPatch.mockResolvedValueOnce({ data: baseEvent() });
+
+      await client.updateEvent('evt-1', {
+        start: { date: '2026-09-10' },
+        end: { date: '2026-09-11' },
+      });
+
+      const body = mockEventsPatch.mock.calls[0][0].requestBody;
+      expect(body.start).toEqual({ date: '2026-09-10', dateTime: null, timeZone: null });
+      expect(body.end).toEqual({ date: '2026-09-11', dateTime: null, timeZone: null });
+    });
+
+    it('leaves an existing time zone alone when the caller does not supply one', async () => {
+      mockEventsPatch.mockResolvedValueOnce({ data: baseEvent() });
+
+      await client.updateEvent('evt-1', { start: START });
+
+      expect(mockEventsPatch.mock.calls[0][0].requestBody.start).not.toHaveProperty('timeZone');
+    });
+
+    it('sends a supplied time zone on a timed update', async () => {
+      mockEventsPatch.mockResolvedValueOnce({ data: baseEvent() });
+
+      await client.updateEvent('evt-1', {
+        start: { dateTime: '2026-09-10T09:00:00', timeZone: 'America/New_York' },
+      });
+
+      expect(mockEventsPatch.mock.calls[0][0].requestBody.start).toEqual({
+        dateTime: '2026-09-10T09:00:00',
+        date: null,
+        timeZone: 'America/New_York',
+      });
     });
 
     it('re-reads once when a conference added on update comes back pending', async () => {

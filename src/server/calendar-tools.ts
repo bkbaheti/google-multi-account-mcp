@@ -2,7 +2,11 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Capability, CapabilityGate } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
-import { CalendarClient, type ConferencingRequest } from '../calendar/index.js';
+import {
+  CalendarClient,
+  type ConferencingRequest,
+  normalizeMeetingCode,
+} from '../calendar/index.js';
 import {
   confirmationRequired,
   errorResponse,
@@ -52,7 +56,9 @@ export function resolveConferencing(args: {
 }): ConferencingRequest | undefined | { error: string } {
   const requested = [
     args.addMeet ? 'addMeet' : null,
-    args.meetingCode ? 'meetingCode' : null,
+    // Presence, not truthiness: meetingCode: "" is a malformed code the caller meant to
+    // supply, and must be rejected rather than silently ignored.
+    args.meetingCode !== undefined ? 'meetingCode' : null,
     args.removeConferencing ? 'removeConferencing' : null,
   ].filter((v): v is string => v !== null);
 
@@ -65,8 +71,14 @@ export function resolveConferencing(args: {
   if (args.addMeet) {
     return { type: 'googleMeet' };
   }
-  if (args.meetingCode) {
-    return { type: 'existing', meetingCode: args.meetingCode };
+  if (args.meetingCode !== undefined) {
+    // Validated here rather than only in the client so a typo surfaces as a validation
+    // error naming the field, instead of an UNKNOWN_ERROR from a bare throw deeper down.
+    try {
+      return { type: 'existing', meetingCode: normalizeMeetingCode(args.meetingCode) };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
   }
   if (args.removeConferencing) {
     return { type: 'none' };
@@ -90,7 +102,7 @@ export function registerCalendarTools(
     'calendar_list_calendars',
     {
       description:
-        'List all calendars for a Google account (primary, shared, subscribed). Each entry reports accessRole ("owner", "writer", "reader", "freeBusyReader") and a derived canEdit flag saying whether events can be created or changed on it.',
+        'List all calendars for a Google account (primary, shared, subscribed). Each entry reports accessRole ("owner", "writer", "writerWithoutPrivateAccess", "reader", "freeBusyReader") and a derived canEdit flag saying whether events can be created or changed on it.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
         maxResults: z
@@ -386,14 +398,14 @@ export function registerCalendarTools(
       // the original event's access with it. Both consequences are reported together so a
       // caller sees everything one confirm authorises.
       const hasAttendees = args.attendees && args.attendees.length > 0;
-      if ((hasAttendees || args.meetingCode) && !args.confirm) {
+      if ((hasAttendees || args.meetingCode !== undefined) && !args.confirm) {
         const operations: string[] = [];
         const hints: string[] = [];
         if (hasAttendees) {
           operations.push(`create event with ${args.attendees!.length} attendee(s)`);
           hints.push('This will send calendar invitations.');
         }
-        if (args.meetingCode) {
+        if (args.meetingCode !== undefined) {
           operations.push('attach an existing meeting code');
           hints.push(MEETING_CODE_REUSE_WARNING);
         }
@@ -549,7 +561,7 @@ export function registerCalendarTools(
             }
           }
 
-          if (args.meetingCode) {
+          if (args.meetingCode !== undefined) {
             operations.push('attach an existing meeting code');
             hints.push(MEETING_CODE_REUSE_WARNING);
           }

@@ -128,11 +128,17 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
   silently ignores conference data in the body. Reusing a meeting code leaves access bound
   to the original event's guest list, which is why `meetingCode` sits behind a confirm gate
   and `addMeet` does not.
-- **`events.patch`, never `events.update`.** Update is full replacement, so it rewrites
-  every field of the event including ones this server does not model. That was survivable
-  only while `conferenceDataVersion` defaulted to 0; with version 1 a full-body update wipes
-  conferences it failed to round-trip. Google warns about exactly this shape. Do not
-  reintroduce the get-then-replace pattern in `updateEvent`.
+  - Google's "you may inadvertently remove existing conferences" warning is scoped to apps
+    that hold events in **local storage** and write back stale copies. It is not a statement
+    about `events.update` as such. Do not cite it as one.
+- **`updateEvent` uses `events.patch`, and patch merges nested objects.** Sending only
+  `start.dateTime` at an event that currently has `start.date` leaves BOTH set, which Google
+  rejects — so `buildEventDateTimeForPatch` nulls the mutually exclusive sibling explicitly.
+  Anything nested added to the patch body needs the same treatment; arrays are fine, patch
+  overwrites those. Patch was chosen over the previous get-then-`events.update` because it
+  cannot lose a concurrent edit to a field the caller did not touch, **not** on quota
+  grounds — Google's own reference prefers get+update, which costs 2 units against patch's
+  3. Either shape is defensible; the nested-merge rule is what is non-negotiable.
 - **One header list.** `MESSAGE_HEADER_FIELDS` in `src/server/gmail-tools.ts` is the single
   definition of which headers a message response surfaces, used by `gmail_get_message`,
   `gmail_get_messages_batch`, `gmail_get_thread` and `gmail_get_draft`. Each of those four

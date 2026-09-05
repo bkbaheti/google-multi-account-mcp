@@ -10,7 +10,10 @@ export interface CalendarInfo {
   description?: string;
   timeZone?: string;
   primary?: boolean;
-  /** Raw Google role: 'owner' | 'writer' | 'reader' | 'freeBusyReader'. */
+  /**
+   * Raw Google role: 'owner' | 'writer' | 'writerWithoutPrivateAccess' | 'reader' |
+   * 'freeBusyReader'.
+   */
   accessRole?: string;
   /**
    * Whether events can be created or changed on this calendar. Derived from accessRole,
@@ -29,8 +32,16 @@ export interface CalendarList {
   nextPageToken?: string;
 }
 
-/** Roles that permit writing events. Google's other roles are 'reader' and 'freeBusyReader'. */
-const EDITABLE_ACCESS_ROLES = new Set(['owner', 'writer']);
+/**
+ * Roles that permit writing events. Google's other roles are 'reader' and 'freeBusyReader'.
+ *
+ * `writerWithoutPrivateAccess` belongs here: Google documents it as "read and write access
+ * to the calendar", differing from `writer` only in that private events' details stay
+ * hidden. Omitting it reports a calendar the account can genuinely write to as read-only,
+ * which is the failure direction that matters — an agent picking a target calendar would
+ * silently skip it.
+ */
+const EDITABLE_ACCESS_ROLES = new Set(['owner', 'writer', 'writerWithoutPrivateAccess']);
 
 export interface CalendarEvent {
   id: string;
@@ -147,7 +158,7 @@ const MEET_CODE_PATTERN = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
  */
 export function normalizeMeetingCode(input: string): string {
   const trimmed = input.trim();
-  const fromUrl = trimmed.match(/^https?:\/\/meet\.google\.com\/([^?#/]+)/i);
+  const fromUrl = trimmed.match(/^(?:https?:\/\/)?meet\.google\.com\/([^?#/]+)/i);
   const code = (fromUrl?.[1] ?? trimmed).toLowerCase();
 
   if (!MEET_CODE_PATTERN.test(code)) {
@@ -210,6 +221,10 @@ export function buildConferenceData(
       // of {meetingCode, accessCode, passcode, password, pin} that matches Meet's
       // terminology, and Google asks that only the matching subset be populated.
       return {
+        // For hangoutsMeet, Google defines conferenceId as the meeting code itself. Sent
+        // because the documented path is copying a whole conferenceData block, and every
+        // worked example of that carries the id.
+        conferenceId: code,
         conferenceSolution: { key: { type: 'hangoutsMeet' } },
         entryPoints: [
           {
@@ -258,7 +273,7 @@ export class CalendarClient {
     // silently lost the tail.
     const params: calendar_v3.Params$Resource$Calendarlist$List = {};
     if (options.maxResults !== undefined) {
-      params.maxResults = Math.min(Math.max(options.maxResults, 1), 250);
+      params.maxResults = Math.min(Math.max(Math.round(options.maxResults), 1), 250);
     }
     if (options.pageToken !== undefined) {
       params.pageToken = options.pageToken;
@@ -495,10 +510,19 @@ export class CalendarClient {
       return event;
     }
 
-    const calendar = await this.getCalendar();
-    const refreshed = await calendar.events.get({ calendarId, eventId: event.id });
+    try {
+      const calendar = await this.getCalendar();
+      const refreshed = await calendar.events.get({ calendarId, eventId: event.id });
 
-    return refreshed.data;
+      return refreshed.data;
+    } catch {
+      // The write already succeeded — the event exists and its invitations have gone out.
+      // Letting a failed convenience read propagate would report that write as failed, and
+      // a caller retrying a non-idempotent create would produce a second event, a second
+      // conference and a second round of invitations to real people. Return what the write
+      // returned; its status still says the conference is pending.
+      return event;
+    }
   }
 
   /**
@@ -531,10 +555,10 @@ export class CalendarClient {
       requestBody.location = updates.location;
     }
     if (updates.start !== undefined) {
-      requestBody.start = this.buildEventDateTime(updates.start);
+      requestBody.start = this.buildEventDateTimeForPatch(updates.start);
     }
     if (updates.end !== undefined) {
-      requestBody.end = this.buildEventDateTime(updates.end);
+      requestBody.end = this.buildEventDateTimeForPatch(updates.end);
     }
     if (updates.attendees !== undefined) {
       requestBody.attendees = updates.attendees.map((a) => ({ email: a.email }));
@@ -646,6 +670,34 @@ export class CalendarClient {
     if (dt.date) {
       result.date = dt.date;
     }
+    if (dt.timeZone) {
+      result.timeZone = dt.timeZone;
+    }
+
+    return result;
+  }
+
+  /**
+   * Builds a `start`/`end` for a patch, nulling the variant that must not survive.
+   *
+   * Patch merges nested objects rather than replacing them, so sending only `dateTime` at
+   * an event that currently has `date` leaves BOTH set — a combination Google rejects, so
+   * converting an all-day event to a timed one (or back) fails outright. The mutually
+   * exclusive sibling has to be nulled explicitly.
+   *
+   * `timeZone` is nulled only when converting to all-day, where it is meaningless. On a
+   * timed event it is left alone unless the caller supplied one: a caller changing just the
+   * start time should not silently lose the event's time zone.
+   */
+  private buildEventDateTimeForPatch(dt: EventDateTime): calendar_v3.Schema$EventDateTime {
+    if (dt.date) {
+      return { date: dt.date, dateTime: null, timeZone: dt.timeZone ?? null };
+    }
+
+    const result: calendar_v3.Schema$EventDateTime = {
+      dateTime: dt.dateTime ?? null,
+      date: null,
+    };
     if (dt.timeZone) {
       result.timeZone = dt.timeZone;
     }

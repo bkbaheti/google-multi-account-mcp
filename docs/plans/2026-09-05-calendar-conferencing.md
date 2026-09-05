@@ -83,8 +83,9 @@ and it is a latent hazard for every other field we do not model as well.
 ### Calendar discovery is thin
 
 `listCalendars` (`src/calendar/client.ts:82`) calls `calendarList.list()` with no
-parameters. Google caps that at 100 entries and returns a `nextPageToken` we discard, so
-an account subscribed to more than 100 calendars silently loses the tail.
+parameters. Google defaults that to 100 entries (250 is the maximum) and returns a
+`nextPageToken` we discard, so an account subscribed to more than 100 calendars silently
+loses the tail.
 `convertCalendarInfo` (`src/calendar/client.ts:394`) does pass `accessRole` through, so
 read-only vs editable *is* discoverable — but only as a raw Google enum
 (`owner` / `writer` / `reader` / `freeBusyReader`) with nothing naming the consequence.
@@ -205,7 +206,9 @@ Conference removal (`conferenceData: null`, `conferenceDataVersion: 1`) rides on
 
 ### E. Calendar discovery
 
-- `canEdit: boolean` derived from `accessRole ∈ {owner, writer}`, alongside the raw
+- `canEdit: boolean` derived from `accessRole ∈ {owner, writer, writerWithoutPrivateAccess}`
+  — Google documents five roles, not four, and `writerWithoutPrivateAccess` grants write
+  access — alongside the raw
   `accessRole` — the raw enum stays, since it distinguishes `reader` from
   `freeBusyReader`, which `canEdit` cannot.
 - Pagination: `maxResults` / `pageToken` in, `nextPageToken` out.
