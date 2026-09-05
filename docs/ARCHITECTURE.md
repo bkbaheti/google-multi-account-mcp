@@ -119,3 +119,21 @@ Decision: [TBD during Phase 2]
 - An optional `driveId` arg on `drive_search_files` narrows to a single Shared Drive (`corpora: 'drive'`); omitting it searches My Drive + all Shared Drives the user is a member of.
 - `drive_list_shared_drives` (wrapping `drives.list`) exists so agents can discover Shared Drive IDs to pass as `folderId` (browse top level) or `driveId` (scoped search).
 - The existing `drive:read` (reading Shared Drive content) and `drive:appfiles` (writing to it) capabilities already cover Shared Drive access; no new consent step needed.
+
+### Calendar Conferencing (v0.9.0)
+**Decision:** Model conferencing as one `ConferencingRequest` union, translated by a single `buildConferenceData`, and send `conferenceDataVersion: 1` only when conferencing was actually requested.
+
+**Rationale:**
+- Google accepts conference data two mutually exclusive ways, and they do different things. `createRequest` mints a **new** conference; its only fields are `requestId` (an idempotency key) and `conferenceSolutionKey`, so **the API offers no way to request a specific meeting code**. `conferenceSolution` + at least one `entryPoint` **attaches an existing** conference — the documented "copy `conferenceData` from one event to another" path, and the API equivalent of the Calendar UI's edit-the-meeting-ID pencil. A union type makes it impossible to send both.
+- At `conferenceDataVersion: 0` (Google's default) conference data in the request body is *silently ignored*. Sending version 1 unconditionally would instead make our body authoritative over conference data we do not model, so the parameter is attached only to requests that actually carry a conferencing change.
+- Conference creation is asynchronous: an insert can return `status.statusCode === 'pending'` with no entry points. `settleConference` re-reads the event **once** in that case. Once rather than a poll loop — the pending window is short and an MCP tool call is the wrong place to block; a conference still pending after the re-read is reported as pending rather than hidden.
+- Reusing an existing meeting code is gated behind `confirm: true` while `addMeet` is not. This is not symmetric caution: Google's guidance is that a reused conference keeps its access bound to the *original* event's guest list, so participants of that event may reach the new meeting's recordings and chat. That is a data-exposure consequence, which is the same bar the send and share gates use. A freshly created conference carries nothing with it and needs no gate.
+- Meeting codes are validated against Meet's `xxx-xxxx-xxx` shape before any API call. Passing a typo through produces an event whose join button leads nowhere, which is strictly worse than a rejected call.
+
+### Calendar updates use `events.patch`, not `events.update` (v0.9.0)
+**Decision:** `CalendarClient.updateEvent` sends `events.patch` with only the fields the caller changed.
+
+**Rationale:**
+- `events.update` is full replacement, so the previous implementation had to `events.get` the whole event and echo every field back. That silently rewrote fields this server does not model — including any added to the Calendar API after the code was written — and cost an extra read per update.
+- It is also what makes `conferenceDataVersion: 1` safe on this path. Google warns that enabling conference-data support on modifications "may inadvertently remove existing conferences from users' events" when the client does not hold the full event state; a get-then-replace is exactly that shape. Do not reintroduce it.
+- `sendUpdates` is now unconditionally `'all'`. Google notifies guests, and an event with no guests has nobody to notify, so this needs no attendee lookup — and a time change on a meeting with guests now always reaches them. The tool layer still reads the event when it needs an attendee *count* for the confirm gate, which is a separate concern from what the API call sends.

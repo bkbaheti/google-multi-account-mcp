@@ -107,6 +107,7 @@ calendar:write (Write calendar)
 ### Google Calendar (10 tools)
 - calendar_list_calendars, calendar_list_events, calendar_get_event, calendar_search_events, calendar_freebusy
 - calendar_create_event, calendar_update_event, calendar_delete_event, calendar_rsvp, calendar_move_event
+- Google Meet: calendar_create_event and calendar_update_event accept addMeet (new conference) or meetingCode (attach an existing one, requires confirm); calendar_update_event also accepts removeConferencing
 
 ## Links
 

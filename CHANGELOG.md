@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.9.0 (September 2026)
+
+Calendar events can carry a Google Meet link — and reading an event finally shows the one it already has.
+
+- **fix:** `calendar_get_event`, `calendar_list_events` and `calendar_search_events` return `hangoutLink` and `conferenceData` (solution, `conferenceId`, `entryPoints[]` with video and phone details, and the create-request `status`). Google returned all of it; `convertCalendarEvent` whitelisted 15 fields and conference data was not among them, so an event created in the Calendar UI *with* a Meet link came back through this server with no join URL at all. Same shape as the v0.8.0 header bug: a hand-maintained field list quietly losing data the API had already sent.
+- **feat:** `calendar_create_event` and `calendar_update_event` accept `addMeet: true`, which generates a new Google Meet conference and attaches it. Because Google creates conferences asynchronously, an insert that comes back `pending` is re-read once, so a caller who asked for a Meet link never receives an event without one.
+- **feat:** Both tools also accept `meetingCode` to attach an **existing** conference — a code (`abc-defg-hij`) or a `https://meet.google.com/...` URL — mirroring the Calendar UI's edit-the-meeting-ID affordance. It requires `confirm: true`: a reused conference keeps its access bound to the original event's guest list, so people from that event may reach this meeting's recordings and chat, and this event's guests may have to ask to join. `addMeet` needs no confirmation because a fresh conference carries nothing with it. Codes are validated before the call, since an unchecked typo produces an event whose join button leads nowhere.
+- **feat:** `calendar_update_event` accepts `removeConferencing: true` to drop the video conference from an event.
+- **feat:** `calendar_list_calendars` reports `canEdit` (derived from `accessRole`) so a shared calendar you can only read is distinguishable from one you can write to, plus `summaryOverride` — the user's own rename of a shared calendar, often the only name they recognise — and `selected`/`hidden`/`deleted`. It now paginates (`maxResults`, `pageToken`, `nextPageToken`) and takes `showHidden`/`showDeleted`; previously it passed no parameters and dropped `nextPageToken`, so an account subscribed to more than 100 calendars silently lost the tail.
+- **fix:** `calendar_update_event` sends `events.patch` instead of `events.update`. Update is full replacement, so every update read the whole event and echoed it back, silently rewriting fields this server does not model — including any added to the Calendar API since the code was written. It also removes a read per update. This is what makes `conferenceDataVersion: 1` safe here: Google warns that a full-body modification can wipe conferences the client failed to round-trip.
+- **BREAKING (library consumers only):** `CalendarClient.listCalendars()` returns `{ calendars, nextPageToken? }` rather than a bare array, and takes an options object. No MCP tool response shape changed for a caller reading `calendars`, but the tool result is now an object rather than an array.
+
+There is deliberately no way to request a *specific* new meeting code. Google's `createRequest` accepts only a `requestId` (an idempotency key) and a solution type; a chosen code is not offered by the API or by the Calendar UI. `meetingCode` attaches a code that already exists — it does not reserve one.
+
+Update notifications on `calendar_update_event` now always use `sendUpdates: 'all'`. Google notifies guests, and an event without guests has nobody to notify, so this needs no attendee lookup — and a change of time on a meeting with guests now always reaches them.
+
 ## v0.8.0 (September 2026)
 
 Reading a message no longer hides who else was on it.

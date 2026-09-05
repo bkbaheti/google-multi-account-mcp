@@ -68,13 +68,13 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `drive_update_permissions` - modify permissions (requires confirm: true)
 
 **Calendar:**
-- `calendar_list_calendars` - list all calendars
+- `calendar_list_calendars` - list all calendars (paginated; reports `accessRole` plus a derived `canEdit`, and `summaryOverride`/`selected`/`hidden`/`deleted`)
 - `calendar_list_events` - list events in time range
 - `calendar_get_event` - get event details
 - `calendar_search_events` - search events by text
 - `calendar_freebusy` - check free/busy status
-- `calendar_create_event` - create event (confirm if attendees)
-- `calendar_update_event` - update event (confirm if attendees)
+- `calendar_create_event` - create event (confirm if attendees; `addMeet` for a new Google Meet link, `meetingCode` to attach an existing one)
+- `calendar_update_event` - update event (confirm if attendees; `addMeet`/`meetingCode`/`removeConferencing`)
 - `calendar_delete_event` - delete event (confirm if attendees)
 - `calendar_rsvp` - respond to invitation
 - `calendar_move_event` - move to different calendar
@@ -120,6 +120,19 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - Local-first stdio MCP server
 - Account isolation (tokens, cache, rate limits)
 - Draft-first + confirm gate for all sends
+- **Conferencing goes through `buildConferenceData`.** Google accepts conference data two
+  mutually exclusive ways, and the difference is not cosmetic: `createRequest` mints a
+  **new** conference (its only fields are `requestId` and `conferenceSolutionKey` — there is
+  no way to ask for a specific meeting code), while `conferenceSolution` + `entryPoints`
+  **attaches an existing** one. Both need `conferenceDataVersion: 1`; at version 0 Google
+  silently ignores conference data in the body. Reusing a meeting code leaves access bound
+  to the original event's guest list, which is why `meetingCode` sits behind a confirm gate
+  and `addMeet` does not.
+- **`events.patch`, never `events.update`.** Update is full replacement, so it rewrites
+  every field of the event including ones this server does not model. That was survivable
+  only while `conferenceDataVersion` defaulted to 0; with version 1 a full-body update wipes
+  conferences it failed to round-trip. Google warns about exactly this shape. Do not
+  reintroduce the get-then-replace pattern in `updateEvent`.
 - **One header list.** `MESSAGE_HEADER_FIELDS` in `src/server/gmail-tools.ts` is the single
   definition of which headers a message response surfaces, used by `gmail_get_message`,
   `gmail_get_messages_batch`, `gmail_get_thread` and `gmail_get_draft`. Each of those four

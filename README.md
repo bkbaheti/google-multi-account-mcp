@@ -468,6 +468,8 @@ These prompts guide Claude through complex workflows:
 
 **Google Calendar:**
 - `calendar_list_calendars`, `calendar_list_events`, `calendar_get_event`, `calendar_search_events`, `calendar_freebusy`, `calendar_create_event`, `calendar_update_event`, `calendar_delete_event`, `calendar_rsvp`, `calendar_move_event`
+  - `calendar_list_calendars` reports `accessRole` and a derived `canEdit` per calendar, so a shared calendar you can only read is distinguishable from one you can write to.
+  - `calendar_create_event` and `calendar_update_event` take `addMeet: true` to generate a Google Meet link. `meetingCode` attaches an **existing** conference instead (a code or a `https://meet.google.com/...` URL) and needs `confirm: true`, because a reused conference keeps its access bound to the original event's guest list. `calendar_update_event` also takes `removeConferencing: true`.
 
 **MCP Prompts:**
 - `compose-email`, `reply-to-email`, `review-drafts`, `summarize-thread`, `smart-reply`, `extract-action-items`, `categorize-emails`
