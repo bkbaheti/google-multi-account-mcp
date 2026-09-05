@@ -1,10 +1,16 @@
 export {
+  buildConferenceData,
   CalendarClient,
   type CalendarEvent,
   type CalendarInfo,
+  type CalendarList,
+  type ConferenceData,
+  type ConferenceEntryPoint,
+  type ConferencingRequest,
   type EventAttendee,
   type EventDateTime,
   type EventInput,
   type EventList,
   type FreeBusyResult,
+  normalizeMeetingCode,
 } from './client.js';

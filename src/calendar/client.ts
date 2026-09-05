@@ -1,15 +1,36 @@
+import { randomUUID } from 'node:crypto';
 import { type calendar_v3, google } from 'googleapis';
 import type { AccountStore } from '../auth/index.js';
 
 export interface CalendarInfo {
   id: string;
   summary: string;
+  /** The user's own rename of a shared calendar — often the only name they recognise. */
+  summaryOverride?: string;
   description?: string;
   timeZone?: string;
   primary?: boolean;
+  /** Raw Google role: 'owner' | 'writer' | 'reader' | 'freeBusyReader'. */
   accessRole?: string;
+  /**
+   * Whether events can be created or changed on this calendar. Derived from accessRole,
+   * and kept alongside it rather than replacing it: `canEdit` cannot distinguish a
+   * `reader` (sees event details) from a `freeBusyReader` (sees only busy blocks).
+   */
+  canEdit?: boolean;
   backgroundColor?: string;
+  selected?: boolean;
+  hidden?: boolean;
+  deleted?: boolean;
 }
+
+export interface CalendarList {
+  calendars: CalendarInfo[];
+  nextPageToken?: string;
+}
+
+/** Roles that permit writing events. Google's other roles are 'reader' and 'freeBusyReader'. */
+const EDITABLE_ACCESS_ROLES = new Set(['owner', 'writer']);
 
 export interface CalendarEvent {
   id: string;
@@ -27,6 +48,36 @@ export interface CalendarEvent {
   htmlLink?: string;
   created?: string;
   updated?: string;
+  hangoutLink?: string;
+  conferenceData?: ConferenceData;
+}
+
+/**
+ * A conference attached to an event (Google Meet, or a third-party solution added
+ * through a Calendar add-on).
+ *
+ * `status` is worth surfacing rather than hiding: Google creates conferences
+ * asynchronously, so a freshly created event can legitimately come back with a
+ * `pending` conference and no `entryPoints` yet.
+ */
+export interface ConferenceData {
+  conferenceId?: string;
+  conferenceSolution?: { name?: string; type?: string; iconUri?: string };
+  entryPoints?: ConferenceEntryPoint[];
+  status?: string;
+  notes?: string;
+}
+
+export interface ConferenceEntryPoint {
+  entryPointType?: string; // 'video' | 'phone' | 'sip' | 'more'
+  uri?: string;
+  label?: string;
+  pin?: string;
+  meetingCode?: string;
+  accessCode?: string;
+  passcode?: string;
+  password?: string;
+  regionCode?: string;
 }
 
 export interface EventDateTime {
@@ -61,6 +112,115 @@ export interface EventInput {
   attendees?: Array<{ email: string }>;
   recurrence?: string[];
   timeZone?: string;
+  conferencing?: ConferencingRequest;
+}
+
+/**
+ * How an event should be conferenced.
+ *
+ * The two variants map to the two mutually exclusive ways Google accepts conference
+ * data — the reference states "Either conferenceSolution and at least one entryPoint,
+ * or createRequest is required":
+ *
+ * - `googleMeet` sends a `createRequest`, which mints a NEW conference. There is no
+ *   field for a desired meeting code; you cannot ask Google for a specific one.
+ * - `existing` sends `conferenceSolution` + `entryPoints`, which ATTACHES an
+ *   already-existing conference. This is the documented "copy conferenceData from one
+ *   event to another" path and the API equivalent of the Calendar UI's
+ *   paste-a-meeting-ID pencil. Access stays bound to the original event's guest list,
+ *   which is why the tool layer gates it behind an explicit confirm.
+ * - `none` clears any conference on the event.
+ */
+export type ConferencingRequest =
+  | { type: 'googleMeet' }
+  | { type: 'existing'; meetingCode: string }
+  | { type: 'none' };
+
+/** Meet meeting codes are three-four-three lowercase letters, e.g. `abc-defg-hij`. */
+const MEET_CODE_PATTERN = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+
+/**
+ * Accepts a full Meet URL or a bare meeting code and returns the normalised code.
+ *
+ * Validated rather than passed through: an unchecked typo produces an event whose join
+ * button leads nowhere, which is a worse outcome than a rejected call.
+ */
+export function normalizeMeetingCode(input: string): string {
+  const trimmed = input.trim();
+  const fromUrl = trimmed.match(/^https?:\/\/meet\.google\.com\/([^?#/]+)/i);
+  const code = (fromUrl?.[1] ?? trimmed).toLowerCase();
+
+  if (!MEET_CODE_PATTERN.test(code)) {
+    throw new Error(
+      `Invalid Google Meet meeting code: "${input}". Expected a code like "abc-defg-hij" or a https://meet.google.com/... URL.`,
+    );
+  }
+
+  return code;
+}
+
+/**
+ * Writes a conferencing request onto an event body.
+ *
+ * Clearing a conference is an explicit `null`, which the generated googleapis types do not
+ * model (`conferenceData?: Schema$ConferenceData`, no null), hence the narrow cast.
+ */
+function applyConferenceData(
+  requestBody: calendar_v3.Schema$Event,
+  request: ConferencingRequest,
+): void {
+  const conferenceData = buildConferenceData(request);
+
+  if (conferenceData === null) {
+    (requestBody as { conferenceData?: unknown }).conferenceData = null;
+    return;
+  }
+
+  requestBody.conferenceData = conferenceData;
+}
+
+/**
+ * Translates a conferencing request into Google's `conferenceData` body.
+ *
+ * Returns `null` for `none`, which is how a conference is cleared — the caller sends that
+ * null through, together with `conferenceDataVersion: 1`.
+ */
+export function buildConferenceData(
+  request: ConferencingRequest,
+): calendar_v3.Schema$ConferenceData | null {
+  switch (request.type) {
+    case 'none':
+      return null;
+
+    case 'googleMeet':
+      // createRequest mints a NEW conference. requestId is an idempotency key, not a
+      // meeting code — Google offers no way to request a specific code.
+      return {
+        createRequest: {
+          requestId: randomUUID(),
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      };
+
+    case 'existing': {
+      const code = normalizeMeetingCode(request.meetingCode);
+
+      // The "copy conferenceData between events" shape: conferenceSolution plus at least
+      // one entryPoint, and deliberately no createRequest. `meetingCode` is the only one
+      // of {meetingCode, accessCode, passcode, password, pin} that matches Meet's
+      // terminology, and Google asks that only the matching subset be populated.
+      return {
+        conferenceSolution: { key: { type: 'hangoutsMeet' } },
+        entryPoints: [
+          {
+            entryPointType: 'video',
+            uri: `https://meet.google.com/${code}`,
+            meetingCode: code,
+          },
+        ],
+      };
+    }
+  }
 }
 
 export class CalendarClient {
@@ -83,12 +243,44 @@ export class CalendarClient {
 
   // === Read methods ===
 
-  async listCalendars(): Promise<CalendarInfo[]> {
+  async listCalendars(
+    options: {
+      maxResults?: number;
+      pageToken?: string;
+      showHidden?: boolean;
+      showDeleted?: boolean;
+    } = {},
+  ): Promise<CalendarList> {
     const calendar = await this.getCalendar();
 
-    const response = await calendar.calendarList.list();
+    // Google caps a page at 250 and defaults to 100. The previous implementation passed
+    // nothing and dropped nextPageToken, so an account with more than 100 calendars
+    // silently lost the tail.
+    const params: calendar_v3.Params$Resource$Calendarlist$List = {};
+    if (options.maxResults !== undefined) {
+      params.maxResults = Math.min(Math.max(options.maxResults, 1), 250);
+    }
+    if (options.pageToken !== undefined) {
+      params.pageToken = options.pageToken;
+    }
+    if (options.showHidden !== undefined) {
+      params.showHidden = options.showHidden;
+    }
+    if (options.showDeleted !== undefined) {
+      params.showDeleted = options.showDeleted;
+    }
 
-    return (response.data.items ?? []).map((c) => this.convertCalendarInfo(c));
+    const response = await calendar.calendarList.list(params);
+
+    const result: CalendarList = {
+      calendars: (response.data.items ?? []).map((c) => this.convertCalendarInfo(c)),
+    };
+
+    if (response.data.nextPageToken) {
+      result.nextPageToken = response.data.nextPageToken;
+    }
+
+    return result;
   }
 
   async listEvents(
@@ -232,6 +424,7 @@ export class CalendarClient {
 
   async createEvent(input: EventInput, calendarId?: string): Promise<CalendarEvent> {
     const calendar = await this.getCalendar();
+    const calId = calendarId ?? 'primary';
 
     const requestBody: calendar_v3.Schema$Event = {
       summary: input.summary,
@@ -252,17 +445,72 @@ export class CalendarClient {
       requestBody.recurrence = input.recurrence;
     }
 
+    const conferencing = input.conferencing;
+    if (conferencing) {
+      applyConferenceData(requestBody, conferencing);
+    }
+
     const hasAttendees = input.attendees && input.attendees.length > 0;
 
-    const response = await calendar.events.insert({
-      calendarId: calendarId ?? 'primary',
+    const params: calendar_v3.Params$Resource$Events$Insert = {
+      calendarId: calId,
       requestBody,
       sendUpdates: hasAttendees ? 'all' : 'none',
-    });
+    };
+    // Only sent when conferencing was actually requested. Google ignores body conference
+    // data at version 0, so sending version 1 unconditionally would make our request body
+    // authoritative over conference data we do not model.
+    if (conferencing) {
+      params.conferenceDataVersion = 1;
+    }
 
-    return this.convertCalendarEvent(response.data);
+    const response = await calendar.events.insert(params);
+
+    return this.convertCalendarEvent(
+      await this.settleConference(response.data, calId, conferencing),
+    );
   }
 
+  /**
+   * Google creates conferences asynchronously, so an insert that requested one can return
+   * with `status.statusCode === 'pending'` and no entry points. Re-read the event once so
+   * a caller who asked for a Meet link does not get an event without one.
+   *
+   * Once, not a poll loop: the pending window is short, and an MCP tool call is the wrong
+   * place to block. A conference still pending after the re-read comes back with its
+   * status intact, which is honest about what happened.
+   */
+  private async settleConference(
+    event: calendar_v3.Schema$Event,
+    calendarId: string,
+    conferencing: ConferencingRequest | undefined,
+  ): Promise<calendar_v3.Schema$Event> {
+    if (conferencing?.type !== 'googleMeet') {
+      return event;
+    }
+    if (event.conferenceData?.createRequest?.status?.statusCode !== 'pending') {
+      return event;
+    }
+    if (!event.id) {
+      return event;
+    }
+
+    const calendar = await this.getCalendar();
+    const refreshed = await calendar.events.get({ calendarId, eventId: event.id });
+
+    return refreshed.data;
+  }
+
+  /**
+   * Patches an event.
+   *
+   * `events.patch`, not `events.update`: update is full replacement, so the previous
+   * implementation had to read the whole event and echo every field back — silently
+   * rewriting fields this server does not model, including any added to the Calendar API
+   * since this code was written. Patch also removes the extra read, and it is what makes
+   * `conferenceDataVersion: 1` safe here: with a full-body update, any conference data we
+   * failed to round-trip would be authoritative and would wipe the event's conference.
+   */
   async updateEvent(
     eventId: string,
     updates: Partial<EventInput>,
@@ -271,13 +519,7 @@ export class CalendarClient {
     const calendar = await this.getCalendar();
     const calId = calendarId ?? 'primary';
 
-    // Get existing event first
-    const existing = await calendar.events.get({
-      calendarId: calId,
-      eventId,
-    });
-
-    const requestBody: calendar_v3.Schema$Event = { ...existing.data };
+    const requestBody: calendar_v3.Schema$Event = {};
 
     if (updates.summary !== undefined) {
       requestBody.summary = updates.summary;
@@ -301,18 +543,30 @@ export class CalendarClient {
       requestBody.recurrence = updates.recurrence;
     }
 
-    const hasAttendees =
-      (requestBody.attendees && requestBody.attendees.length > 0) ||
-      (updates.attendees && updates.attendees.length > 0);
+    const conferencing = updates.conferencing;
+    if (conferencing) {
+      applyConferenceData(requestBody, conferencing);
+    }
 
-    const response = await calendar.events.update({
+    const params: calendar_v3.Params$Resource$Events$Patch = {
       calendarId: calId,
       eventId,
       requestBody,
-      sendUpdates: hasAttendees ? 'all' : 'none',
-    });
+      // 'all' unconditionally: Google notifies guests, and an event with no guests has
+      // nobody to notify, so this needs no attendee lookup. The previous code read the
+      // event first purely to decide this, and a change of time on a meeting with guests
+      // must reach them.
+      sendUpdates: 'all',
+    };
+    if (conferencing) {
+      params.conferenceDataVersion = 1;
+    }
 
-    return this.convertCalendarEvent(response.data);
+    const response = await calendar.events.patch(params);
+
+    return this.convertCalendarEvent(
+      await this.settleConference(response.data, calId, conferencing),
+    );
   }
 
   async deleteEvent(
@@ -414,11 +668,24 @@ export class CalendarClient {
     if (c.primary !== undefined && c.primary !== null) {
       result.primary = c.primary;
     }
+    if (c.summaryOverride) {
+      result.summaryOverride = c.summaryOverride;
+    }
     if (c.accessRole) {
       result.accessRole = c.accessRole;
+      result.canEdit = EDITABLE_ACCESS_ROLES.has(c.accessRole);
     }
     if (c.backgroundColor) {
       result.backgroundColor = c.backgroundColor;
+    }
+    if (c.selected !== undefined && c.selected !== null) {
+      result.selected = c.selected;
+    }
+    if (c.hidden !== undefined && c.hidden !== null) {
+      result.hidden = c.hidden;
+    }
+    if (c.deleted !== undefined && c.deleted !== null) {
+      result.deleted = c.deleted;
     }
 
     return result;
@@ -484,6 +751,80 @@ export class CalendarClient {
     }
     if (e.updated) {
       result.updated = e.updated;
+    }
+    if (e.hangoutLink) {
+      result.hangoutLink = e.hangoutLink;
+    }
+    if (e.conferenceData) {
+      result.conferenceData = this.convertConferenceData(e.conferenceData);
+    }
+
+    return result;
+  }
+
+  private convertConferenceData(c: calendar_v3.Schema$ConferenceData): ConferenceData {
+    const result: ConferenceData = {};
+
+    if (c.conferenceId) {
+      result.conferenceId = c.conferenceId;
+    }
+    if (c.conferenceSolution) {
+      const solution: { name?: string; type?: string; iconUri?: string } = {};
+      if (c.conferenceSolution.name) {
+        solution.name = c.conferenceSolution.name;
+      }
+      if (c.conferenceSolution.key?.type) {
+        solution.type = c.conferenceSolution.key.type;
+      }
+      if (c.conferenceSolution.iconUri) {
+        solution.iconUri = c.conferenceSolution.iconUri;
+      }
+      result.conferenceSolution = solution;
+    }
+    if (c.entryPoints && c.entryPoints.length > 0) {
+      result.entryPoints = c.entryPoints.map((ep) => this.convertEntryPoint(ep));
+    }
+    // A conference created in the same request is asynchronous: the status distinguishes
+    // "no link yet, ask again" from "this conference has no video entry point".
+    if (c.createRequest?.status?.statusCode) {
+      result.status = c.createRequest.status.statusCode;
+    }
+    if (c.notes) {
+      result.notes = c.notes;
+    }
+
+    return result;
+  }
+
+  private convertEntryPoint(ep: calendar_v3.Schema$EntryPoint): ConferenceEntryPoint {
+    const result: ConferenceEntryPoint = {};
+
+    if (ep.entryPointType) {
+      result.entryPointType = ep.entryPointType;
+    }
+    if (ep.uri) {
+      result.uri = ep.uri;
+    }
+    if (ep.label) {
+      result.label = ep.label;
+    }
+    if (ep.pin) {
+      result.pin = ep.pin;
+    }
+    if (ep.meetingCode) {
+      result.meetingCode = ep.meetingCode;
+    }
+    if (ep.accessCode) {
+      result.accessCode = ep.accessCode;
+    }
+    if (ep.passcode) {
+      result.passcode = ep.passcode;
+    }
+    if (ep.password) {
+      result.password = ep.password;
+    }
+    if (ep.regionCode) {
+      result.regionCode = ep.regionCode;
     }
 
     return result;

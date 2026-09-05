@@ -2,12 +2,13 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Capability, CapabilityGate } from '../auth/capabilities.js';
 import type { AccountStore } from '../auth/index.js';
-import { CalendarClient } from '../calendar/index.js';
+import { CalendarClient, type ConferencingRequest } from '../calendar/index.js';
 import {
   confirmationRequired,
   errorResponse,
   successResponse,
   toMcpError,
+  validationError,
 } from '../errors/index.js';
 import { coerceArgs } from '../utils/index.js';
 
@@ -26,6 +27,54 @@ const CALENDAR_READ_OR_WRITE_GATE: CapabilityGate = {
   remedy: 'calendar:read',
 };
 
+/**
+ * Why attaching an existing meeting code needs a confirm gate.
+ *
+ * Google's own guidance: permissions and access stay tied to the ORIGINAL event's guest
+ * list, so participants of that event may reach this meeting's recordings and chat, and
+ * this event's new guests may have to ask to join. That is a data-exposure consequence
+ * the caller should see stated before it happens, in the same spirit as the send and
+ * share gates elsewhere in this server.
+ */
+const MEETING_CODE_REUSE_WARNING =
+  "Reusing an existing meeting code keeps the conference's access bound to the original event's guest list: people from that event may reach this meeting's recordings and chat, and guests of this event may have to request to join. Set confirm: true to proceed.";
+
+/**
+ * Resolves the three mutually exclusive conferencing inputs into one request.
+ *
+ * Mutually exclusive by design: silently letting one win would leave a caller who asked
+ * for both with an event they did not describe.
+ */
+export function resolveConferencing(args: {
+  addMeet?: boolean | undefined;
+  meetingCode?: string | undefined;
+  removeConferencing?: boolean | undefined;
+}): ConferencingRequest | undefined | { error: string } {
+  const requested = [
+    args.addMeet ? 'addMeet' : null,
+    args.meetingCode ? 'meetingCode' : null,
+    args.removeConferencing ? 'removeConferencing' : null,
+  ].filter((v): v is string => v !== null);
+
+  if (requested.length > 1) {
+    return {
+      error: `Only one conferencing option may be set, but ${requested.join(' and ')} were given.`,
+    };
+  }
+
+  if (args.addMeet) {
+    return { type: 'googleMeet' };
+  }
+  if (args.meetingCode) {
+    return { type: 'existing', meetingCode: args.meetingCode };
+  }
+  if (args.removeConferencing) {
+    return { type: 'none' };
+  }
+
+  return undefined;
+}
+
 export function registerCalendarTools(
   server: McpServer,
   accountStore: AccountStore,
@@ -40,20 +89,51 @@ export function registerCalendarTools(
   server.registerTool(
     'calendar_list_calendars',
     {
-      description: 'List all calendars for a Google account (primary, shared, subscribed).',
+      description:
+        'List all calendars for a Google account (primary, shared, subscribed). Each entry reports accessRole ("owner", "writer", "reader", "freeBusyReader") and a derived canEdit flag saying whether events can be created or changed on it.',
       inputSchema: {
         accountId: z.string().describe('The Google account ID, alias, or email'),
+        maxResults: z
+          .number()
+          .optional()
+          .describe('Calendars per page (Google defaults to 100, maximum 250)'),
+        pageToken: z.string().optional().describe('Token for pagination'),
+        showHidden: z.boolean().optional().describe('Include calendars hidden in the Calendar UI'),
+        showDeleted: z.boolean().optional().describe('Include deleted calendar list entries'),
       },
     },
-    async (args) => {
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, {
+        maxResults: 'number',
+        showHidden: 'boolean',
+        showDeleted: 'boolean',
+      });
       const validation = validateAccountScope(args.accountId, 'calendar:read');
       if ('error' in validation) return validation.error;
 
       try {
         const client = new CalendarClient(accountStore, args.accountId);
-        const calendars = await client.listCalendars();
+        const options: {
+          maxResults?: number;
+          pageToken?: string;
+          showHidden?: boolean;
+          showDeleted?: boolean;
+        } = {};
+        if (args.maxResults !== undefined) {
+          options.maxResults = args.maxResults;
+        }
+        if (args.pageToken !== undefined) {
+          options.pageToken = args.pageToken;
+        }
+        if (args.showHidden !== undefined) {
+          options.showHidden = args.showHidden;
+        }
+        if (args.showDeleted !== undefined) {
+          options.showDeleted = args.showDeleted;
+        }
+        const result = await client.listCalendars(options);
 
-        return successResponse(calendars);
+        return successResponse(result);
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -274,25 +354,51 @@ export function registerCalendarTools(
           .array(z.string())
           .optional()
           .describe('Recurrence rules (e.g., ["RRULE:FREQ=WEEKLY;COUNT=10"])'),
+        addMeet: z
+          .boolean()
+          .optional()
+          .describe('Generate a new Google Meet conference and attach it to the event'),
+        meetingCode: z
+          .string()
+          .optional()
+          .describe(
+            'Attach an EXISTING Google Meet conference instead of generating one. Accepts a code ("abc-defg-hij") or a https://meet.google.com/... URL. Requires confirm: true — access stays tied to the original event\'s guest list. Cannot be combined with addMeet.',
+          ),
         confirm: z
           .boolean()
           .optional()
-          .describe('Set to true to confirm creating event with attendees (sends invitations)'),
+          .describe(
+            'Set to true to confirm creating an event with attendees (sends invitations) or reusing an existing meeting code',
+          ),
       },
     },
     async (rawArgs) => {
-      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
+      const args = coerceArgs(rawArgs, { confirm: 'boolean', addMeet: 'boolean' });
       const validation = validateAccountScope(args.accountId, 'calendar:write');
       if ('error' in validation) return validation.error;
 
-      // Conditional confirm gate: only if attendees present
+      const conferencing = resolveConferencing(args);
+      if (conferencing && 'error' in conferencing) {
+        return errorResponse(validationError(conferencing.error, 'conferencing').toResponse());
+      }
+
+      // Conditional confirm gate: attendees get invited, and a reused meeting code carries
+      // the original event's access with it. Both consequences are reported together so a
+      // caller sees everything one confirm authorises.
       const hasAttendees = args.attendees && args.attendees.length > 0;
-      if (hasAttendees && !args.confirm) {
+      if ((hasAttendees || args.meetingCode) && !args.confirm) {
+        const operations: string[] = [];
+        const hints: string[] = [];
+        if (hasAttendees) {
+          operations.push(`create event with ${args.attendees!.length} attendee(s)`);
+          hints.push('This will send calendar invitations.');
+        }
+        if (args.meetingCode) {
+          operations.push('attach an existing meeting code');
+          hints.push(MEETING_CODE_REUSE_WARNING);
+        }
         return errorResponse(
-          confirmationRequired(
-            `create event with ${args.attendees!.length} attendee(s)`,
-            'This will send calendar invitations. Set confirm: true to proceed.',
-          ).toResponse(),
+          confirmationRequired(operations.join(' and '), hints.join(' ')).toResponse(),
         );
       }
 
@@ -312,6 +418,7 @@ export function registerCalendarTools(
           attendees?: Array<{ email: string }>;
           recurrence?: string[];
           timeZone?: string;
+          conferencing?: ConferencingRequest;
         } = {
           summary: args.summary,
           start: isAllDayStart
@@ -339,6 +446,9 @@ export function registerCalendarTools(
         }
         if (args.timeZone !== undefined) {
           input.timeZone = args.timeZone;
+        }
+        if (conferencing !== undefined) {
+          input.conferencing = conferencing;
         }
 
         const event = await client.createEvent(input, args.calendarId);
@@ -376,16 +486,41 @@ export function registerCalendarTools(
           .describe('New attendee email addresses (replaces existing attendees)'),
         timeZone: z.string().optional().describe('Time zone (e.g., "America/New_York")'),
         calendarId: z.string().optional().describe('Calendar ID (default: "primary")'),
+        addMeet: z
+          .boolean()
+          .optional()
+          .describe('Generate a new Google Meet conference and attach it to the event'),
+        meetingCode: z
+          .string()
+          .optional()
+          .describe(
+            'Attach an EXISTING Google Meet conference. Accepts a code ("abc-defg-hij") or a https://meet.google.com/... URL. Requires confirm: true — access stays tied to the original event\'s guest list. Cannot be combined with addMeet or removeConferencing.',
+          ),
+        removeConferencing: z
+          .boolean()
+          .optional()
+          .describe('Remove the video conference currently attached to the event'),
         confirm: z
           .boolean()
           .optional()
-          .describe('Set to true to confirm updating event with attendees (sends notifications)'),
+          .describe(
+            'Set to true to confirm updating an event with attendees (sends notifications) or reusing an existing meeting code',
+          ),
       },
     },
     async (rawArgs) => {
-      const args = coerceArgs(rawArgs, { confirm: 'boolean' });
+      const args = coerceArgs(rawArgs, {
+        confirm: 'boolean',
+        addMeet: 'boolean',
+        removeConferencing: 'boolean',
+      });
       const validation = validateAccountScope(args.accountId, 'calendar:write');
       if ('error' in validation) return validation.error;
+
+      const conferencing = resolveConferencing(args);
+      if (conferencing && 'error' in conferencing) {
+        return errorResponse(validationError(conferencing.error, 'conferencing').toResponse());
+      }
 
       try {
         const client = new CalendarClient(accountStore, args.accountId);
@@ -393,24 +528,35 @@ export function registerCalendarTools(
         // Check if new attendees are being added
         const addingAttendees = args.attendees && args.attendees.length > 0;
 
-        if (addingAttendees && !args.confirm) {
-          return errorResponse(
-            confirmationRequired(
-              `update event with ${args.attendees!.length} attendee(s)`,
-              'This will send calendar notifications to attendees. Set confirm: true to proceed.',
-            ).toResponse(),
-          );
-        }
+        if (!args.confirm) {
+          // Reasons this update needs confirming, collected so one gate reports everything
+          // a single confirm would authorise.
+          const operations: string[] = [];
+          const hints: string[] = [];
 
-        // If no new attendees, check if existing event has attendees
-        if (!addingAttendees && !args.confirm) {
-          const existingEvent = await client.getEvent(args.eventId, args.calendarId);
-          if (existingEvent.attendees && existingEvent.attendees.length > 0) {
-            return errorResponse(
-              confirmationRequired(
+          if (addingAttendees) {
+            operations.push(`update event with ${args.attendees!.length} attendee(s)`);
+            hints.push('This will send calendar notifications to attendees.');
+          } else {
+            // No new attendee list given, so the existing one decides whether anybody is
+            // notified. This read is the only reason the update path still fetches.
+            const existingEvent = await client.getEvent(args.eventId, args.calendarId);
+            if (existingEvent.attendees && existingEvent.attendees.length > 0) {
+              operations.push(
                 `update event with ${existingEvent.attendees.length} existing attendee(s)`,
-                'This event has attendees who will be notified of changes. Set confirm: true to proceed.',
-              ).toResponse(),
+              );
+              hints.push('This event has attendees who will be notified of changes.');
+            }
+          }
+
+          if (args.meetingCode) {
+            operations.push('attach an existing meeting code');
+            hints.push(MEETING_CODE_REUSE_WARNING);
+          }
+
+          if (operations.length > 0) {
+            return errorResponse(
+              confirmationRequired(operations.join(' and '), hints.join(' ')).toResponse(),
             );
           }
         }
@@ -425,6 +571,7 @@ export function registerCalendarTools(
           attendees?: Array<{ email: string }>;
           recurrence?: string[];
           timeZone?: string;
+          conferencing?: ConferencingRequest;
         } = {};
 
         if (args.summary !== undefined) {
@@ -457,6 +604,9 @@ export function registerCalendarTools(
         }
         if (args.timeZone !== undefined) {
           updates.timeZone = args.timeZone;
+        }
+        if (conferencing !== undefined) {
+          updates.conferencing = conferencing;
         }
 
         const event = await client.updateEvent(args.eventId, updates, args.calendarId);

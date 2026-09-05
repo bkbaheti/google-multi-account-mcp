@@ -1,5 +1,76 @@
 # Tasks
 
+## Google Meet conferencing + calendar discovery (COMPLETED — v0.9.0)
+
+Requirement doc: `docs/plans/2026-09-05-calendar-conferencing.md`.
+
+Asked as a question — can the API add a Meet link, can we target a specific calendar, does
+the calendar list say which ones are writable — and all three turned out to have a gap
+behind them.
+
+- [DONE] **Conference data was dropped on every read path.** `convertCalendarEvent`
+  whitelisted 15 fields; `hangoutLink` and `conferenceData` were not among them, so an
+  event created in the Calendar UI *with* a Meet link came back through this server with no
+  join URL. Google had returned it all along. Structurally identical to the v0.8.0 `Cc`
+  bug — a hand-maintained field list losing data the API already sent — and fixed the same
+  way, in the one converter every read tool funnels through
+- [DONE] `addMeet` on `calendar_create_event` / `calendar_update_event` → `createRequest`
+  with a `randomUUID()` requestId and `conferenceDataVersion: 1`. No new scope and no
+  reauth: `events.insert` accepts `calendar.events`, which `calendar:write` already requests
+- [DONE] `pending` conferences re-read once (`settleConference`), so a caller who asked for
+  Meet never gets an event without it. Conference creation is asynchronous; returning the
+  insert response verbatim would have looked like a broken feature intermittently
+- [DONE] `meetingCode` attaches an **existing** conference (code or `meet.google.com` URL),
+  the API equivalent of the UI's edit-the-meeting-ID pencil. Behind `confirm: true`: a
+  reused conference keeps its access bound to the original event's guest list, so people
+  from that event may reach this meeting's recordings and chat. `addMeet` is deliberately
+  ungated — a fresh conference carries nothing with it
+- [DONE] Codes validated against Meet's `xxx-xxxx-xxx` shape before any API call. A typo
+  passed through produces an event whose join button leads nowhere
+- [DONE] `addMeet` / `meetingCode` / `removeConferencing` are mutually exclusive and error
+  when combined, rather than resolving by silent precedence
+- [DONE] `removeConferencing` on `calendar_update_event` (`conferenceData: null`)
+- [DONE] **`updateEvent` switched from `events.update` to `events.patch`.** Update is full
+  replacement, so every update read the whole event and echoed it back, rewriting fields
+  this server does not model. It is also what made `conferenceDataVersion: 1` unsafe here —
+  Google warns a full-body modification can wipe conferences the client failed to
+  round-trip. `sendUpdates` is now unconditionally `'all'`, which needs no attendee lookup
+  (an event with no guests has nobody to notify) and means a time change always reaches
+  attendees
+- [DONE] `calendar_list_calendars` paginates (`maxResults` clamped to Google's 250,
+  `pageToken`, `nextPageToken`) — it previously passed no parameters and dropped the token,
+  so an account with more than 100 calendars silently lost the tail. Adds `canEdit` derived
+  from `accessRole`, `summaryOverride`, `selected`, `hidden`, `deleted`, and
+  `showHidden`/`showDeleted` passthrough
+- [DONE] 70 unit tests across three files: `calendar-conferencing.test.ts` (read path,
+  create, attach, patch), `calendar-calendars.test.ts` (pagination, `canEdit` per role),
+  `calendar-tools.test.ts` (the confirm gates and mutual exclusion, exercised through
+  registered tool handlers rather than only the client)
+
+**Not offered, deliberately:** requesting a *specific new* meeting code. `createRequest`
+takes only a `requestId` and a solution type; neither the API nor the Calendar UI can
+reserve a chosen code. `meetingCode` attaches one that already exists.
+
+**Verified against Google's per-method reference, not memory** — each of these is easy to
+get wrong in the opposite direction: `events.insert` accepts `calendar.events`;
+`conferenceDataVersion: 0` ignores body conference data entirely; `createRequest` and
+`conferenceSolution`+`entryPoints` are mutually exclusive alternatives; only `meetingCode`
+of `{meetingCode, accessCode, passcode, password, pin}` applies to Meet.
+
+**Follow-up — not yet done, and required before release.** Live verification against a real
+account. The docs mark `conferenceId`, `conferenceSolution` and `signature` read-only while
+simultaneously requiring `conferenceSolution` + `entryPoints` when attaching an existing
+conference; that contradiction is resolved only by a real call. Mocks establish nothing
+about what Google accepts, which is the standard the last three changes here were held to:
+1. Create an event with `addMeet` and read the join URL back
+2. Attach an existing code to an existing event and confirm Google accepts the copy shape
+3. Update an unrelated field on an event with a conference and confirm the conference survives
+4. Remove a conference
+
+**Identified, not scheduled:** resolving a calendar *name* to an ID inside the write tools,
+and pre-flighting `accessRole` before a write so a read-only calendar returns a clear error
+rather than Google's raw 403. Both cost an extra API call per write and want a cache first.
+
 ## Message headers dropped from every read path (COMPLETED — v0.8.0)
 
 Reported from another session: `gmail_get_message` and `gmail_get_thread` returned no `cc` at
