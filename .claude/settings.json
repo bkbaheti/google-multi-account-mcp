@@ -1,5 +1,16 @@
 {
   "enabledPlugins": {
     "frontend-design@claude-code-plugins": true
+  },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
+  "env": {
+    "GIT_AUTHOR_NAME": "Braj Baheti",
+    "GIT_AUTHOR_EMAIL": "bahetibraj@gmail.com",
+    "GIT_COMMITTER_NAME": "Braj Baheti",
+    "GIT_COMMITTER_EMAIL": "bahetibraj@gmail.com"
   }
 }
