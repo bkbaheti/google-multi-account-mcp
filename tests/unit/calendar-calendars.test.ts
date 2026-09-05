@@ -35,9 +35,13 @@ describe('CalendarClient — listCalendars', () => {
   });
 
   describe('access role', () => {
+    // All five roles Google documents on a CalendarList entry. writerWithoutPrivateAccess
+    // is the one that is easy to miss and the one whose omission fails silently: it grants
+    // write access, differing from writer only in that private event details stay hidden.
     it.each([
       ['owner', true],
       ['writer', true],
+      ['writerWithoutPrivateAccess', true],
       ['reader', false],
       ['freeBusyReader', false],
     ])('derives canEdit=%s for accessRole %s', async (accessRole, canEdit) => {
@@ -94,6 +98,14 @@ describe('CalendarClient — listCalendars', () => {
       await client.listCalendars({ maxResults: 5000 });
 
       expect(mockCalendarListList.mock.calls[0][0].maxResults).toBe(250);
+    });
+
+    it('rounds a fractional maxResults rather than forwarding it', async () => {
+      mockCalendarListList.mockResolvedValueOnce({ data: { items: [] } });
+
+      await client.listCalendars({ maxResults: 10.5 });
+
+      expect(mockCalendarListList.mock.calls[0][0].maxResults).toBe(11);
     });
 
     it('raises maxResults below 1 up to 1', async () => {

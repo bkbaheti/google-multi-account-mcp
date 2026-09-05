@@ -35,11 +35,25 @@ describe('resolveConferencing', () => {
     expect(resolveConferencing({ addMeet: true })).toEqual({ type: 'googleMeet' });
   });
 
-  it('maps meetingCode to an existing conference, passing the raw input through', () => {
-    expect(resolveConferencing({ meetingCode: 'abc-defg-hij' })).toEqual({
+  it('maps meetingCode to an existing conference, normalising the input', () => {
+    expect(resolveConferencing({ meetingCode: 'https://meet.google.com/ABC-DEFG-HIJ' })).toEqual({
       type: 'existing',
       meetingCode: 'abc-defg-hij',
     });
+  });
+
+  it('rejects a malformed meeting code here, rather than letting it reach the API', () => {
+    const result = resolveConferencing({ meetingCode: 'nonsense' });
+
+    expect(result).toHaveProperty('error');
+    expect((result as { error: string }).error).toMatch(/Invalid Google Meet meeting code/);
+  });
+
+  // An empty string is a code the caller meant to supply, not an absent option.
+  it('rejects an empty meeting code rather than ignoring it', () => {
+    const result = resolveConferencing({ meetingCode: '' });
+
+    expect(result).toHaveProperty('error');
   });
 
   it('maps removeConferencing to a clear', () => {
@@ -179,6 +193,16 @@ describe('calendar tool conferencing gates', () => {
       expect(result.isError).toBe(true);
       expect(text(result)).toMatch(/Only one conferencing option/);
       expect(mockEventsInsert).not.toHaveBeenCalled();
+    });
+
+    it('reports a malformed meeting code as a validation error against the field', async () => {
+      const result = await tool('calendar_create_event')({
+        ...BASE_CREATE,
+        meetingCode: 'nonsense',
+        confirm: true,
+      });
+
+      expect(payload(result)).toMatchObject({ code: 'VALIDATION_ERROR' });
     });
 
     it('surfaces a malformed meeting code as an error, not a dead join link', async () => {
