@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://multiaccountgooglemcp.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.8.0",
+    "softwareVersion": "0.9.0",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -236,8 +236,22 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.8.0</span>
+            <span class="release-version">v0.9.0</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">September 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type fix">fix</span><span class="change-text">Calendar events now come back with their video call attached. <code>calendar_get_event</code>, <code>calendar_list_events</code> and <code>calendar_search_events</code> return <code>hangoutLink</code> and the full conference details — the Meet URL, dial-in numbers and PIN. A meeting created in Google Calendar with a Meet link previously arrived through this server with no way to join it; Google had been sending the link all along</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Create meetings with a Google Meet link. Pass <code>addMeet: true</code> to <code>calendar_create_event</code> or <code>calendar_update_event</code> and a new conference is generated and attached. No re-authorisation needed — the existing calendar permission already covers it</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Attach an existing meeting code with <code>meetingCode</code>, taking either a code like <code>abc-defg-hij</code> or a full Meet URL — the same thing as editing the meeting ID in the Calendar UI. It asks for confirmation first, because a reused conference keeps its access tied to the original event's guest list: people from that meeting may reach this one's recordings and chat. <code>calendar_update_event</code> also takes <code>removeConferencing</code> to drop a call from an event</span></li>
+            <li><span class="change-type fix">fix</span><span class="change-text"><code>calendar_list_calendars</code> now says which calendars you can actually write to, with a <code>canEdit</code> flag alongside the raw access role — so a shared calendar you can only read is no longer indistinguishable from one you can schedule on. It also shows your own name for a shared calendar, and pages properly: accounts subscribed to more than 100 calendars were silently losing the rest</span></li>
+            <li><span class="change-type breaking">breaking</span><span class="change-text"><code>calendar_list_calendars</code> returns an object with a <code>calendars</code> array rather than a bare array, so that paging is possible. Anything reading the result directly as a list needs to read <code>.calendars</code> instead</span></li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.8.0</span>
             <span class="release-date">September 2026</span>
           </div>
           <ul class="release-changes">
