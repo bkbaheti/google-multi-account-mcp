@@ -135,22 +135,30 @@ function isColorOnlyUpdate(
     return false;
   }
 
-  const CHANGES_THE_EVENT = [
-    'summary',
-    'start',
-    'end',
-    'description',
-    'location',
-    'attendees',
-    'timeZone',
-    'recurrence',
-    'addMeet',
-    'meetingCode',
-    'removeConferencing',
-  ];
-
   return CHANGES_THE_EVENT.every((field) => args[field] === undefined);
 }
+
+/**
+ * Every `calendar_update_event` field a guest could notice.
+ *
+ * Exported so a test can pin it against the tool's own schema: this is a hand-maintained
+ * list guarding a safety gate, and a field added to the schema but not here would silently
+ * skip the confirm prompt. The only fields that legitimately stay off it are addressing
+ * (accountId, eventId, calendarId), confirm itself, and the colour options.
+ */
+export const CHANGES_THE_EVENT = [
+  'summary',
+  'start',
+  'end',
+  'description',
+  'location',
+  'attendees',
+  'timeZone',
+  'recurrence',
+  'addMeet',
+  'meetingCode',
+  'removeConferencing',
+];
 
 export function registerCalendarTools(
   server: McpServer,
@@ -627,13 +635,13 @@ export function registerCalendarTools(
           .string()
           .optional()
           .describe(
-            'New event colour: an id 1-11, or a Calendar colour name (Lavender, Sage, Grape, Flamingo, Banana, Tangerine, Peacock, Graphite, Blueberry, Basil, Tomato). A colour-only update notifies no attendees and needs no confirm. Use calendar_list_colors to see the palette.',
+            'New event colour: an id 1-11, or a Calendar colour name (Lavender, Sage, Grape, Flamingo, Banana, Tangerine, Peacock, Graphite, Blueberry, Basil, Tomato). A colour-only update notifies no attendees and needs no confirm. Recurrence matters: an instance id (what calendar_list_events and calendar_search_events return) colours that one occurrence, while the recurring event id colours the whole series. Use calendar_list_colors to see the palette.',
           ),
         resetColor: z
           .boolean()
           .optional()
           .describe(
-            "Reset the event to its calendar's default colour. Cannot be combined with colorId.",
+            "Reset the event to its calendar's default colour, following the same instance-vs-series rule as colorId. Cannot be combined with colorId.",
           ),
         confirm: z
           .boolean()

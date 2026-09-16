@@ -26,7 +26,11 @@ vi.mock('googleapis', () => ({
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AccountStore } from '../../src/auth/index.js';
-import { registerCalendarTools, resolveConferencing } from '../../src/server/calendar-tools.js';
+import {
+  CHANGES_THE_EVENT as colorOnlyExemptFields,
+  registerCalendarTools,
+  resolveConferencing,
+} from '../../src/server/calendar-tools.js';
 
 describe('resolveConferencing', () => {
   it('returns undefined when no conferencing option was given', () => {
@@ -455,5 +459,48 @@ describe('calendar tool colours', () => {
 
       expect(requiredFor('calendar_list_colors')).toBe('calendar:read');
     });
+  });
+});
+
+/**
+ * Pins the field list that decides whether an update may skip the attendee confirm gate.
+ *
+ * `isColorOnlyUpdate` asks whether anything *other* than colour changed, from a list
+ * maintained by hand. Add a field to the schema and forget the list, and a change a guest
+ * can see silently skips the confirmation prompt — the same hand-maintained-whitelist
+ * failure as the four copies of the Gmail header list and the dropped Cc.
+ */
+describe('calendar_update_event notification safety', () => {
+  // Fields that cannot change what a guest sees: addressing, the confirm itself, and the
+  // colour options whose whole point is that they are invisible to guests.
+  const NOT_A_VISIBLE_CHANGE = new Set([
+    'accountId',
+    'eventId',
+    'calendarId',
+    'confirm',
+    'colorId',
+    'resetColor',
+  ]);
+
+  it('treats every schema field as a guest-visible change unless it is explicitly exempt', () => {
+    const schemas = new Map<string, Record<string, unknown>>();
+    const server = {
+      registerTool: (name: string, def: { inputSchema: Record<string, unknown> }) => {
+        schemas.set(name, def.inputSchema);
+      },
+    } as unknown as McpServer;
+
+    registerCalendarTools(server, {} as unknown as AccountStore, () => ({
+      account: { id: 'acct-1' },
+    }));
+
+    const fields = Object.keys(schemas.get('calendar_update_event') ?? {});
+    expect(fields.length).toBeGreaterThan(0);
+
+    const unaccounted = fields.filter(
+      (field) => !NOT_A_VISIBLE_CHANGE.has(field) && !colorOnlyExemptFields.includes(field),
+    );
+
+    expect(unaccounted).toEqual([]);
   });
 });
