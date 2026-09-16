@@ -262,17 +262,33 @@ the site, and in the package description; it does not need a dist-tag. See
 
 After pushing a `v*` tag and seeing the workflow go green, you are not finished:
 
-1. **Verify what actually shipped**, rather than trusting the green check:
-   `npm view @procedure-tech/mcp-google version dist-tags` — `latest` must be the new
-   version, and must be the only tag listed.
+1. **Verify what actually shipped**, rather than trusting the green check — and read the
+   registry itself, **not** `npm view`:
+
+   ```
+   curl -s https://registry.npmjs.org/@procedure-tech/mcp-google \
+     | python3 -c "import json,sys; print(json.load(sys.stdin)['dist-tags'])"
+   ```
+
+   `latest` must be the new version, and must be the only tag listed. **`npm view` reads a
+   local metadata cache and will report the previous version long after the registry has
+   updated** — on the v0.10.0 release it still said `0.9.0` when the publish had already
+   succeeded, which makes a failed check ambiguous between "publish failed" and "not
+   surfaced yet". Expect a delay either way: npm's own publish log ends with *"Your package
+   is being processed and may take a few minutes to become available"*, and 0.10.0 took
+   ~90 seconds to appear. **Poll for a couple of minutes before concluding anything broke.**
 2. **Confirm the published build matches the tag**: `npm pack @procedure-tech/mcp-google@<version>`
-   and check `package/dist/build-info.json` — its `commit` must equal the tagged commit. A mismatch
-   means the build predates the version bump.
+   and check `package/dist/build-info.json` — its `commit` must equal the tagged commit
+   (`git rev-parse --short v<version>`). A mismatch means the build predates the version bump.
 3. **If the site content changed**, confirm the deploy landed:
    `curl -s https://multiaccountgooglemcp.procedure.tech/ | grep softwareVersion`
    Bump `site/index.html` (`softwareVersion` in the JSON-LD, and the release-notes block)
    *after* the npm tag is out, never before — the site auto-deploys from `master`, so an
    early bump advertises a version nobody can install.
+4. **Updating a local install right after a release needs `--prefer-online`**:
+   `npm i -g --prefer-online @procedure-tech/mcp-google@<version>`. Without it the same
+   stale metadata cache fails the install outright with
+   `notarget No matching version found`, for a version that is demonstrably published.
 
 ## Debugging "google_version returns an old version" (npx cache gotcha)
 
@@ -283,7 +299,9 @@ After pushing a `v*` tag and seeing the workflow go green, you are not finished:
 
 **Diagnosis steps when google_version is wrong:**
 
-1. Confirm the registry is current: `npm view @procedure-tech/mcp-google version dist-tags`.
+1. Confirm the registry is current — by curling the registry, not with `npm view`, which
+   reads a local cache and lies right after a release (see the release checklist above):
+   `curl -s https://registry.npmjs.org/@procedure-tech/mcp-google | python3 -c "import json,sys; print(json.load(sys.stdin)['dist-tags'])"`
 2. Verify the published tarball: `npm pack @procedure-tech/mcp-google@<version>` then inspect `package/dist/build-info.json` inside.
 3. Find what's actually running on the user's machine: `ps aux | grep mcp-google` — the path tells you which install is live.
 4. Inspect that install's `dist/build-info.json` directly.

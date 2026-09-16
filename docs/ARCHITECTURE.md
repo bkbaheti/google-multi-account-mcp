@@ -154,3 +154,11 @@ Decision: [TBD during Phase 2]
 - `CHANGES_THE_EVENT` — the tool-layer list deciding whether an update is colour-only — is exported and pinned by a test against `calendar_update_event`'s own `inputSchema`. It is a hand-maintained list guarding a safety gate, which is the exact shape of the bug this release fixes; without the pin, a field added to the schema and forgotten here would let a guest-visible change skip the confirm prompt.
 - Recurrence is the caller's choice of id, not a flag: an instance id (what `calendar_list_events` returns with `singleEvents: true`) colours one occurrence, the recurring event id colours the series. Both `colorId` descriptions say so.
 - Verified live against a real account before release, per the standard the last three calendar changes were held to: palette shape and names, create with a colour, colour on `events.get` and `events.list`, recolour, reset to default, and a colour surviving an unrelated patch.
+
+### Release verification reads the registry, not `npm view` (v0.10.0)
+**Decision:** `CLAUDE.md`'s release checklist and npx-cache playbook now verify a publish by curling `registry.npmjs.org` directly, and install locally with `npm i -g --prefer-online`.
+
+**Rationale:**
+- The checklist already said not to trust the workflow's green check. It turns out the prescribed replacement could not be trusted either: on the v0.10.0 release `npm view` reported `0.9.0` while the publish had demonstrably succeeded, because it reads a local metadata cache. A verification step that returns the old version on success is worse than none — it makes "publish failed" and "not surfaced yet" indistinguishable.
+- npm publishes asynchronously; its own log ends with *"Your package is being processed and may take a few minutes to become available."* 0.10.0 took ~90 seconds to appear in the registry. The checklist now says to poll rather than to conclude.
+- The same cache makes `npm i -g @pkg@<new version>` fail with `notarget No matching version found` for a version that is published, which is why the local-install step carries `--prefer-online`.
