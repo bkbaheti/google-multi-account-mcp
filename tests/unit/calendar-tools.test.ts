@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockEventsInsert = vi.fn();
 const mockEventsPatch = vi.fn();
 const mockEventsGet = vi.fn();
+const mockColorsGet = vi.fn();
 
 vi.mock('googleapis', () => ({
   google: {
     calendar: vi.fn(() => ({
       calendarList: { list: vi.fn() },
+      colors: { get: mockColorsGet },
       events: {
         list: vi.fn(),
         get: mockEventsGet,
@@ -278,6 +280,180 @@ describe('calendar tool conferencing gates', () => {
 
       expect(result.isError).toBe(true);
       expect(text(result)).toMatch(/Only one conferencing option/);
+    });
+  });
+});
+
+/**
+ * Registers the tools with a recording capability gate, so a tool's required capability can
+ * be asserted as well as its behaviour.
+ */
+function registerToolsRecordingGate(): {
+  tool: (name: string) => ToolHandler;
+  requiredFor: (name: string) => unknown;
+} {
+  const handlers = new Map<string, ToolHandler>();
+  const required = new Map<string, unknown>();
+  let current = '';
+
+  const server = {
+    registerTool: (name: string, _def: unknown, handler: ToolHandler) => {
+      handlers.set(name, async (args) => {
+        current = name;
+        return handler(args);
+      });
+    },
+  } as unknown as McpServer;
+
+  const accountStore = {
+    getAuthenticatedClient: vi.fn().mockResolvedValue({}),
+  } as unknown as AccountStore;
+
+  registerCalendarTools(server, accountStore, (_accountId, requiredCapability) => {
+    required.set(current, requiredCapability);
+    return { account: { id: 'acct-1' } };
+  });
+
+  return {
+    tool: (name) => {
+      const handler = handlers.get(name);
+      if (!handler) {
+        throw new Error(`Tool ${name} was never registered`);
+      }
+      return handler;
+    },
+    requiredFor: (name) => required.get(name),
+  };
+}
+
+describe('calendar tool colours', () => {
+  let tool: (name: string) => ToolHandler;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEventsInsert.mockResolvedValue({ data: { id: 'evt-1', colorId: '11' } });
+    mockEventsPatch.mockResolvedValue({ data: { id: 'evt-1', colorId: '11' } });
+    mockEventsGet.mockResolvedValue({ data: { id: 'evt-1' } });
+    mockColorsGet.mockResolvedValue({
+      data: {
+        updated: '2012-02-14T00:00:00.000Z',
+        event: { '11': { background: '#dc2127', foreground: '#1d1d1d' } },
+        calendar: { '3': { background: '#dc2127', foreground: '#1d1d1d' } },
+      },
+    });
+    tool = registerTools();
+  });
+
+  describe('calendar_create_event', () => {
+    it('passes a colour id through to the new event', async () => {
+      const result = await tool('calendar_create_event')({ ...BASE_CREATE, colorId: '11' });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockEventsInsert.mock.calls[0][0].requestBody.colorId).toBe('11');
+    });
+
+    it('accepts a Calendar colour name in place of an id', async () => {
+      const result = await tool('calendar_create_event')({ ...BASE_CREATE, colorId: 'Tomato' });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockEventsInsert.mock.calls[0][0].requestBody.colorId).toBe('11');
+    });
+
+    it('rejects an unusable colour before calling Google, naming what is valid', async () => {
+      const result = await tool('calendar_create_event')({ ...BASE_CREATE, colorId: '24' });
+
+      expect(result.isError).toBe(true);
+      expect(text(result)).toMatch(/Invalid event color/);
+      expect(text(result)).toMatch(/Tomato/);
+      expect(mockEventsInsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('calendar_update_event', () => {
+    const BASE_UPDATE = { accountId: 'acct-1', eventId: 'evt-1' };
+
+    it('recolours an event', async () => {
+      const result = await tool('calendar_update_event')({ ...BASE_UPDATE, colorId: 'Basil' });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockEventsPatch.mock.calls[0][0].requestBody.colorId).toBe('10');
+    });
+
+    it('resets an event to its calendar default', async () => {
+      const result = await tool('calendar_update_event')({ ...BASE_UPDATE, resetColor: true });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockEventsPatch.mock.calls[0][0].requestBody.colorId).toBeNull();
+    });
+
+    it('accepts resetColor as a string, as loosely-typed MCP clients send it', async () => {
+      const result = await tool('calendar_update_event')({ ...BASE_UPDATE, resetColor: 'true' });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockEventsPatch.mock.calls[0][0].requestBody.colorId).toBeNull();
+    });
+
+    it('rejects colorId and resetColor together rather than picking one', async () => {
+      const result = await tool('calendar_update_event')({
+        ...BASE_UPDATE,
+        colorId: '11',
+        resetColor: true,
+      });
+
+      expect(result.isError).toBe(true);
+      expect(text(result)).toMatch(/colorId and resetColor/);
+      expect(mockEventsPatch).not.toHaveBeenCalled();
+    });
+
+    // The attendee confirm gate exists because guests get mailed. A colour-only change
+    // mails nobody and is invisible in a guest's own copy, so gating it would make
+    // recolouring a run of meetings impossible without confirming each one.
+    it('recolours an event with attendees without asking for confirmation', async () => {
+      mockEventsGet.mockResolvedValue({
+        data: { id: 'evt-1', attendees: [{ email: 'a@example.test' }] },
+      });
+
+      const result = await tool('calendar_update_event')({ ...BASE_UPDATE, colorId: '11' });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockEventsPatch.mock.calls[0][0].sendUpdates).toBe('none');
+    });
+
+    it('still gates a colour change bundled with a real change to the event', async () => {
+      mockEventsGet.mockResolvedValue({
+        data: { id: 'evt-1', attendees: [{ email: 'a@example.test' }] },
+      });
+
+      const result = await tool('calendar_update_event')({
+        ...BASE_UPDATE,
+        colorId: '11',
+        summary: 'Renamed',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(payload(result)).toMatchObject({ code: 'CONFIRMATION_REQUIRED' });
+      expect(mockEventsPatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('calendar_list_colors', () => {
+    it('returns the palette with Calendar UI names for event colours', async () => {
+      const result = await tool('calendar_list_colors')({ accountId: 'acct-1' });
+
+      expect(result.isError).toBeFalsy();
+      expect(payload(result)).toMatchObject({
+        event: { '11': { background: '#dc2127', name: 'Tomato' } },
+      });
+    });
+
+    // colors.get accepts calendar and calendar.readonly but NOT calendar.events, so this
+    // cannot be offered under the read-or-write gate the other read tools use.
+    it('requires calendar:read, which is the only capability that satisfies colors.get', async () => {
+      const { tool: gatedTool, requiredFor } = registerToolsRecordingGate();
+
+      await gatedTool('calendar_list_colors')({ accountId: 'acct-1' });
+
+      expect(requiredFor('calendar_list_colors')).toBe('calendar:read');
     });
   });
 });

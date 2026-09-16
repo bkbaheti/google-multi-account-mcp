@@ -68,13 +68,14 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
 - `drive_update_permissions` - modify permissions (requires confirm: true)
 
 **Calendar:**
+- `calendar_list_colors` - list the event palette (11 ids, hex + Calendar UI names) and calendar palette (24); needs `calendar:read`
 - `calendar_list_calendars` - list all calendars (paginated; reports `accessRole` plus a derived `canEdit`, and `summaryOverride`/`selected`/`hidden`/`deleted`)
 - `calendar_list_events` - list events in time range
 - `calendar_get_event` - get event details
 - `calendar_search_events` - search events by text
 - `calendar_freebusy` - check free/busy status
-- `calendar_create_event` - create event (confirm if attendees; `addMeet` for a new Google Meet link, `meetingCode` to attach an existing one)
-- `calendar_update_event` - update event (confirm if attendees; `addMeet`/`meetingCode`/`removeConferencing`)
+- `calendar_create_event` - create event (confirm if attendees; `addMeet` for a new Google Meet link, `meetingCode` to attach an existing one; `colorId` takes an id 1-11 or a colour name)
+- `calendar_update_event` - update event (confirm if attendees; `addMeet`/`meetingCode`/`removeConferencing`; `colorId`/`resetColor`)
 - `calendar_delete_event` - delete event (confirm if attendees)
 - `calendar_rsvp` - respond to invitation
 - `calendar_move_event` - move to different calendar
@@ -139,6 +140,28 @@ npm-installable MCP server for multi-Google-account access. Supports: Gmail, Goo
   cannot lose a concurrent edit to a field the caller did not touch, **not** on quota
   grounds — Google's own reference prefers get+update, which costs 2 units against patch's
   3. Either shape is defensible; the nested-merge rule is what is non-negotiable.
+- **Event colour is the one update that does not notify guests.** `updateEvent` sends
+  `sendUpdates: 'none'` when the patch body contains nothing but `colorId`, and
+  `calendar_update_event` skips the attendee confirm gate in that same case. Both follow
+  from the same fact: an event's colour is the organiser's own view — a guest's copy is
+  coloured by their settings, not this field — so a notification would be mail about a
+  change the recipient cannot see, once per event per guest across a bulk recolour. The
+  decision is read off the **built patch body** (`isColorOnlyPatch`), not the caller's
+  arguments, so a field added to the body later cannot slip into the silent path. Anything
+  that *is* visible to a guest keeps `'all'`.
+  - `colorId: null` is the reset — verified live, the event falls back to its calendar's
+    colour. An empty string is rejected by Google as an invalid colour id, so null is the
+    only way to express it, hence `EventUpdate` rather than `Partial<EventInput>`.
+  - Colours are validated against 1-11 **before** the API call. Google's own error is a
+    bare `Invalid color id value.` naming neither the range nor the fact that names exist.
+  - The Calendar UI names (Tomato, Basil, …) in `src/calendar/colors.ts` are **not API
+    data** — `colors.get` returns ids and hex only. Event and calendar palettes are
+    separate: Tomato is event 11 but calendar 3, so the map is event-only.
+  - `colors.get` accepts `calendar` and `calendar.readonly` but **not** `calendar.events`,
+    so `calendar_list_colors` is gated on `calendar:read` and not on the read-or-write gate
+    the other read tools use. An account holding only `calendar:write` cannot call it.
+  - `eventLabelVersion` defaults to `0`, which is what keeps `colorId` honoured. At
+    version 1 Google processes `eventLabelId` and **ignores `colorId`** — do not send it.
 - **One header list.** `MESSAGE_HEADER_FIELDS` in `src/server/gmail-tools.ts` is the single
   definition of which headers a message response surfaces, used by `gmail_get_message`,
   `gmail_get_messages_batch`, `gmail_get_thread` and `gmail_get_draft`. Each of those four

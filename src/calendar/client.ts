@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type calendar_v3, google } from 'googleapis';
 import type { AccountStore } from '../auth/index.js';
+import { EVENT_COLOR_NAMES } from './colors.js';
 
 export interface CalendarInfo {
   id: string;
@@ -61,6 +62,11 @@ export interface CalendarEvent {
   updated?: string;
   hangoutLink?: string;
   conferenceData?: ConferenceData;
+  /**
+   * Event palette id, 1-11 (see `listColors`). Absent when the event simply inherits its
+   * calendar's colour, which is how Google reports the default.
+   */
+  colorId?: string;
 }
 
 /**
@@ -110,6 +116,26 @@ export interface EventList {
   nextPageToken?: string;
 }
 
+/**
+ * One entry of a Google colour palette. `name` is the Calendar UI label, which Google does
+ * not return and this server adds — event colours only, since the calendar palette's 24
+ * entries have no such names.
+ */
+export interface PaletteColor {
+  background?: string;
+  foreground?: string;
+  name?: string;
+}
+
+export interface ColorPalette {
+  /** Event palette, ids 1-11. */
+  event: Record<string, PaletteColor>;
+  /** Calendar palette, ids 1-24. A different palette: the same name has a different id. */
+  calendar: Record<string, PaletteColor>;
+  /** When Google last changed the palette. It has read 2012-02-14 for over a decade. */
+  updated?: string;
+}
+
 export interface FreeBusyResult {
   calendars: Record<string, { busy: Array<{ start: string; end: string }> }>;
 }
@@ -124,7 +150,18 @@ export interface EventInput {
   recurrence?: string[];
   timeZone?: string;
   conferencing?: ConferencingRequest;
+  /** Event palette id, 1-11, or a Calendar UI colour name resolved by the tool layer. */
+  colorId?: string;
 }
+
+/**
+ * Fields an update may change.
+ *
+ * `colorId: null` is the reset: verified live, Google clears the field and the event falls
+ * back to its calendar's colour. An empty string is rejected as an invalid colour id, so
+ * null is the only way to express it — hence this type rather than `Partial<EventInput>`.
+ */
+export type EventUpdate = Partial<Omit<EventInput, 'colorId'>> & { colorId?: string | null };
 
 /**
  * How an event should be conferenced.
@@ -168,6 +205,44 @@ export function normalizeMeetingCode(input: string): string {
   }
 
   return code;
+}
+
+/**
+ * Whether a patch body changes nothing but the event's colour.
+ *
+ * Drives the one case where guests are deliberately not notified. Read off the built body
+ * rather than the caller's input so a field added to the body later cannot slip into the
+ * silent path unnoticed.
+ */
+function isColorOnlyPatch(requestBody: calendar_v3.Schema$Event): boolean {
+  const keys = Object.keys(requestBody);
+
+  return keys.length > 0 && keys.every((key) => key === 'colorId');
+}
+
+function toPaletteColor(color: calendar_v3.Schema$ColorDefinition): PaletteColor {
+  const result: PaletteColor = {};
+
+  if (color.background) {
+    result.background = color.background;
+  }
+  if (color.foreground) {
+    result.foreground = color.foreground;
+  }
+
+  return result;
+}
+
+/** Adds the Calendar UI name to an event colour. Unknown ids pass through unnamed. */
+function withName(id: string, color: calendar_v3.Schema$ColorDefinition): PaletteColor {
+  const result = toPaletteColor(color);
+  const name = EVENT_COLOR_NAMES[id];
+
+  if (name) {
+    result.name = name;
+  }
+
+  return result;
 }
 
 /**
@@ -435,6 +510,38 @@ export class CalendarClient {
     return { calendars };
   }
 
+  /**
+   * The colour palettes, straight from Google, with the Calendar UI name added to each
+   * event colour.
+   *
+   * Needs calendar:read, NOT calendar:write: Google's per-method scope list for colors.get
+   * accepts calendar and calendar.readonly but not calendar.events, so an account holding
+   * only calendar:write cannot read this at all.
+   */
+  async listColors(): Promise<ColorPalette> {
+    const calendar = await this.getCalendar();
+
+    const response = await calendar.colors.get({});
+
+    const event: Record<string, PaletteColor> = {};
+    for (const [id, color] of Object.entries(response.data.event ?? {})) {
+      event[id] = withName(id, color);
+    }
+
+    const calendarColors: Record<string, PaletteColor> = {};
+    for (const [id, color] of Object.entries(response.data.calendar ?? {})) {
+      calendarColors[id] = toPaletteColor(color);
+    }
+
+    const result: ColorPalette = { event, calendar: calendarColors };
+
+    if (response.data.updated) {
+      result.updated = response.data.updated;
+    }
+
+    return result;
+  }
+
   // === Write methods ===
 
   async createEvent(input: EventInput, calendarId?: string): Promise<CalendarEvent> {
@@ -458,6 +565,9 @@ export class CalendarClient {
     }
     if (input.recurrence) {
       requestBody.recurrence = input.recurrence;
+    }
+    if (input.colorId !== undefined) {
+      requestBody.colorId = input.colorId;
     }
 
     const conferencing = input.conferencing;
@@ -537,7 +647,7 @@ export class CalendarClient {
    */
   async updateEvent(
     eventId: string,
-    updates: Partial<EventInput>,
+    updates: EventUpdate,
     calendarId?: string,
   ): Promise<CalendarEvent> {
     const calendar = await this.getCalendar();
@@ -566,6 +676,11 @@ export class CalendarClient {
     if (updates.recurrence !== undefined) {
       requestBody.recurrence = updates.recurrence;
     }
+    if (updates.colorId !== undefined) {
+      // null clears the colour. The generated types say `colorId?: string`, with no null,
+      // so the narrow cast is the same shape used for clearing conferenceData above.
+      (requestBody as { colorId?: string | null }).colorId = updates.colorId;
+    }
 
     const conferencing = updates.conferencing;
     if (conferencing) {
@@ -576,11 +691,16 @@ export class CalendarClient {
       calendarId: calId,
       eventId,
       requestBody,
-      // 'all' unconditionally: Google notifies guests, and an event with no guests has
-      // nobody to notify, so this needs no attendee lookup. The previous code read the
-      // event first purely to decide this, and a change of time on a meeting with guests
-      // must reach them.
-      sendUpdates: 'all',
+      // 'all' for anything a guest would want to know about: Google notifies guests, and
+      // an event with no guests has nobody to notify, so this needs no attendee lookup.
+      // A change of time on a meeting with guests must reach them.
+      //
+      // A colour-only patch is the exception. An event's colour is the organiser's own
+      // view of their own calendar — a guest's copy is coloured by their settings, not
+      // this field — so notifying anyone would be mail about a change they cannot see.
+      // Recolouring a run of existing events is the whole point of exposing colorId, and
+      // at 'all' that would mean one email per event per guest.
+      sendUpdates: isColorOnlyPatch(requestBody) ? 'none' : 'all',
     };
     if (conferencing) {
       params.conferenceDataVersion = 1;
@@ -809,6 +929,9 @@ export class CalendarClient {
     }
     if (e.conferenceData) {
       result.conferenceData = this.convertConferenceData(e.conferenceData);
+    }
+    if (e.colorId) {
+      result.colorId = e.colorId;
     }
 
     return result;

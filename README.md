@@ -467,9 +467,10 @@ These prompts guide Claude through complex workflows:
 - `drive_list_shared_drives`, `drive_search_files`, `drive_list_files`, `drive_get_file`, `drive_get_file_content`, `drive_get_full_file_content`, `drive_download_file`, `drive_upload_file`, `drive_create_folder`, `drive_move_file`, `drive_copy_file`, `drive_rename_file`, `drive_trash_file`, `drive_share_file`, `drive_update_permissions` — all tools work with Shared Drives (Team Drives)
 
 **Google Calendar:**
-- `calendar_list_calendars`, `calendar_list_events`, `calendar_get_event`, `calendar_search_events`, `calendar_freebusy`, `calendar_create_event`, `calendar_update_event`, `calendar_delete_event`, `calendar_rsvp`, `calendar_move_event`
+- `calendar_list_calendars`, `calendar_list_colors`, `calendar_list_events`, `calendar_get_event`, `calendar_search_events`, `calendar_freebusy`, `calendar_create_event`, `calendar_update_event`, `calendar_delete_event`, `calendar_rsvp`, `calendar_move_event`
   - `calendar_list_calendars` reports `accessRole` and a derived `canEdit` per calendar, so a shared calendar you can only read is distinguishable from one you can write to.
   - `calendar_create_event` and `calendar_update_event` take `addMeet: true` to generate a Google Meet link. `meetingCode` attaches an **existing** conference instead (a code or a `https://meet.google.com/...` URL) and needs `confirm: true`, because a reused conference keeps its access bound to the original event's guest list. `calendar_update_event` also takes `removeConferencing: true`.
+  - **Event colours.** Every read tool returns the event's `colorId`. `calendar_create_event` and `calendar_update_event` take `colorId` as either an id (`"11"`) or a Calendar colour name (`"Tomato"`, `"Basil"`, …); `calendar_update_event` takes `resetColor: true` to put an event back on its calendar's colour. `calendar_list_colors` shows the palette. A colour-only update notifies no attendees and needs no `confirm` — a guest's copy is coloured by their own settings, so there is nothing for them to see — which is what makes recolouring a run of existing events practical.
 
 **MCP Prompts:**
 - `compose-email`, `reply-to-email`, `review-drafts`, `summarize-thread`, `smart-reply`, `extract-action-items`, `categorize-emails`

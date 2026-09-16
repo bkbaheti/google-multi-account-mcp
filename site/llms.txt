@@ -104,10 +104,11 @@ calendar:write (Write calendar)
 - drive_upload_file, drive_create_folder, drive_move_file, drive_copy_file, drive_rename_file, drive_trash_file
 - drive_share_file, drive_update_permissions
 
-### Google Calendar (10 tools)
-- calendar_list_calendars, calendar_list_events, calendar_get_event, calendar_search_events, calendar_freebusy
+### Google Calendar (11 tools)
+- calendar_list_calendars, calendar_list_colors, calendar_list_events, calendar_get_event, calendar_search_events, calendar_freebusy
 - calendar_create_event, calendar_update_event, calendar_delete_event, calendar_rsvp, calendar_move_event
 - Google Meet: calendar_create_event and calendar_update_event accept addMeet (new conference) or meetingCode (attach an existing one, requires confirm); calendar_update_event also accepts removeConferencing
+- Event colours: read tools return colorId; calendar_create_event and calendar_update_event accept colorId (id 1-11 or a Calendar colour name such as Tomato); calendar_update_event accepts resetColor; calendar_list_colors returns the palette. A colour-only update notifies no attendees and needs no confirm
 
 ## Links
 

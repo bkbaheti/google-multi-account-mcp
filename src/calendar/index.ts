@@ -4,6 +4,7 @@ export {
   type CalendarEvent,
   type CalendarInfo,
   type CalendarList,
+  type ColorPalette,
   type ConferenceData,
   type ConferenceEntryPoint,
   type ConferencingRequest,
@@ -11,6 +12,9 @@ export {
   type EventDateTime,
   type EventInput,
   type EventList,
+  type EventUpdate,
   type FreeBusyResult,
   normalizeMeetingCode,
+  type PaletteColor,
 } from './client.js';
+export { EVENT_COLOR_NAMES, resolveEventColorId } from './colors.js';

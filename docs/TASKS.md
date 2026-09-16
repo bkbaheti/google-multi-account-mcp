@@ -1,5 +1,55 @@
 # Tasks
 
+## Event colours (COMPLETED — v0.10.0)
+
+Reported from another session: the connector returned no `colorId`, so a colour set in the
+Calendar UI could not be read back, and there was no way to set one. The report also said
+there was no update-event tool; `calendar_update_event` has existed since v0.6.0 — the gap
+was only the field.
+
+- [DONE] **`colorId` was dropped on every read path.** `convertCalendarEvent` whitelists
+  ~15 fields and `colorId` was not one, so Google's colour never reached a caller. The
+  third instance of this exact defect in three releases, after `Cc` (v0.8.0) and
+  `conferenceData` (v0.9.0) — same converter, same cause, same fix
+- [DONE] `colorId` on `calendar_create_event` and `calendar_update_event`, accepting either
+  an id (`"11"`) or a Calendar UI colour name (`"Tomato"`), resolved by `resolveEventColorId`
+- [DONE] `resetColor: true` on `calendar_update_event` → `colorId: null`, which Google
+  treats as "fall back to the calendar's colour". Verified live; an empty string is rejected
+  as an invalid colour id, so null is the only expression of it
+- [DONE] **A colour-only update notifies nobody and needs no confirm.** `updateEvent` sends
+  `sendUpdates: 'none'` when the built patch body contains nothing but `colorId`, and the
+  tool skips the attendee confirm gate in the same case. A guest's copy of an event is
+  coloured by their own settings, so a notification would be mail about a change they cannot
+  see — and the use case is recolouring a run of events, which at `'all'` would be one email
+  per event per guest and one confirm per event. Decided from the built body, not the
+  caller's args, so a field added later cannot inherit the silent path
+- [DONE] Colours validated against 1-11 before any API call. Google's own error is a bare
+  `Invalid color id value.` naming neither the range nor the existence of names
+- [DONE] `colorId` and `resetColor` are mutually exclusive and error when combined, matching
+  how the conferencing options already behave
+- [DONE] `calendar_list_colors` wrapping `colors.get`: the 11 event colours with hex and
+  Calendar UI names, plus the 24 calendar colours. Gated on `calendar:read` — Google's
+  per-method scope list accepts `calendar` and `calendar.readonly` but **not**
+  `calendar.events`, so an account holding only `calendar:write` cannot call it
+- [DONE] 37 unit tests written failing first across `calendar-colors.test.ts` (read path,
+  create, patch, reset, notification suppression, palette, name resolution) and
+  `calendar-tools.test.ts` (schema passthrough, the mutual exclusion, the skipped confirm
+  gate, `resetColor` coercion, and the capability the palette tool actually requires)
+
+**Verified live against a real account before release**, the standard the last three calendar
+changes were held to — mocks establish nothing about what Google accepts: palette shape and
+names, create with a colour, `colorId` on `events.get` and `events.list`, recolour, reset to
+default, a colour surviving an unrelated patch, and an out-of-range id rejected locally.
+
+**Not offered, deliberately:** calendar-level colour writes (`calendarList.patch` with
+`colorRgbFormat`) — a different resource with a different 24-entry palette in which the same
+name has a different id. Event labels (`eventLabelVersion: 1`) are also out of scope; at that
+version Google ignores `colorId` entirely, so the default of 0 is what keeps this working.
+
+**Identified, not scheduled:** surfacing the calendar's own `colorId`/`foregroundColor` in
+`calendar_list_calendars` (only `backgroundColor` is surfaced today), and a bulk recolour tool
+that takes a list of event ids — worth doing only if one-call-per-event proves slow in practice.
+
 ## Google Meet conferencing + calendar discovery (COMPLETED — v0.9.0)
 
 Requirement doc: `docs/plans/2026-09-05-calendar-conferencing.md`.

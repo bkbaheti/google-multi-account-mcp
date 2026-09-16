@@ -6,6 +6,7 @@ import {
   CalendarClient,
   type ConferencingRequest,
   normalizeMeetingCode,
+  resolveEventColorId,
 } from '../calendar/index.js';
 import {
   confirmationRequired,
@@ -87,6 +88,70 @@ export function resolveConferencing(args: {
   return undefined;
 }
 
+/**
+ * Resolves the two colour inputs into what the client should send.
+ *
+ * `undefined` leaves the event's colour alone, a string sets it, and `null` resets it to
+ * the calendar default. Mutually exclusive for the same reason as the conferencing
+ * options: a caller who asks for two things should not silently get one.
+ */
+export function resolveEventColor(args: {
+  colorId?: string | undefined;
+  resetColor?: boolean | undefined;
+}): string | null | undefined | { error: string } {
+  if (args.colorId !== undefined && args.resetColor) {
+    return { error: 'Only one of colorId and resetColor may be set, but both were given.' };
+  }
+
+  if (args.resetColor) {
+    return null;
+  }
+
+  if (args.colorId !== undefined) {
+    // Resolved here so a bad colour is a validation error naming the field and the valid
+    // values, rather than Google's bare "Invalid color id value." 400.
+    try {
+      return resolveEventColorId(args.colorId);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Whether an update changes nothing but the event's colour.
+ *
+ * A colour-only update notifies nobody (see `updateEvent`), so the attendee confirm gate —
+ * which exists because guests get mailed — has nothing to warn about. Gating it anyway
+ * would mean confirming once per event when recolouring a run of meetings.
+ */
+function isColorOnlyUpdate(
+  args: Record<string, unknown>,
+  color: string | null | undefined,
+): boolean {
+  if (color === undefined) {
+    return false;
+  }
+
+  const CHANGES_THE_EVENT = [
+    'summary',
+    'start',
+    'end',
+    'description',
+    'location',
+    'attendees',
+    'timeZone',
+    'recurrence',
+    'addMeet',
+    'meetingCode',
+    'removeConferencing',
+  ];
+
+  return CHANGES_THE_EVENT.every((field) => args[field] === undefined);
+}
+
 export function registerCalendarTools(
   server: McpServer,
   accountStore: AccountStore,
@@ -146,6 +211,35 @@ export function registerCalendarTools(
         const result = await client.listCalendars(options);
 
         return successResponse(result);
+      } catch (error) {
+        return errorResponse(toMcpError(error));
+      }
+    },
+  );
+
+  // calendar_list_colors - The event and calendar colour palettes
+  //
+  // calendar:read, not the read-or-write gate the other read tools use: Google's
+  // per-method scope list for colors.get accepts calendar and calendar.readonly but NOT
+  // calendar.events, so an account holding only calendar:write cannot make this call.
+  server.registerTool(
+    'calendar_list_colors',
+    {
+      description:
+        'List the Google Calendar colour palettes. Returns the 11 event colours (the ids accepted by calendar_create_event and calendar_update_event) with their hex values and Calendar UI names, plus the 24 calendar colours. Event and calendar palettes are separate: the same name has a different id in each.',
+      inputSchema: {
+        accountId: z.string().describe('The Google account ID, alias, or email'),
+      },
+    },
+    async (rawArgs) => {
+      const args = coerceArgs(rawArgs, {});
+      const validation = validateAccountScope(args.accountId, 'calendar:read');
+      if ('error' in validation) return validation.error;
+
+      try {
+        const client = new CalendarClient(accountStore, args.accountId);
+
+        return successResponse(await client.listColors());
       } catch (error) {
         return errorResponse(toMcpError(error));
       }
@@ -376,6 +470,12 @@ export function registerCalendarTools(
           .describe(
             'Attach an EXISTING Google Meet conference instead of generating one. Accepts a code ("abc-defg-hij") or a https://meet.google.com/... URL. Requires confirm: true — access stays tied to the original event\'s guest list. Cannot be combined with addMeet.',
           ),
+        colorId: z
+          .string()
+          .optional()
+          .describe(
+            "Event colour: an id 1-11, or a Calendar colour name (Lavender, Sage, Grape, Flamingo, Banana, Tangerine, Peacock, Graphite, Blueberry, Basil, Tomato). Omit to inherit the calendar's colour. Use calendar_list_colors to see the palette.",
+          ),
         confirm: z
           .boolean()
           .optional()
@@ -392,6 +492,11 @@ export function registerCalendarTools(
       const conferencing = resolveConferencing(args);
       if (conferencing && 'error' in conferencing) {
         return errorResponse(validationError(conferencing.error, 'conferencing').toResponse());
+      }
+
+      const color = resolveEventColor(args);
+      if (color !== null && typeof color === 'object') {
+        return errorResponse(validationError(color.error, 'colorId').toResponse());
       }
 
       // Conditional confirm gate: attendees get invited, and a reused meeting code carries
@@ -431,6 +536,7 @@ export function registerCalendarTools(
           recurrence?: string[];
           timeZone?: string;
           conferencing?: ConferencingRequest;
+          colorId?: string;
         } = {
           summary: args.summary,
           start: isAllDayStart
@@ -461,6 +567,11 @@ export function registerCalendarTools(
         }
         if (conferencing !== undefined) {
           input.conferencing = conferencing;
+        }
+        // A create has nothing to reset, so only a real colour reaches the body. resetColor
+        // is an update-only option and is not in this tool's schema.
+        if (typeof color === 'string') {
+          input.colorId = color;
         }
 
         const event = await client.createEvent(input, args.calendarId);
@@ -512,6 +623,18 @@ export function registerCalendarTools(
           .boolean()
           .optional()
           .describe('Remove the video conference currently attached to the event'),
+        colorId: z
+          .string()
+          .optional()
+          .describe(
+            'New event colour: an id 1-11, or a Calendar colour name (Lavender, Sage, Grape, Flamingo, Banana, Tangerine, Peacock, Graphite, Blueberry, Basil, Tomato). A colour-only update notifies no attendees and needs no confirm. Use calendar_list_colors to see the palette.',
+          ),
+        resetColor: z
+          .boolean()
+          .optional()
+          .describe(
+            "Reset the event to its calendar's default colour. Cannot be combined with colorId.",
+          ),
         confirm: z
           .boolean()
           .optional()
@@ -525,6 +648,7 @@ export function registerCalendarTools(
         confirm: 'boolean',
         addMeet: 'boolean',
         removeConferencing: 'boolean',
+        resetColor: 'boolean',
       });
       const validation = validateAccountScope(args.accountId, 'calendar:write');
       if ('error' in validation) return validation.error;
@@ -534,13 +658,22 @@ export function registerCalendarTools(
         return errorResponse(validationError(conferencing.error, 'conferencing').toResponse());
       }
 
+      const color = resolveEventColor(args);
+      if (color !== null && typeof color === 'object') {
+        return errorResponse(validationError(color.error, 'colorId').toResponse());
+      }
+      const colorOnly = isColorOnlyUpdate(args, color);
+
       try {
         const client = new CalendarClient(accountStore, args.accountId);
 
         // Check if new attendees are being added
         const addingAttendees = args.attendees && args.attendees.length > 0;
 
-        if (!args.confirm) {
+        // A colour-only update mails nobody and is invisible in a guest's own copy, so
+        // there is no consequence for a confirm to authorise — and skipping the gate also
+        // skips the attendee lookup below, which is the only read left on this path.
+        if (!args.confirm && !colorOnly) {
           // Reasons this update needs confirming, collected so one gate reports everything
           // a single confirm would authorise.
           const operations: string[] = [];
@@ -584,6 +717,7 @@ export function registerCalendarTools(
           recurrence?: string[];
           timeZone?: string;
           conferencing?: ConferencingRequest;
+          colorId?: string | null;
         } = {};
 
         if (args.summary !== undefined) {
@@ -619,6 +753,11 @@ export function registerCalendarTools(
         }
         if (conferencing !== undefined) {
           updates.conferencing = conferencing;
+        }
+        // null is meaningful here — it resets the event to its calendar's colour — so this
+        // tests against undefined rather than truthiness.
+        if (color !== undefined) {
+          updates.colorId = color;
         }
 
         const event = await client.updateEvent(args.eventId, updates, args.calendarId);
