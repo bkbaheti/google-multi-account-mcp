@@ -35,7 +35,7 @@
     "description": "Open-source MCP server that connects AI assistants to Gmail, Google Drive, and Google Calendar with multi-account support.",
     "url": "https://multiaccountgooglemcp.procedure.tech/",
     "downloadUrl": "https://www.npmjs.com/package/@procedure-tech/mcp-google",
-    "softwareVersion": "0.9.0",
+    "softwareVersion": "0.10.0",
     "license": "https://opensource.org/licenses/MIT",
     "author": {
       "@type": "Organization",
@@ -236,8 +236,21 @@
       <div class="releases">
         <div class="release">
           <div class="release-header">
-            <span class="release-version">v0.9.0</span>
+            <span class="release-version">v0.10.0</span>
             <span class="release-tag">Latest</span>
+            <span class="release-date">September 2026</span>
+          </div>
+          <ul class="release-changes">
+            <li><span class="change-type fix">fix</span><span class="change-text">Events now come back with their colour. <code>calendar_get_event</code>, <code>calendar_list_events</code> and <code>calendar_search_events</code> return <code>colorId</code>, so a colour you set in Google Calendar can finally be read back. Google had been sending it all along — the same field-list omission that hid <code>Cc</code> in v0.8.0 and the Meet link in v0.9.0</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Set an event's colour when you create or update it. <code>colorId</code> takes either an id (<code>"11"</code>) or the name you see in Google Calendar — <code>Tomato</code>, <code>Basil</code>, <code>Peacock</code> and the rest — and <code>calendar_update_event</code> takes <code>resetColor: true</code> to put an event back on its calendar's colour</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">Recolouring a run of events no longer mails everyone. A colour-only update notifies no attendees and asks for no confirmation: a guest's copy of an event is coloured by their own settings, so there is nothing for them to see. Any change they <em>can</em> see still notifies them as before</span></li>
+            <li><span class="change-type feat">feat</span><span class="change-text">New <code>calendar_list_colors</code> tool returns the palette — the 11 event colours with their hex values and Calendar names, plus the 24 calendar colours</span></li>
+          </ul>
+        </div>
+
+        <div class="release">
+          <div class="release-header">
+            <span class="release-version">v0.9.0</span>
             <span class="release-date">September 2026</span>
           </div>
           <ul class="release-changes">
